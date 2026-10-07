@@ -13,8 +13,8 @@ How work moves from an idea to `main`. The rules behind these steps are in the
 5. Commit with the subject `[#n] Imperative description`.
 6. Run a Codex review of the branch. Fix confirmed findings, and record rejected ones with the reason.
 7. Open a PR into `main`. Copilot reviews each push. Answer and resolve every thread.
-8. Squash-merge when the reviews are done and CI passes. Until the repo has CI, the reviews are
-   enough.
+8. Squash-merge when the reviews are done and CI passes. Until the repo has CI, run the tests and
+   checks that exist on your own machine. They must pass.
 
 The owner runs these steps with personal `cpcc-workflow-*` Claude Code skills. They are not in this
 repo. You can follow the same steps by hand.

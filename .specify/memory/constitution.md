@@ -54,7 +54,8 @@ Why: the owner follows upstream releases. An upstream change must land in the sa
 ### IV. Safe by default
 
 - `review`, `adversarial-review` and the review gate MUST NOT change the target repo or any remote.
-  The Copilot CLI permission settings MUST enforce this. Words in the prompt are not enough.
+  The Copilot CLI's own controls (tool permissions, sandbox) MUST enforce this. Words in the prompt
+  are not enough.
 - If a review cannot run read-only, it MUST refuse to run.
 - The only files a review may write are the plugin's own job files.
 - The companion MUST run read-only unless `--write` is passed. This matches the upstream `task`

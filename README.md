@@ -43,8 +43,9 @@ claude plugin install copilot@tmathura-copilot
 ## Differences from the Codex plugin
 
 - There is no `/copilot:transfer`. Copilot cannot import a Claude Code session.
-- Reviews are read-only because the Copilot CLI permission settings block writes. Codex has a
-  sandbox for this, and Copilot does not.
+- Reviews are read-only because the Copilot CLI's own controls block writes. Codex uses its
+  read-only sandbox mode. The transport spec chooses which Copilot controls to use: tool permissions,
+  the Copilot sandbox, or both.
 - On Windows, the plugin starts Copilot without a shell. A shell could run text from the repo as a
   command, so this is a security change.
 - The plugin needs Node.js 22, not 18.18, because the Copilot CLI needs Node 22.
