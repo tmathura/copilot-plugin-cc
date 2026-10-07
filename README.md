@@ -35,7 +35,8 @@ Notes:
   write `{"feature_directory": "specs/NNN-<name>"}` to `.specify/feature.json`. Always use a path
   relative to the repo root.
 - Don't use `specify workflow run speckit`. The bundled workflow runs specify → plan → tasks →
-  implement in one checkout, with no review gates.
+  implement in one checkout. It pauses for review after specify and after plan, but goes straight
+  from tasks to implement, and never creates the ticket branch and worktree the work belongs in.
 - Spec Kit does not create git branches here. Branches are named `<type>/<n>-<slug>` and are created
   outside Spec Kit.
 - The generators (`/speckit-specify`, `/speckit-plan`, `/speckit-tasks`) rewrite their files. Make
