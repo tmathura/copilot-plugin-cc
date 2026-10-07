@@ -5,8 +5,8 @@ A Claude Code plugin. Details will follow with the first feature.
 ## Spec Kit
 
 The repo uses [Spec Kit](https://github.com/github/spec-kit) for spec-driven planning, with the
-Claude Code integration (`.claude/skills/speckit-*`) and PowerShell scripts
-(`.specify/scripts/powershell/`). Installed version: **1.1.2.dev0**, no extensions.
+Claude Code integration (`.claude/skills/speckit-*`) and bash scripts (`.specify/scripts/bash/`).
+Installed version: **1.1.2.dev0**, no extensions.
 
 ### Using it
 
@@ -21,10 +21,11 @@ Run the skills in this order:
 
 Notes:
 
-- The skills run the scripts in `.specify/scripts/powershell/`. Windows PowerShell 5.1 is enough:
-  `powershell -NoProfile -File .specify/scripts/powershell/<script>.ps1 -Json`. PowerShell 7 (`pwsh`)
-  isn't required. Don't run a `.ps1` directly from Git Bash: its `#!/usr/bin/env pwsh` shebang
-  fails when `pwsh` isn't installed.
+- The skills run the scripts in `.specify/scripts/bash/` directly, e.g.
+  `.specify/scripts/bash/setup-plan.sh --json`, so they work the same on macOS, Linux and Windows
+  (through Git Bash, which Claude Code's Bash tool uses). `jq` is optional; the scripts fall back to
+  `printf` and `awk` without it. Git stores the scripts as executable (mode `100755`). If a script
+  fails with "permission denied", run `git add --chmod=+x .specify/scripts/bash/*.sh` and commit.
 - Specs live in `specs/NNN-<name>/`, numbered sequentially. The next number is the highest one in
   `specs/` of the current checkout plus one. A spec moved into a ticket worktree and not yet merged
   doesn't count, so before specifying a second ticket in parallel, check the open worktrees for
@@ -49,17 +50,23 @@ Notes:
 This is how the scaffolding was created, in an empty checkout:
 
 ```
-specify init --here --force --non-interactive --ignore-agent-tools --integration claude --script ps
+specify init --here --force --non-interactive --ignore-agent-tools --integration claude --script sh
+git add --chmod=+x .specify/scripts/bash/*.sh
 ```
 
 `--force` only skips the "directory not empty" prompt. `--ignore-agent-tools` skips the check for a
-`claude` CLI on `PATH`. Don't re-run this on a populated repo: `--force` overwrites customised shared
-files.
+`claude` CLI on `PATH`. The `chmod` keeps the scripts executable when the install runs on Windows,
+which otherwise commits them as `100644` and breaks the skills on macOS and Linux. Use `sh`, not
+`ps` (PowerShell doesn't run on macOS or Linux) or `py` (it also installs the PowerShell scripts, and
+its skills call `python`). Don't re-run this on a populated repo: `--force` overwrites customised
+shared files, and switching `--script` this way leaves the old scripts' entries in
+`.specify/integrations/speckit.manifest.json`.
 
 ### Upgrading
 
 1. Upgrade the CLI (`uv tool upgrade specify-cli`), then run `specify integration upgrade claude`.
-   It refuses if a managed file was changed by hand. Review the diff before committing.
+   It refuses if a managed file was changed by hand. Review the diff before committing, and re-run
+   `git add --chmod=+x .specify/scripts/bash/*.sh` if it adds a script.
 2. Refresh the bundled workflow by hand. Neither `integration upgrade`, `init` nor `workflow update`
    refreshes it. Diff `.specify/workflows/speckit/workflow.yml` against
    `core_pack/workflows/speckit/workflow.yml` in the installed `specify_cli` package. If it changed,
