@@ -1,0 +1,5 @@
+# Local secrets; copied into each worktree, never committed.
+.env
+
+# Per-user Claude Code settings.
+.claude/settings.local.json
