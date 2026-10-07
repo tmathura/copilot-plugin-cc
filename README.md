@@ -19,6 +19,10 @@ Run the skills in this order:
 5. `/speckit-analyze` (optional) checks the spec, plan and tasks against each other
 6. `/speckit-implement` works through `tasks.md`
 
+`/speckit-checklist` (optional) writes a requirements checklist. Run it only after `/speckit-plan`:
+its setup script stops with "plan.md not found" when there is no plan yet. This is upstream
+behaviour; the managed skill and script are kept unmodified so upgrades keep working.
+
 Notes:
 
 - The skills run the scripts in `.specify/scripts/bash/` directly, e.g.
