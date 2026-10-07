@@ -44,8 +44,8 @@ Why: the owner follows upstream releases. An upstream change must land in the sa
   `scripts/lib/codex.mjs`.
 - Only that module builds Copilot arguments and decides permissions. A transport helper that it uses
   MUST NOT be imported by any other module. The helper only starts the process and reads its output.
-- A feature spec chooses the transport. It MUST compare the options on permission control,
-  streaming, cancel, sessions, Windows support and CLI version support first. Closeness to upstream
+- A feature spec chooses the transport. It MUST compare the options on permission control
+  (tool permissions and the Copilot sandbox), streaming, cancel, sessions, Windows support and CLI version support first. Closeness to upstream
   comes second.
 - The supported Copilot CLI versions MUST be documented.
 - `setup` MUST give a clear error when the CLI is missing, the version is not supported, or the user
