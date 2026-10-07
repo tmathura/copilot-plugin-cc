@@ -29,7 +29,9 @@ Notes:
   `.specify/scripts/bash/setup-plan.sh --json`, so they work the same on macOS, Linux and Windows
   (through Git Bash, which Claude Code's Bash tool uses). `jq` is optional; the scripts fall back to
   `printf` and `awk` without it. Git stores the scripts as executable (mode `100755`). If a script
-  fails with "permission denied", run `git add --chmod=+x .specify/scripts/bash/*.sh` and commit.
+  fails with "permission denied", run `chmod +x .specify/scripts/bash/*.sh` to fix the checkout. If
+  `git ls-files -s .specify/scripts/bash` then shows `100644`, also run
+  `git add --chmod=+x .specify/scripts/bash/*.sh` and commit, so other checkouts get the right mode.
 - Specs live in `specs/NNN-<name>/`, numbered sequentially. The next number is the highest one in
   `specs/` of the current checkout plus one. A spec moved into a ticket worktree and not yet merged
   doesn't count, so before specifying a second ticket in parallel, check the open worktrees for
