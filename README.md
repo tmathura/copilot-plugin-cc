@@ -21,6 +21,10 @@ Run the skills in this order:
 
 Notes:
 
+- The skills run the scripts in `.specify/scripts/powershell/`. Windows PowerShell 5.1 is enough:
+  `powershell -NoProfile -File .specify/scripts/powershell/<script>.ps1 -Json`. PowerShell 7 (`pwsh`)
+  isn't required. Don't run a `.ps1` directly from Git Bash: its `#!/usr/bin/env pwsh` shebang
+  fails when `pwsh` isn't installed.
 - Specs live in `specs/NNN-<name>/`, numbered sequentially. The next number is the highest one in
   `specs/` of the current checkout plus one. A spec moved into a ticket worktree and not yet merged
   doesn't count, so before specifying a second ticket in parallel, check the open worktrees for
