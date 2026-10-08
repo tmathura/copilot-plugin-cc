@@ -342,7 +342,8 @@ and to `BLOCK`.
   `BLOCK:`; gate lets Claude stop on `ALLOW:`; an unexpected answer blocks with upstream's message; a
   missing Copilot gives a setup note and does not block; the gate run uses the read-only profile; a
   gate run past its time limit blocks with upstream's timeout message, and the companion, the fake
-  Copilot and their child processes are gone afterwards (the 840 s limit is passed in through an
+  Copilot and their child processes are gone afterwards, also when the fake Copilot ignores
+  `SIGTERM` (the 840 s limit is passed in through an
   option, so the test can use a short one); a 100 KB last Claude message reaches the companion on
   stdin and the gate runs; the gate prompt holds the working-tree context, and above the inline
   limit the patch folder reaches Copilot as `--add-dir` through `--context-dir`, and is removed after
@@ -364,7 +365,8 @@ and to `BLOCK`.
   `task --context-dir <path>` option and remove it in a `finally` step; send the prompt to
   `task --json` on stdin, not as an argument; use an 840 s run limit (research.md §7, hook time
   budgets); start the companion with `detached: true` on macOS and Linux, and on the time limit kill
-  its process tree with `terminateProcessTree`
+  its process tree with `terminateProcessTree`, then stop the `copilotPid` of the companion's job
+  record (found by the companion's `pid`; research.md §7, stopping a job)
 - [ ] T077 [US5] Port `U/scripts/session-lifecycle-hook.mjs` to `P/scripts/session-lifecycle-hook.mjs`
   (no broker, no transcript path). `SessionEnd` signals the `pid` and `copilotPid` of every running
   job first, waits once (up to 2 s), sends `SIGKILL` to survivors, then prunes (research.md §7, hook
