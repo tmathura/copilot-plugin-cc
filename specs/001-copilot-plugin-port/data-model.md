@@ -17,6 +17,9 @@ One file per workspace, at `<state root>/<slug>-<hash>/state.json`.
 | `config.stopReviewGate` | boolean | Default `false`. Set by `setup --enable-review-gate` or `--disable-review-gate` |
 | `jobs` | Job summary[] | Newest first, at most 50. Pruning deletes the pruned jobs' files and logs |
 
+Every update holds the lock file `state.json.lock` and replaces `state.json` through a temp file
+and a rename (research §7, locked state updates).
+
 ## Job
 
 A summary lives in `state.json`. The full record lives in `jobs/<id>.json`, and the log in

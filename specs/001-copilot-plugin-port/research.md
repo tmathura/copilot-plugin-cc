@@ -327,6 +327,23 @@ Later tickets apply these rules. The call-site map uses them.
     session first, then waits once, up to 2 s in total, then sends `SIGKILL` to what is still alive,
     then prunes the jobs. It never waits per job.
 
+- **Locked state updates** (decided 2026-10-08, after Copilot PR review): `updateState` holds a lock
+  file, `state.json.lock`, for the whole read, change, save and prune. It creates the lock with an
+  exclusive create (`wx`) and writes its owner into it: its `pid` and a random token. It retries for
+  up to 5 seconds, then fails with a clear error and changes nothing. It reclaims a lock only when
+  the owner's `pid` is no longer running, never because of age alone. Reclaiming is serialized by a
+  second lock, `state.json.lock.reclaim`, also created with `wx` and holding a `pid` and token. Only
+  its holder reads the main lock, checks that its owner is dead, and deletes it. A new main lock can
+  only appear after that delete, so the reclaimer never deletes a live lock. If the reclaim lock's
+  own owner is dead, the update fails with a clear error that names the file to delete; that needs
+  a process to die inside a few lines of code. A holder removes a lock only if the file still holds
+  its own token. It writes `state.json` to a temp file in the same folder and
+  renames it over the old file, so a reader never sees half a file. Reason: correctness. Two
+  companions that save at the same time can otherwise drop each other's job, and pruning then
+  deletes that job's record and log, so cancel and `SessionEnd` lose its `pid` and `copilotPid`.
+  Rejected alternative: keep upstream's unlocked update for parity; upstream has the same race, but
+  this port relies on the job records to stop processes.
+
 ## 8. Effect on the ticket split
 
 The 8 tickets stay as planned.

@@ -110,7 +110,9 @@ setup.
   (research.md §2, self-collect); pass `--no-optional-locks -c core.fsmonitor=false` to every git call and `--no-textconv`
   to every `git diff` (research.md §4b)
 - [ ] T025 [P] Port `U/scripts/lib/state.mjs` to `P/scripts/lib/state.mjs` (fallback root
-  `<tmp>/copilot-companion`); keep `MAX_JOBS = 50` and `STATE_VERSION = 1`
+  `<tmp>/copilot-companion`); keep `MAX_JOBS = 50` and `STATE_VERSION = 1`; lock `updateState` with
+  `state.json.lock` and write through a temp file and a rename (research.md §7, locked state
+  updates)
 - [ ] T026 [P] Port `U/scripts/lib/tracked-jobs.mjs` to `P/scripts/lib/tracked-jobs.mjs`
   (`COPILOT_COMPANION_SESSION_ID`, `[copilot]` prefix)
 - [ ] T027 Create `P/scripts/lib/copilot.mjs` with only `getSessionRuntimeStatus`, which always
@@ -131,7 +133,14 @@ setup.
   with a configured `core.fsmonitor` hook and a `textconv` driver: context collection runs neither
   (each would write a marker file); with stale cached file data (a tracked file touched after
   `git add`), context collection leaves the SHA-256 of `.git/index` unchanged
-- [ ] T032 [P] Port `tests/state.test.mjs` and `tests/render.test.mjs`
+- [ ] T032 [P] Port `tests/state.test.mjs` and `tests/render.test.mjs`; add state tests: several
+  processes that add jobs at the same time all keep their job records and logs, and each job can
+  still be found for cancel; a lock whose owner `pid` is dead is reclaimed; a lock held by a live
+  process stays, however old it is, and the waiting update fails with a clear error after 5 seconds
+  (short in tests) without changing `state.json`; a holder never removes a lock with another token;
+  two reclaimers of the same dead lock, with the second paused after it saw the dead owner, let only
+  one live holder in (the reclaim lock serializes them); a reclaim lock with a dead owner gives the
+  clear error that names it
 - [ ] T033 [P] Add `tests/job-control.test.mjs` for job lookup by id and prefix, ambiguous prefixes,
   and the "still running" errors
 - [ ] T034 Add the Phase 3 differences (no shell in `runCommand`, the self-collect text) to the
