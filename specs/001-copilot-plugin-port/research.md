@@ -158,16 +158,26 @@ data model, the contracts, the plan and the tasks link here.
   - No flags (chinlung read-only): it depends on saved approvals not existing.
   - Approve everything (wagnersza): not safe.
 
-## 4. Starting Copilot without a shell
+## 4. Starting Copilot and npm without a shell
 
-- **Decision**: One helper resolves the launcher.
-  - If `copilot.exe` (Windows) or `copilot` (other systems) is an executable file on the PATH, spawn
-    it directly.
-  - On Windows, if only the npm shim `copilot.cmd` is found, spawn `node` (`process.execPath`) with
-    `<shim folder>/node_modules/@github/copilot/npm-loader.js`.
+- **Decision**: One helper, `resolveLauncher(name)` in `scripts/lib/process.mjs`, turns a command
+  name into a program and leading arguments. Setup uses it for `npm`; the adapter uses it for
+  `copilot`.
+  - On macOS and Linux: the name itself.
+  - On Windows, the first match on the PATH:
+    - `<name>.exe`: spawn it directly (for example a WinGet install of Copilot).
+    - `<name>.cmd` written by npm for a global package: spawn `node` (`process.execPath`) with the
+      script the shim names after `%dp0%`. For Copilot this is
+      `<shim folder>/node_modules/@github/copilot/npm-loader.js` (seen on this machine).
+    - `npm.cmd` from the Node install: spawn `node` with `<shim folder>/node_modules/npm/bin/npm-cli.js`
+      (seen on this machine).
+    - Anything else: the command counts as not found, with a message that it cannot start without a
+      shell.
   - Never pass `shell: true`.
-- **Rationale**: Principle IV. Upstream uses a shell on Windows. Node refuses to spawn a `.cmd` file
-  without a shell, and with a shell `cmd.exe` would read the arguments.
+- **Rationale**: Principle IV ("If Windows needs a `.cmd` shim, it MUST live in one helper").
+  Upstream uses a shell on Windows. Node refuses to spawn a `.cmd` file without a shell, and with a
+  shell `cmd.exe` would read the arguments. Tested: `spawnSync("npm", ["--version"], { shell: false })`
+  fails with `ENOENT` on Windows, so setup needs the helper for `npm` too.
 - **Alternatives rejected**: `shell: true` (unsafe), `cmd.exe /c` with escaping (fragile), and
   hard-coding `copilot-win32-x64/copilot.exe` (it ties the plugin to one npm package layout and CPU).
 

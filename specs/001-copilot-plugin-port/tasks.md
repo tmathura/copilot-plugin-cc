@@ -103,7 +103,8 @@ setup.
 - [ ] T021 [P] Copy `U/scripts/lib/args.mjs`, `U/scripts/lib/prompts.mjs` and
   `U/scripts/lib/workspace.mjs` to `P/scripts/lib/` unchanged
 - [ ] T022 [P] Port `U/scripts/lib/fs.mjs` to `P/scripts/lib/fs.mjs` (temp prefix `copilot-plugin-`)
-- [ ] T023 Port `U/scripts/lib/process.mjs` to `P/scripts/lib/process.mjs` with `shell: false` always
+- [ ] T023 Port `U/scripts/lib/process.mjs` to `P/scripts/lib/process.mjs` with `shell: false` always;
+  add `resolveLauncher(name)` (research.md §4) and use it in `binaryAvailable`
 - [ ] T024 Port `U/scripts/lib/git.mjs` to `P/scripts/lib/git.mjs`; change the self-collect guidance
   in `buildAdversarialCollectionGuidance` to "Read the patch files listed below with the view tool"
   (research.md §2, self-collect)
@@ -120,7 +121,10 @@ setup.
   ID", `/copilot:*` hints, `- copilot:` in the setup report)
 - [ ] T030 [P] Port `tests/process.test.mjs`; add tests: `runCommand` never uses a shell; arguments
   with spaces, quotes, `&`, `|`, `;`, `$` and `%` reach the child unchanged; a non-zero exit gives
-  `formatCommandFailure` text; `terminateProcessTree` kills a child and its grandchild
+  `formatCommandFailure` text; `terminateProcessTree` kills a child and its grandchild;
+  `resolveLauncher` on Windows (simulated with a temp PATH): an `.exe`, an npm global-package `.cmd`
+  shim, `npm.cmd` with `node_modules/npm/bin/npm-cli.js`, an unknown `.cmd` (not found), and paths
+  with spaces; `binaryAvailable("npm")` finds npm on Windows with no shell
 - [ ] T031 [P] Port `tests/git.test.mjs`, including a repository path with spaces
 - [ ] T032 [P] Port `tests/state.test.mjs` and `tests/render.test.mjs`
 - [ ] T033 [P] Add `tests/job-control.test.mjs` for job lookup by id and prefix, ambiguous prefixes,
@@ -155,15 +159,16 @@ logged in, and ready.
   prints `result` and then does not exit is killed after the grace period, the result is kept, and
   the run counts as a success when `result.exitCode` is 0
   (the grace period is an option, so the test can use a short one)
-- [ ] T038 [P] [US1] Add `tests/copilot.test.mjs`: version parse and floor 1.0.93; launcher
-  resolution (direct executable, Windows npm shim to `node npm-loader.js`, never `shell: true`);
-  read-only and write profiles build exactly the arguments and environment in research.md §3 (the
+- [ ] T038 [P] [US1] Add `tests/copilot.test.mjs`: version parse and floor 1.0.93; the adapter
+  starts Copilot through `resolveLauncher` and never with `shell: true`; read-only and write profiles build exactly the arguments and environment in research.md §3 (the
   read-only environment has the plugin `COPILOT_HOME` and no `COPILOT_ALLOW_ALL` or
   `GITHUB_COPILOT_PROMPT_MODE_*`); both profiles pass
   `--secret-env-vars=GH_TOKEN,COPILOT_PROVIDER_API_KEY,COPILOT_PROVIDER_BEARER_TOKEN`; no allow-all flag
   in any profile; a launcher and a working folder whose paths contain spaces
 - [ ] T039 [P] [US1] Add setup tests to `tests/runtime.test.mjs`: missing CLI, old version, not
-  logged in (with `!copilot login` next step), BYOK counts as ready, review gate on and off
+  logged in (with `!copilot login` next step), BYOK counts as ready, review gate on and off; with
+  Copilot missing and npm found through `resolveLauncher`, the report says npm is available, so
+  `/copilot:setup` can offer the install
 
 ### Implementation for User Story 1
 
@@ -175,7 +180,7 @@ logged in, and ready.
   contracts/copilot-cli-usage.md; add `typescript` and `@types/node` as devDependencies; add
   `tsconfig.prompt-mode.json` and the `build` script `tsc -p tsconfig.prompt-mode.json`; add
   `npm run build` to CI
-- [ ] T042 [US1] Port `U/scripts/lib/codex.mjs` to `P/scripts/lib/copilot.mjs`: the launcher helper,
+- [ ] T042 [US1] Port `U/scripts/lib/codex.mjs` to `P/scripts/lib/copilot.mjs`: `resolveLauncher("copilot")`,
   `buildCopilotArgs` and `buildCopilotEnv` (the profiles), `getCopilotAvailability`,
   `getCopilotAuthStatus` (one tiny read-only prompt in the plugin data folder), `withPromptMode`,
   `captureTurn`, `runPromptModeTurn` (with the forbidden-tool stop of research.md §3),

@@ -34,7 +34,7 @@ repo root.
 
 | Upstream place | What it does with Codex | Copilot match | Ticket |
 | --- | --- | --- | --- |
-| (none upstream) | Codex is found on the PATH by the shell | `resolveCopilotLauncher`: the launcher helper (§4) | 4 |
+| (none upstream) | Codex is found on the PATH by the shell | `resolveLauncher("copilot")` from `process.mjs` (§4) | 4 |
 | (none upstream) | Codex gets `sandbox` and `approvalPolicy` per thread | `buildCopilotArgs` and `buildCopilotEnv`: the read-only and write profiles (§3), the plugin-owned `COPILOT_HOME`, and the scrubbed environment. Only this module builds Copilot arguments | 4 |
 | `getCodexAvailability` | Runs `codex --version` and `codex app-server --help` | `getCopilotAvailability`: runs `copilot --version`, parses `GitHub Copilot CLI <x.y.z>`, and refuses versions below 1.0.93 (§5) | 4 |
 | `getCodexAuthStatus`, `getCodexAuthStatusFromClient` | `account/read` and `config/read` over the app server | `getCopilotAuthStatus`: one tiny read-only prompt in the plugin data folder; reads the `result` event (§7) | 4 |
@@ -108,8 +108,10 @@ repo root.
 
 | Upstream place | What it does with Codex | Copilot match | Ticket |
 | --- | --- | --- | --- |
-| `scripts/lib/process.mjs` → `runCommand` | `shell` is on by default on Windows | `shell: false` always (Principle IV). The Copilot launcher helper (§4) lives in the adapter | 3 |
-| same → `binaryAvailable`, `terminateProcessTree`, `formatCommandFailure` | No Codex calls | Rename only | 3 |
+| `scripts/lib/process.mjs` → `runCommand` | `shell` is on by default on Windows | `shell: false` always (Principle IV) | 3 |
+| (none upstream) | The shell finds `.cmd` shims on Windows | New `resolveLauncher(name)`: the one helper for Windows `.cmd` shims, used for `npm` and `copilot` (§4) | 3 |
+| same → `binaryAvailable` | Runs `<command> --version` through `runCommand` | Resolves the command with `resolveLauncher` first, so `npm` and `copilot` are found on Windows without a shell | 3 |
+| same → `terminateProcessTree`, `formatCommandFailure` | No Codex calls | Rename only | 3 |
 | `scripts/lib/git.mjs` → `buildAdversarialCollectionGuidance` | Self-collect text: "inspect the target diff yourself with read-only git commands" | "Read the patch files listed below with the view tool". The companion writes the exact patches to a folder passed with `--add-dir` (§2, ticket 5). Copilot has no shell in reviews | 3, 5 |
 | same, rest of `git.mjs` | Runs `git` without a shell | Rename only | 3 |
 | `scripts/lib/state.mjs` → `FALLBACK_STATE_ROOT_DIR` | `<tmp>/codex-companion` | `<tmp>/copilot-companion` | 3 |
