@@ -191,10 +191,24 @@ test("a failed state save removes no job files", (t) => {
   assert.equal(fs.existsSync(oldJob.logFile), true);
 });
 
+test("jobs added and pruned in the same update lose their files", () => {
+  const workspace = makeTempDir();
+  const { oldJob, newerJobs } = stateWithPrunableJob(workspace);
+
+  updateState(workspace, (state) => {
+    state.jobs = [oldJob, ...newerJobs];
+  });
+
+  assert.equal(listJobs(workspace).length, 50);
+  assert.equal(fs.existsSync(resolveJobFile(workspace, "task-old")), false);
+  assert.equal(fs.existsSync(oldJob.logFile), false);
+  assert.equal(fs.existsSync(resolveJobFile(workspace, "task-new-0")), true);
+});
+
 test("a job file that cannot be removed after the save does not fail the update", (t) => {
   const workspace = makeTempDir();
   const { oldJob, newerJobs } = stateWithPrunableJob(workspace);
-  t.mock.method(fs, "unlinkSync", () => {
+  const failingUnlink = t.mock.method(fs, "unlinkSync", () => {
     throw Object.assign(new Error("file in use"), { code: "EBUSY" });
   });
 
@@ -202,6 +216,7 @@ test("a job file that cannot be removed after the save does not fail the update"
     state.jobs = [oldJob, ...newerJobs];
   });
 
+  assert.ok(failingUnlink.mock.callCount() > 0, "the pruned job's files were never deleted");
   assert.equal(listJobs(workspace).length, 50);
   assert.equal(listJobs(workspace).some((job) => job.id === "task-old"), false);
 });

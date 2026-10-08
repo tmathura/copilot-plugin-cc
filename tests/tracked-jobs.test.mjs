@@ -123,6 +123,24 @@ test("a progress write that fails keeps the job file, and the run still complete
   assert.equal(readJobFile(resolveJobFile(workspace, "task-full")).rendered, "done\n");
 });
 
+test("a progress value whose write failed is written by the next event", async (t) => {
+  const workspace = makeTempDir();
+  const progress = createJobProgressUpdater(workspace, "task-retry");
+
+  await runTrackedJob({ id: "task-retry", workspaceRoot: workspace }, async () => {
+    const failingRename = t.mock.method(fs, "renameSync", () => {
+      throw Object.assign(new Error("disk full"), { code: "ENOSPC" });
+    });
+    progress({ phase: "editing" });
+    failingRename.mock.restore();
+    assert.equal(findJob(workspace, "task-retry").phase, "starting");
+
+    progress({ phase: "editing" });
+    assert.equal(findJob(workspace, "task-retry").phase, "editing");
+    return execution;
+  });
+});
+
 test("a broken job file does not stop the final status write", async () => {
   const workspace = makeTempDir();
 

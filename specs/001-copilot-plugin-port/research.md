@@ -412,7 +412,8 @@ Later tickets apply these rules. The call-site map uses them.
   has removed it. Rejected alternative: upstream's `upsertJob`. A progress write that cannot take the
   state lock is skipped and does not fail the run; the job log still gets the line. The final status
   write runs outside the runner's error handling, so a failed write never turns a finished run into a
-  failed one (both added 2026-10-08, ticket 3 code review).
+  failed one (both added 2026-10-08, ticket 3 code review). A progress value counts as written only
+  after its write succeeds, so the next event retries it (added 2026-10-08, PR review).
 - **Hook time budgets**: Claude Code stops a hook at its `hooks.json` timeout (`Stop` 900 s,
   `SessionEnd` 5 s, as upstream), and then no cleanup runs. So each hook does its work inside a
   smaller budget.
@@ -467,7 +468,8 @@ Later tickets apply these rules. The call-site map uses them.
   An update that cannot read or parse an existing `state.json` stops with an error that names the
   file and changes nothing; plain readers still fall back to the empty state, as upstream. Pruned
   jobs' files and logs are deleted only after the new `state.json` is saved, and a failed delete
-  does not fail the saved update. Reason: correctness (decided 2026-10-08, ticket 3 Codex review).
+  does not fail the saved update. A job that the same update adds and prunes loses its files too
+  (upstream checks only the jobs read before the change; added 2026-10-08, PR review). Reason: correctness (decided 2026-10-08, ticket 3 Codex review).
   Upstream saves the empty default over a file it could not read, and deletes before it saves
   (rejected: a read error or a failed save loses job records, pids and logs). Job files
   (`jobs/<id>.json`) are also written through a temp file and a rename, and the final status write

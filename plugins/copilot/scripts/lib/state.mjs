@@ -263,7 +263,7 @@ export function updateState(cwd, mutate, options = {}) {
 
     // Only after the save: a failed save must keep the files that the old state still names.
     const retainedIds = new Set(nextJobs.map((job) => job.id));
-    for (const job of previousJobs) {
+    for (const job of [...previousJobs, ...(state.jobs ?? [])]) {
       if (retainedIds.has(job.id)) {
         continue;
       }

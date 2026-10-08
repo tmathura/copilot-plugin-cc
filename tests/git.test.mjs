@@ -259,7 +259,7 @@ test("collectReviewContext works in a repository path with spaces and shell char
   const context = collectReviewContext(cwd, target);
 
   assert.equal(target.mode, "working-tree");
-  assert.equal(fs.realpathSync(context.repoRoot), fs.realpathSync(cwd));
+  assert.equal(fs.realpathSync.native(context.repoRoot), fs.realpathSync.native(cwd));
   assert.equal(context.inputMode, "inline-diff");
   assert.match(context.content, /SPACE_MARKER/);
 });

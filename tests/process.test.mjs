@@ -169,6 +169,17 @@ test("runCommandChecked reports a non-zero exit with formatCommandFailure text",
   );
 });
 
+test("a command killed by a signal is not reported as a success", { skip: isWindows }, () => {
+  const killSelf = ["-e", "process.kill(process.pid, 'SIGTERM'); setInterval(() => {}, 1000)"];
+
+  const result = runCommand(process.execPath, killSelf);
+
+  assert.equal(result.status, null);
+  assert.equal(result.signal, "SIGTERM");
+  assert.throws(() => runCommandChecked(process.execPath, killSelf), /signal=SIGTERM/);
+  assert.equal(binaryAvailable(process.execPath, killSelf).available, false);
+});
+
 test("terminateProcessTree signals the process itself when it leads no group", async () => {
   const calls = [];
   const outcome = await terminateProcessTree(1234, {

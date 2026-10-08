@@ -99,39 +99,25 @@ function updateRunningJob(workspaceRoot, jobId, buildRecord, statePatch) {
 }
 
 export function createJobProgressUpdater(workspaceRoot, jobId) {
-  let lastPhase = null;
-  let lastThreadId = null;
-  let lastTurnId = null;
+  const saved = { phase: null, threadId: null, turnId: null };
 
   return (event) => {
     const normalized = normalizeProgressEvent(event);
     const patch = {};
-    let changed = false;
-
-    if (normalized.phase && normalized.phase !== lastPhase) {
-      lastPhase = normalized.phase;
-      patch.phase = normalized.phase;
-      changed = true;
+    for (const key of Object.keys(saved)) {
+      if (normalized[key] && normalized[key] !== saved[key]) {
+        patch[key] = normalized[key];
+      }
     }
 
-    if (normalized.threadId && normalized.threadId !== lastThreadId) {
-      lastThreadId = normalized.threadId;
-      patch.threadId = normalized.threadId;
-      changed = true;
-    }
-
-    if (normalized.turnId && normalized.turnId !== lastTurnId) {
-      lastTurnId = normalized.turnId;
-      patch.turnId = normalized.turnId;
-      changed = true;
-    }
-
-    if (!changed) {
+    if (Object.keys(patch).length === 0) {
       return;
     }
 
     try {
       updateRunningJob(workspaceRoot, jobId, (storedJob) => storedJob && { ...storedJob, ...patch }, patch);
+      // Only a saved value is skipped next time, so a failed write is retried by the next event.
+      Object.assign(saved, patch);
     } catch {
       // A status write that cannot take the state lock must not fail the run; the log keeps the line.
     }

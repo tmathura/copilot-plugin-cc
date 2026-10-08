@@ -58,6 +58,9 @@ and the optional Stop-hook review gate. Drop transfer. The first ticket chooses 
   over the file and deletes first (research.md §7, locked state updates). Job files are written
   through a temp file and a rename too, so a failed write keeps the old record (Codex review round
   2).
+- Q: Does `runCommand` report a child killed by a signal as exit 0? → A: No. It keeps
+  `status: null`, so a killed git call is not taken as a success (decided 2026-10-08, PR review).
+  Rejected alternative: upstream's `status ?? 0`.
 - Q: Does the review context read the target of an untracked symlink? → A: No. It shows
   `(skipped: symlink)`, because the target can be outside the repository (decided 2026-10-08,
   ticket 3 Codex review). Rejected alternative: upstream, which follows the link (research.md §4b).

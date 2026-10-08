@@ -112,7 +112,7 @@ repo root.
 
 | Upstream place | What it does with Codex | Copilot match | Ticket |
 | --- | --- | --- | --- |
-| `scripts/lib/process.mjs` → `runCommand` | `shell` is on by default on Windows | `shell: false` always (Principle IV) | 3 |
+| `scripts/lib/process.mjs` → `runCommand` | `shell` is on by default on Windows; a child killed by a signal gets `status: 0` | `shell: false` always (Principle IV). A child killed by a signal keeps `status: null`, so checked calls fail (correctness; decided 2026-10-08, PR review) | 3 |
 | (none upstream) | The shell finds `.cmd` shims on Windows | New `resolveLauncher(name)`: the one helper for Windows `.cmd` shims, used for `npm` and `copilot` (§4) | 3 |
 | same → `binaryAvailable` | Runs `<command> --version` through `runCommand` | Resolves the command with `resolveLauncher` first, so `npm` and `copilot` are found on Windows without a shell | 3 |
 | same → `terminateProcessTree` | Sends `SIGTERM` to the process group on macOS and Linux and returns; on `ESRCH` it does not signal the process itself; `taskkill /T /F` on Windows | Signals the process itself when there is no group, and sends `SIGKILL` to what is still alive after up to 5 seconds (§7, stopping a job). Returns a promise, so the wait does not block the event loop (§7, changed 2026-10-08). The callers start each process they may stop as its own group (§7, process groups) | 3, 4, 7 |
