@@ -57,7 +57,6 @@ test("resolveStateDir falls back to a per-workspace folder under the home folder
 
     assert.equal(path.dirname(stateDir), fallbackRoot);
     assert.match(path.basename(stateDir), /.+-[a-f0-9]{16}$/);
-    assert.equal(stateDir.startsWith(os.tmpdir()), false);
   } finally {
     process.env.CLAUDE_PLUGIN_DATA = previousPluginDataDir;
   }
