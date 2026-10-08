@@ -57,17 +57,35 @@ function readNpmShimScript(shimPath) {
   return match ? path.join(path.dirname(shimPath), ...match[1].split("\\")) : null;
 }
 
+function resolveCmdShim(cmdPath, nodePath) {
+  const npmCli = path.join(path.dirname(cmdPath), "node_modules", "npm", "bin", "npm-cli.js");
+  const isNpm = path.basename(cmdPath).toLowerCase() === "npm.cmd";
+  const script = isNpm && fs.existsSync(npmCli) ? npmCli : readNpmShimScript(cmdPath);
+  if (script && fs.existsSync(script)) {
+    return { command: nodePath, args: [script], detail: null };
+  }
+  return {
+    command: null,
+    args: [],
+    detail: `not found: ${cmdPath} is not an npm shim, and it cannot start without a shell`
+  };
+}
+
 // Node cannot start a .cmd file without a shell, so npm shims run their script with node directly.
 export function resolveLauncher(name, options = {}) {
   const platform = options.platform ?? process.platform;
-  // A path names one program, so only a bare name is looked up on the PATH.
-  if (platform !== "win32" || (/[\\/]/.test(name) && !/\.(cmd|bat)$/i.test(name))) {
+  if (platform !== "win32") {
     return { command: name, args: [], detail: null };
+  }
+
+  const nodePath = options.execPath ?? process.execPath;
+  // A path names one program, so only a bare name is looked up on the PATH.
+  if (/[\\/]/.test(name)) {
+    return /\.(cmd|bat)$/i.test(name) ? resolveCmdShim(name, nodePath) : { command: name, args: [], detail: null };
   }
 
   const baseName = name.replace(/\.(exe|cmd)$/i, "");
   const env = options.env ?? process.env;
-  const nodePath = options.execPath ?? process.execPath;
   const pathValue = env.PATH ?? env.Path ?? "";
   for (const rawDir of pathValue.split(";")) {
     const dir = rawDir.trim().replace(/^"(.*)"$/, "$1");
@@ -81,19 +99,9 @@ export function resolveLauncher(name, options = {}) {
     }
 
     const cmdPath = path.join(dir, `${baseName}.cmd`);
-    if (!fs.existsSync(cmdPath)) {
-      continue;
+    if (fs.existsSync(cmdPath)) {
+      return resolveCmdShim(cmdPath, nodePath);
     }
-    const npmCli = path.join(dir, "node_modules", "npm", "bin", "npm-cli.js");
-    const script = baseName === "npm" && fs.existsSync(npmCli) ? npmCli : readNpmShimScript(cmdPath);
-    if (script && fs.existsSync(script)) {
-      return { command: nodePath, args: [script], detail: null };
-    }
-    return {
-      command: null,
-      args: [],
-      detail: `not found: ${cmdPath} is not an npm shim, and it cannot start without a shell`
-    };
   }
 
   return { command: null, args: [], detail: "not found" };

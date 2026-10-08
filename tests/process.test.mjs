@@ -365,6 +365,20 @@ test("resolveLauncher runs npm.cmd from the Node install through npm-cli.js", ()
   assert.deepEqual(launcher, { command: "node.exe", args: [npmCli], detail: null });
 });
 
+test("resolveLauncher resolves an explicit .cmd path in its own folder", () => {
+  const root = makeTempDir("copilot plugin launcher ");
+  const nodeDir = makeDir(root, "node js");
+  const npmCli = path.join(nodeDir, "node_modules", "npm", "bin", "npm-cli.js");
+  const npmCmd = path.join(nodeDir, "npm.cmd");
+  writeFile(npmCmd, ":: Created by npm, please don't edit manually.\r\n");
+  writeFile(npmCli);
+  writeFile(path.join(nodeDir, "npm.exe"));
+
+  const launcher = resolveLauncher(npmCmd, { platform: "win32", env: { PATH: "" }, execPath: "node.exe" });
+
+  assert.deepEqual(launcher, { command: "node.exe", args: [npmCli], detail: null });
+});
+
 test("resolveLauncher refuses an unknown .cmd file and a missing command", () => {
   const root = makeTempDir("copilot plugin launcher ");
   const dir = makeDir(root, "other tools");
