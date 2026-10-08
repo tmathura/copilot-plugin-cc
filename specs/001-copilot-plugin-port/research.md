@@ -459,6 +459,12 @@ Later tickets apply these rules. The call-site map uses them.
   caller read earlier, is not ported (decided 2026-10-08, ticket 3 code review; rejected alternative:
   a locked `saveState`, which still drops a job added after the caller's read). When the lock file
   has no readable owner, the timeout error says to delete it if no companion is running.
+  An update that cannot read or parse an existing `state.json` stops with an error that names the
+  file and changes nothing; plain readers still fall back to the empty state, as upstream. Pruned
+  jobs' files and logs are deleted only after the new `state.json` is saved, and a failed delete
+  does not fail the saved update. Reason: correctness (decided 2026-10-08, ticket 3 Codex review).
+  Upstream saves the empty default over a file it could not read, and deletes before it saves
+  (rejected: a read error or a failed save loses job records, pids and logs).
   Rejected alternative: keep upstream's unlocked update for parity; upstream has the same race, but
   this port relies on the job records to stop processes.
   Without `CLAUDE_PLUGIN_DATA`, the state lives in `~/.copilot-companion/state`, owned by the user,

@@ -74,7 +74,7 @@ export function ensureStateDir(cwd) {
   fs.mkdirSync(resolveJobsDir(cwd), { recursive: true });
 }
 
-export function loadState(cwd) {
+export function loadState(cwd, options = {}) {
   const stateFile = resolveStateFile(cwd);
   if (!fs.existsSync(stateFile)) {
     return defaultState();
@@ -82,6 +82,9 @@ export function loadState(cwd) {
 
   try {
     const parsed = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("not a JSON object");
+    }
     return {
       ...defaultState(),
       ...parsed,
@@ -92,7 +95,13 @@ export function loadState(cwd) {
       jobs: Array.isArray(parsed.jobs) ? parsed.jobs : [],
       closedSessions: Array.isArray(parsed.closedSessions) ? parsed.closedSessions : []
     };
-  } catch {
+  } catch (error) {
+    // An update must not save the empty default over job records that cancel still needs.
+    if (options.strict) {
+      throw new Error(
+        `Cannot read the job state ${stateFile} (${error.message}). It was not changed. Fix or delete it and retry.`
+      );
+    }
     return defaultState();
   }
 }
@@ -227,7 +236,7 @@ function writeStateFile(cwd, state) {
 export function updateState(cwd, mutate, options = {}) {
   const lock = acquireStateLock(cwd, options);
   try {
-    const state = loadState(cwd);
+    const state = loadState(cwd, { strict: true });
     const previousJobs = state.jobs.map((job) => ({ id: job.id, logFile: job.logFile }));
     mutate(state);
 
@@ -242,16 +251,21 @@ export function updateState(cwd, mutate, options = {}) {
       closedSessions: pruneClosedSessions(state.closedSessions ?? [])
     };
 
+    writeStateFile(cwd, nextState);
+
+    // Only after the save: a failed save must keep the files that the old state still names.
     const retainedIds = new Set(nextJobs.map((job) => job.id));
     for (const job of previousJobs) {
       if (retainedIds.has(job.id)) {
         continue;
       }
-      removeJobFile(resolveJobFile(cwd, job.id));
-      removeFileIfExists(job.logFile);
+      try {
+        removeJobFile(resolveJobFile(cwd, job.id));
+        removeFileIfExists(job.logFile);
+      } catch {
+        // The update is saved; a file that cannot be removed now is only left behind.
+      }
     }
-
-    writeStateFile(cwd, nextState);
     return nextState;
   } finally {
     releaseLock(lock.lockFile, lock.token);

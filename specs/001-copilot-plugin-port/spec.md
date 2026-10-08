@@ -52,6 +52,10 @@ and the optional Stop-hook review gate. Drop transfer. The first ticket chooses 
 - Q: Is upstream's `saveState` ported? → A: No. It saves a snapshot read earlier, so it can drop a
   job another process added; every writer uses `updateState` (decided 2026-10-08, ticket 3 code
   review; research.md §7, locked state updates).
+- Q: What does an update do with a state file it cannot read, or a save that fails? → A: It stops
+  and changes nothing, and it deletes pruned job files only after a successful save (decided
+  2026-10-08, ticket 3 Codex review). Rejected alternative: upstream, which saves the empty state
+  over the file and deletes first (research.md §7, locked state updates).
 - Q: Does a review start a textconv program for a changed submodule? → A: It can, if the user's own
   git config sets one: git starts the submodule diff itself and does not pass `--no-textconv`.
   Kept as a documented limit (decided 2026-10-08, ticket 3 code review; research.md §4b).

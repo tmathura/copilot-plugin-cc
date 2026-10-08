@@ -141,6 +141,71 @@ test("updateState prunes dropped job artifacts when indexed jobs exceed the cap"
   );
 });
 
+test("updateState refuses to save over a state file it cannot parse", () => {
+  const workspace = makeTempDir();
+  const stateFile = resolveStateFile(workspace);
+  fs.mkdirSync(path.dirname(stateFile), { recursive: true });
+  fs.writeFileSync(stateFile, "{ not json", "utf8");
+
+  assert.throws(
+    () => upsertJob(workspace, { id: "task-new", status: "running" }),
+    new RegExp(`Cannot read the job state ${escapeRegExp(stateFile)} .*It was not changed\\. Fix or delete it and retry\\.`)
+  );
+  assert.equal(fs.readFileSync(stateFile, "utf8"), "{ not json");
+});
+
+function stateWithPrunableJob(workspace) {
+  const oldJob = addJobWithFiles(workspace, {
+    id: "task-old",
+    status: "completed",
+    updatedAt: new Date(Date.UTC(2026, 0, 1)).toISOString()
+  });
+  const newerJobs = Array.from({ length: 50 }, (_, index) =>
+    addJobWithFiles(workspace, {
+      id: `task-new-${index}`,
+      status: "completed",
+      updatedAt: new Date(Date.UTC(2026, 1, 1, 0, index)).toISOString()
+    })
+  );
+  return { oldJob, newerJobs };
+}
+
+test("a failed state save removes no job files", (t) => {
+  const workspace = makeTempDir();
+  const { oldJob, newerJobs } = stateWithPrunableJob(workspace);
+  const stateFile = resolveStateFile(workspace);
+  t.mock.method(fs, "renameSync", () => {
+    throw Object.assign(new Error("disk full"), { code: "ENOSPC" });
+  });
+
+  assert.throws(
+    () =>
+      updateState(workspace, (state) => {
+        state.jobs = [oldJob, ...newerJobs];
+      }),
+    /disk full/
+  );
+
+  assert.equal(fs.existsSync(stateFile), false);
+  assert.equal(fs.existsSync(resolveJobFile(workspace, "task-old")), true);
+  assert.equal(fs.existsSync(oldJob.logFile), true);
+});
+
+test("a job file that cannot be removed after the save does not fail the update", (t) => {
+  const workspace = makeTempDir();
+  const { oldJob, newerJobs } = stateWithPrunableJob(workspace);
+  t.mock.method(fs, "unlinkSync", () => {
+    throw Object.assign(new Error("file in use"), { code: "EBUSY" });
+  });
+
+  updateState(workspace, (state) => {
+    state.jobs = [oldJob, ...newerJobs];
+  });
+
+  assert.equal(listJobs(workspace).length, 50);
+  assert.equal(listJobs(workspace).some((job) => job.id === "task-old"), false);
+});
+
 test("an older running job survives 55 newer finished jobs and can still be cancelled", () => {
   const workspace = makeTempDir();
   const runningJob = addJobWithFiles(workspace, {
