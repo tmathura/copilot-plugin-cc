@@ -6,7 +6,13 @@ import path from "node:path";
 import process from "node:process";
 
 import { parseArgs, splitRawArgumentString } from "./lib/args.mjs";
-import { getCopilotAuthStatus, getCopilotAvailability, getSessionRuntimeStatus } from "./lib/copilot.mjs";
+import {
+  CHECK_HINT,
+  getCopilotAuthStatus,
+  getCopilotAvailability,
+  getSessionRuntimeStatus,
+  UPDATE_HINT
+} from "./lib/copilot.mjs";
 import { binaryAvailable } from "./lib/process.mjs";
 import { getConfig, setConfig } from "./lib/state.mjs";
 import { resolveWorkspaceRoot } from "./lib/workspace.mjs";
@@ -70,9 +76,9 @@ async function buildSetupReport(cwd, actionsTaken = []) {
   if (copilotStatus.missing) {
     nextSteps.push("Install Copilot with `npm install -g @github/copilot`.");
   } else if (copilotStatus.version && !copilotStatus.available) {
-    nextSteps.push("Update Copilot with `npm install -g @github/copilot`.");
+    nextSteps.push(`Copilot CLI ${copilotStatus.version} is too old. ${UPDATE_HINT}`);
   } else if (!copilotStatus.available) {
-    nextSteps.push("Check that `copilot --no-auto-update --version` works, then rerun `/copilot:setup`.");
+    nextSteps.push(CHECK_HINT);
   }
   if (copilotStatus.available && !authStatus.loggedIn && authStatus.requiresGithubAuth) {
     nextSteps.push("Run `!copilot login`.");

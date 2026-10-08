@@ -30,6 +30,11 @@ import { ensurePluginDataDir, resolvePluginDataDir } from "./state.mjs";
 
 const MIN_COPILOT_VERSION = [1, 0, 93];
 const INSTALL_HINT = "Install it with `npm install -g @github/copilot`, then rerun `/copilot:setup`.";
+// An npm install cannot update a WinGet or Homebrew install, and `copilot update` only fills the
+// update cache, which --no-auto-update ignores.
+export const UPDATE_HINT =
+  "Update it with the tool that installed it (for an npm install: `npm install -g @github/copilot`), then rerun `/copilot:setup`.";
+export const CHECK_HINT = "Check that `copilot --no-auto-update --version` works, then rerun `/copilot:setup`.";
 const READ_ONLY_TOOLS = ["view", "glob", "grep"];
 const WRITE_TOOLS = ["create", "edit", "apply_patch"];
 const SHELL_TOOLS = new Set(["bash", "powershell"]);
@@ -413,10 +418,13 @@ async function runCopilotTurn(cwd, options = {}) {
 }
 
 function formatUnavailableError(availability) {
-  if (availability.version) {
-    return `Copilot CLI ${availability.version} is not supported. Update it with \`npm install -g @github/copilot\`, then rerun \`/copilot:setup\`.`;
+  if (availability.missing) {
+    return `Copilot CLI is not installed (${availability.detail}). ${INSTALL_HINT}`;
   }
-  return `Copilot CLI is not installed or cannot start (${availability.detail}). ${INSTALL_HINT}`;
+  if (availability.version) {
+    return `Copilot CLI ${availability.version} is not supported. ${UPDATE_HINT}`;
+  }
+  return `Copilot CLI cannot start (${availability.detail}). ${CHECK_HINT}`;
 }
 
 function buildAuthStatus(fields = {}) {

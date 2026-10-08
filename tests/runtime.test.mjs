@@ -80,7 +80,11 @@ test("setup refuses a Copilot version below 1.0.93", () => {
     assert.equal(payload.ready, false, behavior);
     assert.equal(payload.copilot.missing, false, behavior);
     assert.match(payload.copilot.detail, /1\.0\.92 is not supported/);
-    assert.ok(payload.nextSteps.includes("Update Copilot with `npm install -g @github/copilot`."));
+    assert.ok(
+      payload.nextSteps.includes(
+        "Copilot CLI 1.0.92 is too old. Update it with the tool that installed it (for an npm install: `npm install -g @github/copilot`), then rerun `/copilot:setup`."
+      )
+    );
     assert.deepEqual(runs(), []);
   }
 });

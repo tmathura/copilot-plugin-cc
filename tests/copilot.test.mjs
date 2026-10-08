@@ -234,13 +234,23 @@ test("a process that hangs after a successful result still counts as a success",
   assert.equal(result.finalMessage, "Fake Copilot answer.");
 });
 
-test("a run refuses to start when Copilot is missing or too old", async () => {
+test("a run refuses to start when Copilot is missing, too old or its version cannot be read", async () => {
   const missingEnv = buildEnv(makeTempDir(), { PATH: makeTempDir() });
-  await assert.rejects(runPromptModeTurn(".", { prompt: "x", env: missingEnv }), /npm install -g @github\/copilot/);
+  await assert.rejects(runPromptModeTurn(".", { prompt: "x", env: missingEnv }), /not installed.*Install it with/);
 
   const old = setUp("old-version");
-  await assert.rejects(runPromptModeTurn(old.workDir, { prompt: "x", env: old.env }), /1\.0\.92 is not supported/);
+  await assert.rejects(
+    runPromptModeTurn(old.workDir, { prompt: "x", env: old.env }),
+    /1\.0\.92 is not supported\. Update it with the tool that installed it/
+  );
   assert.deepEqual(old.runs(), []);
+
+  const unreadable = setUp("unreadable-version");
+  await assert.rejects(runPromptModeTurn(unreadable.workDir, { prompt: "x", env: unreadable.env }), (error) => {
+    assert.match(error.message, /cannot start .*Check that `copilot --no-auto-update --version` works/);
+    assert.doesNotMatch(error.message, /Install it/);
+    return true;
+  });
 });
 
 test("the login check runs one read-only prompt in the plugin data folder", async () => {
