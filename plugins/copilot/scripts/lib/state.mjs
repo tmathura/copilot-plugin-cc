@@ -56,14 +56,16 @@ export function resolveStateDir(cwd) {
   const slugSource = path.basename(workspaceRoot) || "workspace";
   const slug = slugSource.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "workspace";
   const hash = createHash("sha256").update(canonicalWorkspaceRoot).digest("hex").slice(0, 16);
-  const pluginDataDir = process.env[PLUGIN_DATA_ENV];
-  const stateRoot = pluginDataDir ? path.join(pluginDataDir, "state") : path.join(fallbackDir(), "state");
-  return path.join(stateRoot, `${slug}-${hash}`);
+  return path.join(resolvePluginDataDir(), "state", `${slug}-${hash}`);
 }
 
 // Not the shared temp folder: another local user could create it first and plant job records.
 function fallbackDir() {
   return path.join(os.homedir(), FALLBACK_DIR_NAME);
+}
+
+export function resolvePluginDataDir(env = process.env) {
+  return env[PLUGIN_DATA_ENV] || fallbackDir();
 }
 
 export function resolveStateFile(cwd) {
@@ -74,13 +76,20 @@ export function resolveJobsDir(cwd) {
   return path.join(resolveStateDir(cwd), JOBS_DIR_NAME);
 }
 
-export function ensureStateDir(cwd) {
-  if (!process.env[PLUGIN_DATA_ENV] && process.platform !== "win32") {
+export function ensurePluginDataDir(env = process.env) {
+  if (!env[PLUGIN_DATA_ENV] && process.platform !== "win32") {
     // Others must not read the logs, or change the pids that cancel signals. A folder that already
     // exists keeps its old mode unless it is changed here. A Windows profile folder is private already.
     fs.mkdirSync(fallbackDir(), { recursive: true, mode: 0o700 });
     fs.chmodSync(fallbackDir(), 0o700);
   }
+  const dataDir = resolvePluginDataDir(env);
+  fs.mkdirSync(dataDir, { recursive: true });
+  return dataDir;
+}
+
+export function ensureStateDir(cwd) {
+  ensurePluginDataDir();
   fs.mkdirSync(resolveJobsDir(cwd), { recursive: true });
 }
 

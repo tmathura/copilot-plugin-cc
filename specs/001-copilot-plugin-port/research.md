@@ -29,6 +29,15 @@ Sources:
   - The login is stored in the OS credential store. An empty `COPILOT_HOME` still finds it (tested).
     An invalid `COPILOT_GITHUB_TOKEN` did not cause an error either; Copilot fell back to the stored
     login (tested). So the real "not logged in" output could not be seen in ticket 1.
+  - Copilot also uses the GitHub CLI login (`gh auth login`), from the credential store (tested
+    2026-10-08, ticket 4). On the owner's machine `/logout` said: "/logout only manages OAuth
+    sessions created with /login. You are signed in as tmathura (via gh)." An empty `GH_CONFIG_DIR`
+    did not hide that login either.
+  - The real "not logged in" output (recorded 2026-10-08, ticket 4, Copilot CLI 1.0.93): with no token
+    variable and `COPILOT_GH_HOST` set to a host that has no stored login, Copilot exits with code 1,
+    prints nothing on stdout and no premium request is used. Stderr starts with
+    `Error: No authentication information found.` and lists `/login`, the token variables and
+    `gh auth login`. The fake CLI copies this text.
   - Token variables, in order: `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_TOKEN`. Classic `ghp_`
     tokens do not work.
   - On Windows, `copilot` on the PATH is the npm shim `copilot.cmd`. It runs
@@ -127,8 +136,12 @@ data model, the contracts, the plan and the tasks link here.
     that setup checked is the one that runs.
   - `--secret-env-vars=GH_TOKEN,COPILOT_PROVIDER_API_KEY,COPILOT_PROVIDER_BEARER_TOKEN`. Copilot
     redacts `GITHUB_TOKEN` and `COPILOT_GITHUB_TOKEN` by default, but not these.
-  - `--session-id=<new uuid>` for a new run, or `--resume=<id>` (§7). `--model`,
-    `--reasoning-effort` and `--name` when set.
+  - `--session-id=<new uuid>` for a new run, or `--resume=<id>` (§7). `--model=<m>`,
+    `--reasoning-effort=<e>` and `--name=<n>` when set. Each value is joined to its flag with `=`
+    (decided 2026-10-08, ticket 4). Reason: security. A value in its own argument that starts with
+    `-` could be read as a flag. Rejected alternative: `--model <m>` as two arguments.
+  - Tested 2026-10-08 (ticket 4): the `result` event's `sessionId` is the id passed with
+    `--session-id`.
   - The child environment drops `COPILOT_ALLOW_ALL`, `GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS`,
     `GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP` and `GITHUB_COPILOT_PROMPT_MODE_EXTENSIONS`. An
     inherited `COPILOT_ALLOW_ALL` would otherwise give allow-all to any run.
@@ -146,8 +159,8 @@ data model, the contracts, the plan and the tasks link here.
     repository hooks and workspace MCP servers stay off. It also has no user hooks, no saved
     approvals, no user MCP servers and no user plugins.
   - Login: the plugin home has no stored login file. The login still works when it is in the OS
-    credential store (tested) or in a token variable (`COPILOT_GITHUB_TOKEN`, `GH_TOKEN`,
-    `GITHUB_TOKEN`), which the child environment keeps. Without a credential store, `copilot login`
+    credential store (tested), comes from the GitHub CLI login (tested, ticket 4), or is in a token
+    variable (`COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_TOKEN`), which the child environment keeps. Without a credential store, `copilot login`
     saves the token in a file under the user's `COPILOT_HOME` (command reference), which the plugin
     home cannot see. For that case, setup tells the user to set `COPILOT_GITHUB_TOKEN` to a
     fine-grained token with the "Copilot Requests" permission. The plugin never copies a login file.
@@ -301,19 +314,23 @@ Later tickets apply these rules. The call-site map uses them.
   keep their upstream names: `threadId` holds the Copilot session id, and `turnId` holds the
   `turnId` of the last `assistant.turn_start` event.
 - **One process per run**: `copilot --output-format json` with the flags of section 3, the prompt on
-  stdin, and the workspace root as the working folder. `--model <m>` and `--reasoning-effort <e>`
-  are added when set.
+  stdin, and the workspace root as the working folder. `--model=<m>` and `--reasoning-effort=<e>`
+  are added when set (§3).
 - **Session ids**: a new run passes `--session-id=<new uuid>`, so the job knows its session id before
   Copilot starts. A resumed run passes `--resume=<id>`.
-- **Events read**: `assistant.message` (`data.content` of the last one is the final answer),
-  `assistant.reasoning` (reasoning summary), `assistant.turn_start` (turn id),
-  `tool.execution_start` and `tool.execution_complete` (progress, edited paths), and `result`
+- **Events read**: `assistant.message` (`data.content` of the last one that is not empty is the
+  final answer), `assistant.reasoning` (reasoning summary), `assistant.turn_start` (turn id; a run
+  can have more than one),
+  `tool.execution_start` and `tool.execution_complete` (progress; the complete event has only
+  `data.toolCallId`, so the start event's `toolName` is kept by that id, seen in ticket 4), and `result`
   (`sessionId`, `exitCode`, `usage.codeChanges.filesModified`). All other events are ignored. A line that is
   not JSON, or no `result` before the process exits, fails the run with the stderr text.
 - **Exit after `result`**: the `result` event ends the run. If the process has not exited 5 seconds
   later, the helper kills the process tree and keeps the result. The `result` event decides success;
   the forced exit does not. There is no other run deadline,
-  as upstream has none; cancel and the review gate's 840 s limit stop long runs.
+  as upstream has none; cancel and the review gate's 840 s limit stop long runs. The one exception is
+  setup's login check, which has a 60 s limit (login check, below). A stdout line that is valid JSON
+  but not an object with a `type` is ignored like an unknown event (ticket 4 code review).
 - **Structured output**: prompt mode has no output schema setting, unlike Codex `turn/start`
   (`outputSchema`). The adversarial-review prompt puts the schema text in the prompt.
   `parseStructuredOutput` also accepts JSON inside one surrounding code fence. Then
@@ -326,9 +343,21 @@ Later tickets apply these rules. The call-site map uses them.
   free text, shown by `renderNativeReviewResult` as upstream does.
 - **Login check**: setup runs one tiny read-only prompt in a neutral folder (the plugin data folder)
   and reads the `result` event. It costs one premium request for each `/copilot:setup`. A BYOK
-  provider (`COPILOT_PROVIDER_BASE_URL`) needs no GitHub login. Ticket 4 records the real
-  "not logged in" output: the owner logs out once (`/logout` in an interactive session), runs the
-  check, and logs in again. The fake CLI copies that output.
+  provider (`COPILOT_PROVIDER_BASE_URL`) needs no GitHub login, so setup counts it as ready and runs
+  no check, as upstream does for a provider that needs no OpenAI login (decided 2026-10-08, ticket 4).
+  A failed check is "not logged in" when stderr has Copilot's "No authentication information found"
+  text (§1), and only then does setup give the login next steps; any other failure shows the error
+  and the cleaned stderr on one line. The check has a 60-second limit, after which the process tree
+  is killed and setup reports the timeout (all decided 2026-10-08, ticket 4 code review). Reasons:
+  a stalled model request must not hang setup, and a network or quota error must not send the user
+  to log in again. A set token variable is reported by name only as "is set", because Copilot falls
+  back to a stored login when the token is invalid (§1). Rejected alternatives: no limit, as for
+  other runs; the login steps for every failed check; "logged in with <variable>".
+- **Recording the "not logged in" output** (changed 2026-10-08, ticket 4): the output in §1 was
+  recorded with `COPILOT_GH_HOST` set to a host that has no stored login. Reason: the owner's login
+  comes from the GitHub CLI, and `/logout` cannot remove it (§1). Rejected alternative: the owner
+  logs out once with `/logout`, runs the check and logs in again; that removes only a `/login`
+  session, and logging out of `gh` would also log out the owner's other tools.
 - **Sessions are kept**: upstream asks Codex not to keep review threads (`ephemeral`). Copilot always
   keeps sessions. Read-only sessions live in the plugin-owned `COPILOT_HOME`, so they stay out of the
   user's own session list. `docs/operations.md` says how to clean them up.
@@ -354,7 +383,11 @@ Later tickets apply these rules. The call-site map uses them.
   and the companion that the review gate starts. Each companion also handles `SIGTERM` and
   `SIGINT`: it kills its Copilot child's group, then exits. A cancel or gate timeout that stops a
   companion therefore stops its Copilot process and Copilot's own children too. Windows keeps
-  `taskkill /T`, which follows the whole tree.
+  `taskkill /T`, which follows the whole tree. The handlers live in `prompt-mode.mjs` and are active
+  only while a Copilot child runs (decided 2026-10-08, ticket 4). Reason: only that module holds the
+  child, and Principle III lets no other module import it. They exit with 143 for `SIGTERM` and 130
+  for `SIGINT`. Rejected alternative: handlers in the companion script, which would need the child
+  from the transport helper.
 - **Limit of stopping a job** (decided 2026-10-08, after Copilot PR review): cancel, the gate and
   `SessionEnd` stop the companion, the Copilot process and every process in their process groups
   (the tree with `taskkill /T` on Windows). On macOS and Linux, a program that a `--write` task

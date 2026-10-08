@@ -38,7 +38,7 @@ repo root.
 | (none upstream) | Codex gets `sandbox` and `approvalPolicy` per thread | `buildCopilotArgs` and `buildCopilotEnv`: the read-only and write profiles (§3), the plugin-owned `COPILOT_HOME`, and the scrubbed environment. Only this module builds Copilot arguments | 4 |
 | `getCodexAvailability` | Runs `codex --version` and `codex app-server --help` | `getCopilotAvailability`: runs `copilot --no-auto-update --version` (§5), parses `GitHub Copilot CLI <x.y.z>`, and refuses versions below 1.0.93 (§5) | 4 |
 | `getCodexAuthStatus`, `getCodexAuthStatusFromClient` | `account/read` and `config/read` over the app server | `getCopilotAuthStatus`: one tiny read-only prompt in the plugin data folder; reads the `result` event (§7) | 4 |
-| `buildAppServerAuthStatus`, `buildAuthStatus` | Builds the auth report from the Codex account | Builds it from the check run. Sources: stored login, a token variable (name only, never the value), or BYOK. `requiresOpenaiAuth` becomes `requiresGithubAuth` | 4 |
+| `buildAppServerAuthStatus`, `buildAuthStatus` | Builds the auth report from the Codex account | Builds it from the check run. Sources: stored login (the `/login` login or the GitHub CLI login), a token variable (name only, never the value), or BYOK. A BYOK provider counts as logged in and runs no check, as upstream does when `requiresOpenaiAuth` is false (research §7, login check). `requiresOpenaiAuth` becomes `requiresGithubAuth` | 4 |
 | `resolveProviderConfig`, `normalizeProviderId`, `formatProviderLabel`, `BUILTIN_PROVIDER_LABELS` | Reads the Codex model provider from config | Reads `COPILOT_PROVIDER_TYPE` and `COPILOT_PROVIDER_BASE_URL` for BYOK. Labels: `openai`, `azure`, `anthropic` | 4 |
 | `getSessionRuntimeStatus` | Reports "shared session" when a broker exists | Always reports "direct startup". The function stays, because setup and status show it | 3 |
 | `withAppServer`, `withDirectAppServer` | Connects, with a retry without the broker | `withPromptMode`: starts one process for the run and closes it at the end. No retry path | 4 |
@@ -61,7 +61,7 @@ repo root.
 | `findLatestTaskThread` | `thread/list` with the `Codex Companion Task` name prefix | Returns the session id of the newest task job in the plugin state for this workspace with the same `write` value as the new run, or `null` (§7). Prompt mode has no session list | 6 |
 | `buildTaskThreadName`, `buildPersistentTaskThreadName`, `TASK_THREAD_PREFIX` | Thread name for later lookup | Passed as `--name` on new task runs, and kept for the job title | 6 |
 | `buildResultStatus` | `turn.status === "completed"` gives exit 0 | The `result` event decides: `result.exitCode === 0` gives 0. A kill after `result` (§7) does not change it. Without a `result` event, the run fails with the process exit code | 4 |
-| `cleanCodexStderr` | Drops a Codex PATH warning | `cleanCopilotStderr`: drops empty lines. The Copilot noise list is filled from real runs in ticket 4 | 4 |
+| `cleanCodexStderr` | Drops a Codex PATH warning | `cleanCopilotStderr`: drops empty lines. Real runs in ticket 4 printed nothing else on stderr, so there is no noise list (2026-10-08) | 4 |
 | `parseStructuredOutput` | `JSON.parse` of the final message; Codex enforced the schema | Same, and it also accepts JSON inside one surrounding code fence. New `validateReviewOutput` checks the schema locally and fails the job when it does not match (§7) | 5 |
 | `readOutputSchema` | Reads the schema file | Rename only | 5 |
 | `DEFAULT_CONTINUE_PROMPT` | Prompt for `--resume-last` with no text | Rename only | 6 |

@@ -17,8 +17,9 @@ This file only gives directions. The rules live in the files below.
 
 ```
 .claude-plugin/marketplace.json   marketplace entry
-plugins/copilot/                  the plugin; scripts/lib has the shared modules; commands, agents,
-                                  hooks, skills and the companion are planned
+plugins/copilot/                  the plugin; scripts/copilot-companion.mjs is the companion (setup so
+                                  far), scripts/lib has the shared modules and the Copilot adapter;
+                                  commands and skills hold setup; agents and hooks are planned
 scripts/bump-version.mjs          sets and checks the version in every manifest
 tests/                            node --test suites, helpers and the fake copilot CLI
 UPSTREAM.md                       last upstream commit checked, and the status of later changes
@@ -33,5 +34,6 @@ specs/001-copilot-plugin-port/    the port spec: transport decision, call-site m
 | Purpose | Command |
 | --- | --- |
 | Test | `npm test` |
+| Type check | `npm run build` |
 | Check versions | `npm run check-version` |
 | Validate plugin | `claude plugin validate .` |

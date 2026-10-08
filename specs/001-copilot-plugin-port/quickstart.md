@@ -6,7 +6,7 @@ parts that exist.
 ## Before you start
 
 - Node 22 or later, Git, Claude Code.
-- Copilot CLI 1.0.93 or later: `npm install -g @github/copilot`, then `copilot` and `/login` once.
+- Copilot CLI 1.0.93 or later: `npm install -g @github/copilot`, then `copilot login` once (or a GitHub CLI login, or `COPILOT_GITHUB_TOKEN`; see `docs/configuration.md`).
 - A throwaway git repository with one commit, one staged change and one untracked file. Use it for
   every step below.
 

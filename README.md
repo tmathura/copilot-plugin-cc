@@ -7,8 +7,8 @@ keeps the same commands and layout, and calls the Copilot CLI instead of Codex.
 
 ## Status
 
-Work in progress. The marketplace and an empty `copilot` plugin exist. The plugin has no commands
-yet. The commands below describe what the first release will do.
+Work in progress. The plugin has `/copilot:setup`. The other commands below describe what the first
+release will do.
 
 ## What you get
 
@@ -28,8 +28,9 @@ yet. The commands below describe what the first release will do.
 
 - Claude Code.
 - Node.js 22 or later. The Copilot CLI needs it.
-- The GitHub Copilot CLI (`npm install -g @github/copilot`), logged in with `copilot` and then
-  `/login`.
+- The GitHub Copilot CLI 1.0.93 or later (`npm install -g @github/copilot`), logged in with
+  `copilot login`, the GitHub CLI or a token variable. See
+  [docs/configuration.md](docs/configuration.md).
 
 ## Install
 
@@ -78,6 +79,16 @@ claude plugin install copilot@tmathura-copilot
   marked as running again.
 - Job reports show a `copilot --resume=<id>` command only for `--write` tasks. Read-only jobs run
   in the plugin's own Copilot home, so the report shows only their session id.
+- Setup needs Copilot CLI 1.0.93 or later and refuses older versions. Copilot publishes no schema for
+  its JSON output, so the plugin supports only the versions it was tested on.
+- Setup checks the login with one small read-only prompt, which uses one premium request. Copilot
+  has no other way to report a login. Codex reads the account from its app server.
+- Reviews and read-only tasks run with the plugin's own Copilot folder (`COPILOT_HOME`) and only
+  Copilot's read tools. So the repo's hooks and MCP servers, and your own saved approvals, do not
+  apply. The plugin also removes `COPILOT_ALLOW_ALL` from Copilot's environment. A read-only run
+  that starts any other tool is stopped.
+- When the companion is stopped with `SIGTERM` or `SIGINT`, it first stops its Copilot process and
+  that process's children.
 
 ## Development
 
