@@ -271,6 +271,15 @@ Later tickets apply these rules. The call-site map uses them.
   generator. The port hand-writes the few event types in `scripts/lib/prompt-mode-protocol.d.ts` and
   keeps the `tsc` check with `typescript` and `@types/node` as devDependencies.
 
+- **Process groups**: upstream `terminateProcessTree` signals the process group (`-pid`) on macOS
+  and Linux, and `taskkill /T` on Windows. A group signal reaches only a process that leads its own
+  group. So on macOS and Linux every process the plugin may have to stop starts with
+  `detached: true`: the background worker (as upstream), each Copilot child of `prompt-mode.mjs`,
+  and the companion that the review gate starts. Each companion also handles `SIGTERM` and
+  `SIGINT`: it kills its Copilot child's group, then exits. A cancel or gate timeout that stops a
+  companion therefore stops its Copilot process and Copilot's own children too. Windows keeps
+  `taskkill /T`, which follows the whole tree.
+
 ## 8. Effect on the ticket split
 
 The 8 tickets stay as planned.

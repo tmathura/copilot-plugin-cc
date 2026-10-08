@@ -120,7 +120,8 @@ setup.
   write tasks only; read-only jobs show only the session id, with no command; "Copilot session ID", `/copilot:*` hints, `- copilot:` in the setup report)
 - [ ] T030 [P] Port `tests/process.test.mjs`; add tests: `runCommand` never uses a shell; arguments
   with spaces, quotes, `&`, `|`, `;`, `$` and `%` reach the child unchanged; a non-zero exit gives
-  `formatCommandFailure` text; `terminateProcessTree` kills a child and its grandchild;
+  `formatCommandFailure` text; `terminateProcessTree` kills a child started with `detached: true`
+  and its grandchild on macOS and Linux, and a child tree on Windows;
   `resolveLauncher` on Windows (simulated with a temp PATH): an `.exe`, an npm global-package `.cmd`
   shim, `npm.cmd` with `node_modules/npm/bin/npm-cli.js`, an unknown `.cmd` (not found), and paths
   with spaces; `binaryAvailable("npm")` finds npm on Windows with no shell
@@ -175,7 +176,9 @@ logged in, and ready.
 
 - [ ] T040 [US1] Port `U/scripts/lib/app-server.mjs` to `P/scripts/lib/prompt-mode.mjs`: spawn the
   launcher with the given arguments and environment and no shell, write the prompt to stdin, split
-  stdout into JSON events, report exit code, signal and stderr, and `close` with a tree kill
+  stdout into JSON events, report exit code, signal and stderr, and `close` with a tree kill. On
+  macOS and Linux start Copilot with `detached: true` so the tree kill reaches its children; the
+  companion kills its Copilot child's group on `SIGTERM` and `SIGINT` (research.md §7, process groups)
 - [ ] T041 [US1] Port `U/scripts/lib/app-server-protocol.d.ts` to
   `P/scripts/lib/prompt-mode-protocol.d.ts`: hand-written types for the events in
   contracts/copilot-cli-usage.md; add `typescript` and `@types/node` as devDependencies; add
@@ -277,7 +280,9 @@ cancel a second task; its process tree is gone.
   error says to use `--fresh`; `task-resume-candidate` reports the candidate's `write` value
 - [ ] T061 [P] [US4] Add job tests to `tests/runtime.test.mjs`: background task queued then completed;
   `status` table and single job; `result` output with `copilot --resume=<id>` for a write task and none for a read-only task; cancel kills the
-  worker and the fake Copilot process within 10 seconds (poll with a time limit, no fixed sleep)
+  worker, the fake Copilot process and a child that the fake starts, within 10 seconds (poll with a
+  time limit, no fixed sleep); a foreground `close` (forbidden tool, grace kill) also leaves no
+  Copilot child or grandchild
   and marks the job `cancelled`; `status --wait --timeout-ms` returns `waitTimedOut` for a job that
   keeps running; jobs are filtered by `COPILOT_COMPANION_SESSION_ID`; with `GH_TOKEN` set to a
   marker value, no state, job or log file contains the marker
@@ -333,7 +338,8 @@ and to `BLOCK`.
 - [ ] T074 [P] [US5] Port `U/hooks/hooks.json` to `P/hooks/hooks.json`
 - [ ] T075 [P] [US5] Port `U/prompts/stop-review-gate.md` to `P/prompts/stop-review-gate.md`
 - [ ] T076 [US5] Port `U/scripts/stop-review-gate-hook.mjs` to `P/scripts/stop-review-gate-hook.mjs`;
-  on the time limit, kill the companion's process tree with `terminateProcessTree`
+  start the companion with `detached: true` on macOS and Linux, and on the time limit kill its
+  process tree with `terminateProcessTree`
 - [ ] T077 [US5] Port `U/scripts/session-lifecycle-hook.mjs` to `P/scripts/session-lifecycle-hook.mjs`
   (no broker, no transcript path)
 - [ ] T078 [US5] Add the Phase 7 differences to the README section

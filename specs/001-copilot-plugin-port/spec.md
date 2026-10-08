@@ -213,7 +213,8 @@ the matching function names in it.
 **Transport decision and call-site map (ticket 1)**
 
 - **FR-009**: Before any plugin code exists, the repository MUST hold a written transport decision.
-  It compares ACP with the `-p` JSON mode on permission control, streaming, cancel, sessions, Windows
+  It compares ACP with prompt mode (`copilot --output-format json`, prompt on stdin) on permission
+  control, streaming, cancel, sessions, Windows
   support and CLI version support first, and on closeness to upstream second. It uses the official
   Copilot CLI docs, reads the named community ports for ideas only, and includes any other Claude
   Code to Copilot CLI plugin with more than 20 stars and a push in the last three months.

@@ -111,7 +111,7 @@ repo root.
 | `scripts/lib/process.mjs` → `runCommand` | `shell` is on by default on Windows | `shell: false` always (Principle IV) | 3 |
 | (none upstream) | The shell finds `.cmd` shims on Windows | New `resolveLauncher(name)`: the one helper for Windows `.cmd` shims, used for `npm` and `copilot` (§4) | 3 |
 | same → `binaryAvailable` | Runs `<command> --version` through `runCommand` | Resolves the command with `resolveLauncher` first, so `npm` and `copilot` are found on Windows without a shell | 3 |
-| same → `terminateProcessTree`, `formatCommandFailure` | No Codex calls | Rename only | 3 |
+| same → `terminateProcessTree`, `formatCommandFailure` | Signals the process group on macOS and Linux; `taskkill /T` on Windows | Rename only. The callers start each process they may stop as its own group, and each companion stops its Copilot child on `SIGTERM` (§7, process groups) | 3, 4, 7 |
 | `scripts/lib/git.mjs` → `buildAdversarialCollectionGuidance` | Self-collect text: "inspect the target diff yourself with read-only git commands" | "Read the patch files listed below with the view tool". The companion writes the exact patches to a folder passed with `--add-dir` (§2, ticket 5). Copilot has no shell in reviews | 3, 5 |
 | same, rest of `git.mjs` | Runs `git` without a shell | Rename only | 3 |
 | `scripts/lib/state.mjs` → `FALLBACK_STATE_ROOT_DIR` | `<tmp>/codex-companion` | `<tmp>/copilot-companion` | 3 |
