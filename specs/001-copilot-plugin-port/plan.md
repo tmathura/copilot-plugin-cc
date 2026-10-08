@@ -10,7 +10,8 @@ Port codex-plugin-cc v1.0.6 to a Claude Code plugin that hands reviews and tasks
 CLI. The owner chose prompt mode as the transport ([research.md](research.md) §6). The plugin starts
 `copilot --output-format json` once for each run, sends the prompt on stdin, and reads one JSON event
 per line. Copilot's own tool filters, deny rules and a plugin-owned `COPILOT_HOME` make read-only runs
-read-only. Every upstream call to Codex
+read-only. A review above upstream's inline limit gives Copilot the exact patches in a folder of
+its own job storage (research §2). Every upstream call to Codex
 has a Copilot match or a reason to drop it in [call-site-map.md](call-site-map.md). Ticket 1 delivers
 this research, the map and this plan. Tickets 2 to 8 build the plugin in the phases below.
 
@@ -22,7 +23,9 @@ this research, the map and this plan. Tickets 2 to 8 build the plugin in the pha
 devDependencies for the type check only: `typescript` and `@types/node`
 
 **Storage**: JSON files per workspace under `$CLAUDE_PLUGIN_DATA/state/`, as upstream `state.mjs`.
-The fallback is `~/.copilot-companion/state/`, not upstream's shared temp folder (research §7)
+The fallback is `~/.copilot-companion/state/`, not upstream's shared temp folder (research §7).
+A review above the inline limit also has `jobs/<id>.patches/` while it runs; it is removed at the
+end, and with its job record (research §2, added 2026-10-09)
 
 **Testing**: `node --test tests/*.test.mjs` with a fake `copilot` CLI; `claude plugin validate .`;
 a manual run with `claude --plugin-dir` before release
@@ -114,12 +117,12 @@ plugins/copilot/
         ├── args.mjs
         ├── copilot.mjs
         ├── fs.mjs
-        ├── git.mjs
+        ├── git.mjs           # review context; writeReviewPatches for jobs/<id>.patches
         ├── job-control.mjs
         ├── process.mjs
         ├── prompts.mjs
         ├── render.mjs
-        ├── state.mjs
+        ├── state.mjs         # state.json, jobs/<id>.json, .log and .patches/
         ├── tracked-jobs.mjs
         └── workspace.mjs
 tests/
@@ -149,7 +152,7 @@ differences to the README.
 | 2 | 2 | Base layout: marketplace and plugin manifests, `LICENSE`, `NOTICE`, `UPSTREAM.md`, `package.json` (Node 22+), `scripts/bump-version.mjs`, the PR CI workflow on three systems, `tests/helpers.mjs`, a fake `copilot` that answers `--version` and `--help`, `README.md` skeleton with the differences section. | version check mismatch |
 | 3 | 3 | Shared runtime modules: `args`, `fs`, `git`, `process` (no shell, and the `resolveLauncher` helper for Windows `.cmd` shims), `state`, `tracked-jobs`, `job-control`, `workspace`, `render`, `prompts`, and `copilot.mjs` with only `getSessionRuntimeStatus`. Their tests. `state.mjs` locks each update. | non-zero exit, spaces and shell characters in arguments, process tree kill, concurrent state updates |
 | 4 | 4 | Copilot adapter and setup: `copilot.mjs`, `prompt-mode.mjs` and its types, the prompt-mode fake CLI, the companion `setup` subcommand, `/copilot:setup`, the `copilot-cli-runtime` skill, the type check, `docs/configuration.md`. | missing CLI, old version, no login, broken JSON, output cut off before `result`, non-zero exit, a forbidden tool in a read-only run, a hang after `result` (added 2026-10-08) |
-| 5 | 5 | Review commands: `/copilot:review`, `/copilot:adversarial-review`, `prompts/review.md`, `prompts/adversarial-review.md`, the schema, `copilot-result-handling`. | a write blocked during a review, a review that cannot get the read-only profile, broken review JSON |
+| 5 | 5 | Review commands: `/copilot:review`, `/copilot:adversarial-review`, `prompts/review.md`, `prompts/adversarial-review.md`, the schema, `copilot-result-handling`. Above the inline limit, the patch folder `jobs/<id>.patches` (research §2). | a write blocked during a review, a review that cannot get the read-only profile, broken review JSON, the patch folder removed after the run and on a signal |
 | 6 | 6 | Rescue and background jobs: `/copilot:rescue`, the `copilot-rescue` agent, `gpt-5-4-prompting`, the `task` and `task-worker` subcommands with `--background`, `--write`, `--model`, `--effort`, `--resume`, `--fresh`, `task-resume-candidate`, `/copilot:status`, `/copilot:result`, `/copilot:cancel`, `docs/operations.md`. | cancel with the child process stopped, read-only task blocked from writing, resume with no earlier session |
 | 7 | 7 | Review gate and session hooks: `hooks/hooks.json`, `stop-review-gate-hook.mjs`, `session-lifecycle-hook.mjs`, `prompts/stop-review-gate.md`. | gate blocks a stop, gate lets Claude stop, gate with Copilot missing |
 | 8 | 8 | First release: full README, `docs/architecture.md` from the real code, the manual run in [quickstart.md](quickstart.md), version 1.0.0, the install commands. | manual run (Principle VI) |
