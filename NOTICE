@@ -17,7 +17,7 @@ copilot-plugin-cc, by tmathura, is a port of codex-plugin-cc
 
 Changes
 
-Changed .mjs files say so in a comment at the top. The other changed files
+Changed .mjs and .d.ts files say so in a comment at the top. The other changed files
 are listed below. Each was changed from upstream codex-plugin-cc to use
 GitHub Copilot instead of Codex:
 
@@ -25,5 +25,6 @@ GitHub Copilot instead of Codex:
 - .github/workflows/pull-request-ci.yml
 - package.json
 - package-lock.json
+- tsconfig.prompt-mode.json (from tsconfig.app-server.json)
 
 The plugin folder has its own NOTICE for the files in it.

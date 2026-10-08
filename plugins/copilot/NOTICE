@@ -17,9 +17,11 @@ This plugin, by tmathura, is a port of the codex plugin in codex-plugin-cc
 
 Changes
 
-Changed .mjs files say so in a comment at the top. The other changed files
+Changed .mjs and .d.ts files say so in a comment at the top. The other changed files
 are listed below. Each was changed from upstream plugins/codex to use
 GitHub Copilot instead of Codex:
 
 - .claude-plugin/plugin.json
 - CHANGELOG.md
+- commands/setup.md
+- skills/copilot-cli-runtime/SKILL.md (from skills/codex-cli-runtime/SKILL.md)

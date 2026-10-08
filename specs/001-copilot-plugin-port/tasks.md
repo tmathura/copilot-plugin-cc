@@ -179,20 +179,20 @@ logged in, and ready.
 
 ### Tests for User Story 1
 
-- [ ] T036 [P] [US1] Extend `tests/fake-copilot-fixture.mjs` into a prompt-mode fake that follows
+- [X] T036 [P] [US1] Extend `tests/fake-copilot-fixture.mjs` into a prompt-mode fake that follows
   contracts/copilot-cli-usage.md: it reads the prompt on stdin, writes its arguments, environment
   and prompt to a file the test can read, and prints JSON events. Modes: success, not logged in (the
   real output that T042 records), old version, a line that is not JSON, output cut off before the
   `result` event, non-zero exit, a forbidden tool (`tool.execution_start` with `create`), and a run
   that keeps going until it is killed
-- [ ] T037 [P] [US1] Add `tests/prompt-mode.test.mjs`: the prompt reaches stdin unchanged (with
+- [X] T037 [P] [US1] Add `tests/prompt-mode.test.mjs`: the prompt reaches stdin unchanged (with
   quotes, `&`, `|`, `%` and non-ASCII text, and a 300 KB prompt); events reach the handler in
   order; a line that is not JSON ends the run with an error that quotes it; output cut off before
   `result` fails with the exit code and stderr; `close` kills a running process tree; a process that
   prints `result` and then does not exit is killed after the grace period, the result is kept, and
   the run counts as a success when `result.exitCode` is 0
   (the grace period is an option, so the test can use a short one)
-- [ ] T038 [P] [US1] Add `tests/copilot.test.mjs`: version parse and floor 1.0.93; the version check
+- [X] T038 [P] [US1] Add `tests/copilot.test.mjs`: version parse and floor 1.0.93; the version check
   uses `--no-auto-update --version` (the fake reports a newer version without the flag and an old one
   with it, and setup refuses); the adapter
   starts Copilot through `resolveLauncher` and never with `shell: true`; read-only and write profiles build exactly the arguments and environment in research.md §3 (the
@@ -200,7 +200,7 @@ logged in, and ready.
   `GITHUB_COPILOT_PROMPT_MODE_*`); both profiles pass
   `--secret-env-vars=GH_TOKEN,COPILOT_PROVIDER_API_KEY,COPILOT_PROVIDER_BEARER_TOKEN`; no allow-all flag
   in any profile; a launcher and a working folder whose paths contain spaces
-- [ ] T039 [P] [US1] Add setup tests to `tests/runtime.test.mjs`: missing CLI, old version, not
+- [X] T039 [P] [US1] Add setup tests to `tests/runtime.test.mjs`: missing CLI, old version, not
   logged in (with `!copilot login` next step), BYOK counts as ready, review gate on and off; with
   Copilot missing and npm found through `resolveLauncher`, the report says npm is available, so
   `/copilot:setup` can offer the install; when the login check fails, the next steps name both
@@ -209,34 +209,37 @@ logged in, and ready.
 
 ### Implementation for User Story 1
 
-- [ ] T040 [US1] Port `U/scripts/lib/app-server.mjs` to `P/scripts/lib/prompt-mode.mjs`: spawn the
+- [X] T040 [US1] Port `U/scripts/lib/app-server.mjs` to `P/scripts/lib/prompt-mode.mjs`: spawn the
   launcher with the given arguments and environment and no shell, write the prompt to stdin, split
   stdout into JSON events, report exit code, signal and stderr, and `close` with a tree kill. On
   macOS and Linux start Copilot with `detached: true` so the tree kill reaches its children; the
-  companion kills its Copilot child's group on `SIGTERM` and `SIGINT` (research.md §7, process groups)
-- [ ] T041 [US1] Port `U/scripts/lib/app-server-protocol.d.ts` to
+  companion kills its Copilot child's group on `SIGTERM` and `SIGINT` (research.md §7, process groups;
+  the handlers live in `prompt-mode.mjs` while a child runs, decided 2026-10-08)
+- [X] T041 [US1] Port `U/scripts/lib/app-server-protocol.d.ts` to
   `P/scripts/lib/prompt-mode-protocol.d.ts`: hand-written types for the events in
   contracts/copilot-cli-usage.md; add `typescript` and `@types/node` as devDependencies; add
   `tsconfig.prompt-mode.json` and the `build` script `tsc -p tsconfig.prompt-mode.json`; add
   `npm run build` to CI
-- [ ] T042 [US1] Port `U/scripts/lib/codex.mjs` to `P/scripts/lib/copilot.mjs`: `resolveLauncher("copilot")`,
+- [X] T042 [US1] Port `U/scripts/lib/codex.mjs` to `P/scripts/lib/copilot.mjs`: `resolveLauncher("copilot")`,
   `buildCopilotArgs` and `buildCopilotEnv` (the profiles), `getCopilotAvailability`,
   `getCopilotAuthStatus` (one tiny read-only prompt in the plugin data folder), `withPromptMode`,
   `captureTurn`, `runPromptModeTurn` (with the forbidden-tool stop of research.md §3),
-  `buildResultStatus`, `cleanCopilotStderr`; keep `getSessionRuntimeStatus`. Ask the owner to log
-  out once (`/logout`), record the real "not logged in" output, and copy it into the fake
-- [ ] T043 [US1] Port `U/scripts/codex-companion.mjs` to `P/scripts/copilot-companion.mjs` with the
+  `buildResultStatus`, `cleanCopilotStderr`; keep `getSessionRuntimeStatus`. Record the real "not
+  logged in" output and copy it into the fake. Changed 2026-10-08: recorded with `COPILOT_GH_HOST`
+  set to a host with no stored login, because the owner's login comes from the GitHub CLI and
+  `/logout` cannot remove it (research §1 and §7; rejected: the owner logs out with `/logout`)
+- [X] T043 [US1] Port `U/scripts/codex-companion.mjs` to `P/scripts/copilot-companion.mjs` with the
   `setup` subcommand, `printUsage` and the shared helpers; other subcommands come in later phases
-- [ ] T044 [P] [US1] Port `U/commands/setup.md` to `P/commands/setup.md` (`@github/copilot`,
+- [X] T044 [P] [US1] Port `U/commands/setup.md` to `P/commands/setup.md` (`@github/copilot`,
   `!copilot login`)
-- [ ] T045 [P] [US1] Port `U/skills/codex-cli-runtime/SKILL.md` to
+- [X] T045 [P] [US1] Port `U/skills/codex-cli-runtime/SKILL.md` to
   `P/skills/copilot-cli-runtime/SKILL.md` (no `spark`)
-- [ ] T046 [P] [US1] Write `docs/configuration.md`: supported Copilot versions, install, login and
+- [X] T046 [P] [US1] Write `docs/configuration.md`: supported Copilot versions, install, login and
   token variables (names only), why systems without a credential store need `COPILOT_GITHUB_TOKEN`, BYOK, the permission profiles, the state folder, `--model` and
   `--effort`
-- [ ] T047 [US1] Add the Phase 4 differences (version floor, login check, one process per run, no
+- [X] T047 [US1] Add the Phase 4 differences (version floor, login check, one process per run, no
   broker, no `transfer`) to the README section
-- [ ] T048 [US1] Run `claude plugin validate .`, `npm run build` and `node --test tests/*.test.mjs`;
+- [X] T048 [US1] Run `claude plugin validate .`, `npm run build` and `node --test tests/*.test.mjs`;
   all pass
 
 **Checkpoint**: `/copilot:setup` works with a real Copilot install.

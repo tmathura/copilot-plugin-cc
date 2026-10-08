@@ -67,6 +67,24 @@ and the optional Stop-hook review gate. Drop transfer. The first ticket chooses 
 - Q: Does a review start a textconv program for a changed submodule? → A: It can, if the user's own
   git config sets one: git starts the submodule diff itself and does not pass `--no-textconv`.
   Kept as a documented limit (decided 2026-10-08, ticket 3 code review; research.md §4b).
+- Q: How is Copilot's real "not logged in" output recorded? → A: With `COPILOT_GH_HOST` set to a host
+  that has no stored login. The owner's login comes from the GitHub CLI, and `/logout` cannot remove
+  it (decided 2026-10-08, ticket 4; research.md §1 and §7). Rejected alternative: the owner logs out
+  once with `/logout`.
+- Q: Does setup run the login check for a BYOK provider? → A: No. A BYOK provider needs no GitHub
+  login, so setup counts it as ready, as upstream does for a provider that needs no OpenAI login
+  (decided 2026-10-08, ticket 4; research.md §7, login check).
+- Q: Which login step does setup name? → A: `!copilot login`, `!copilot login --device-code` when the
+  browser flow is blocked, and `COPILOT_GITHUB_TOKEN` on a system without a credential store
+  (decided 2026-10-08, ticket 4; as upstream names `!codex login`). Rejected alternative: "run
+  `copilot` and then `/login`", the earlier wording of User Story 1.
+- Q: Can setup's login check hang, or send the user to log in for any failure? → A: No. The check
+  stops after 60 seconds, and only Copilot's "No authentication information found" output gives
+  the login steps (decided 2026-10-08, ticket 4 code review; research.md §7, login check). Rejected
+  alternatives: no limit; the login steps for every failed check.
+- Q: Can the version check hang setup? → A: No. It stops after 30 seconds and says `--version` did
+  not answer (decided 2026-10-08, ticket 4 Codex review; research.md §5). Rejected alternative: no
+  limit, as upstream.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -95,7 +113,9 @@ CLI, with an old CLI, with no login, and when ready. Each case gives the correct
    `/copilot:setup`, **Then** setup names the installed version, the lowest supported version, and
    how to update.
 4. **Given** a Copilot CLI with no login, **When** the user runs `/copilot:setup`, **Then** setup
-   tells the user to run `copilot` and then `/login`.
+   tells the user to run `!copilot login`, and to set `COPILOT_GITHUB_TOKEN` on a system without a
+   credential store (changed 2026-10-08, ticket 4, to match the upstream `!codex login` step and
+   research.md §3; was "run `copilot` and then `/login`").
 5. **Given** a ready CLI, **When** the user runs `/copilot:setup --enable-review-gate` or
    `--disable-review-gate`, **Then** setup turns the review gate on or off for this repository and
    reports the new state.
