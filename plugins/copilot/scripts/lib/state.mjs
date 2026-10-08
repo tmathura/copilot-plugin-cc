@@ -225,12 +225,20 @@ function acquireStateLock(cwd, options) {
   }
 }
 
+// A reader must never see half a file, and a failed write must keep the old one.
+function writeJsonAtomic(filePath, value) {
+  const tempFile = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
+  try {
+    fs.writeFileSync(tempFile, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+    fs.renameSync(tempFile, filePath);
+  } catch (error) {
+    fs.rmSync(tempFile, { force: true });
+    throw error;
+  }
+}
+
 function writeStateFile(cwd, state) {
-  const stateFile = resolveStateFile(cwd);
-  // A reader must never see half a file.
-  const tempFile = `${stateFile}.${process.pid}.${randomUUID()}.tmp`;
-  fs.writeFileSync(tempFile, `${JSON.stringify(state, null, 2)}\n`, "utf8");
-  fs.renameSync(tempFile, stateFile);
+  writeJsonAtomic(resolveStateFile(cwd), state);
 }
 
 export function updateState(cwd, mutate, options = {}) {
@@ -337,7 +345,7 @@ export function getConfig(cwd) {
 export function writeJobFile(cwd, jobId, payload) {
   ensureStateDir(cwd);
   const jobFile = resolveJobFile(cwd, jobId);
-  fs.writeFileSync(jobFile, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  writeJsonAtomic(jobFile, payload);
   return jobFile;
 }
 

@@ -120,7 +120,8 @@ setup.
   running job; keep `STATE_VERSION = 1`; lock `updateState` (with an optional shorter wait) with
   `state.json.lock` and write through a temp file and a rename (research.md §7, locked state
   updates); do not port `saveState`; an update refuses a state file it cannot read and deletes
-  pruned files only after the save, with tests for both (added 2026-10-08); add `closedSessions` (entries kept 30 days, no count cap) to the state; a companion that
+  pruned files only after the save, with tests for both; job files are written through a temp file
+  and a rename, and `runTrackedJob` completes even after a failed progress write (added 2026-10-08); add `closedSessions` (entries kept 30 days, no count cap) to the state; a companion that
   started before a session's `closedAt` cannot create a job for that session (data-model.md)
 - [X] T026 [P] Port `U/scripts/lib/tracked-jobs.mjs` to `P/scripts/lib/tracked-jobs.mjs`
   (`COPILOT_COMPANION_SESSION_ID`, `[copilot]` prefix); `runTrackedJob` writes its start and final

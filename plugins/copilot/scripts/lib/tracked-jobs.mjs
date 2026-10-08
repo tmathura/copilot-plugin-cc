@@ -69,6 +69,15 @@ export function createJobRecord(base, options = {}) {
   };
 }
 
+// A missing or broken job file must not stop the final status write; it is rebuilt from the run.
+function readJobFileOrNull(jobFile) {
+  try {
+    return readJobFile(jobFile);
+  } catch {
+    return null;
+  }
+}
+
 // Writes the job file and its state entry only while the job is still running, so a cancel stays.
 function updateRunningJob(workspaceRoot, jobId, buildRecord, statePatch) {
   updateState(workspaceRoot, (state) => {
@@ -77,7 +86,7 @@ function updateRunningJob(workspaceRoot, jobId, buildRecord, statePatch) {
       return;
     }
     const jobFile = resolveJobFile(workspaceRoot, jobId);
-    const record = buildRecord(fs.existsSync(jobFile) ? readJobFile(jobFile) : null);
+    const record = buildRecord(readJobFileOrNull(jobFile));
     if (record) {
       writeJobFile(workspaceRoot, jobId, record);
     }

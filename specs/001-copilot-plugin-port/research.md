@@ -464,7 +464,11 @@ Later tickets apply these rules. The call-site map uses them.
   jobs' files and logs are deleted only after the new `state.json` is saved, and a failed delete
   does not fail the saved update. Reason: correctness (decided 2026-10-08, ticket 3 Codex review).
   Upstream saves the empty default over a file it could not read, and deletes before it saves
-  (rejected: a read error or a failed save loses job records, pids and logs).
+  (rejected: a read error or a failed save loses job records, pids and logs). Job files
+  (`jobs/<id>.json`) are also written through a temp file and a rename, and the final status write
+  rebuilds a job file it cannot read (decided 2026-10-08, ticket 3 Codex review round 2; rejected:
+  upstream's direct overwrite, where a failed progress write leaves a broken file that then stops
+  the final write).
   Rejected alternative: keep upstream's unlocked update for parity; upstream has the same race, but
   this port relies on the job records to stop processes.
   Without `CLAUDE_PLUGIN_DATA`, the state lives in `~/.copilot-companion/state`, owned by the user,

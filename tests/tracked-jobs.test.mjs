@@ -98,6 +98,43 @@ test("a cancel during a failing run is not overwritten by the failed write", asy
   assert.equal(findJob(workspace, "task-fail").status, "cancelled");
 });
 
+test("a progress write that fails keeps the job file, and the run still completes", async (t) => {
+  const workspace = makeTempDir();
+  const progress = createJobProgressUpdater(workspace, "task-full");
+
+  await runTrackedJob({ id: "task-full", workspaceRoot: workspace }, async () => {
+    const writeFileSync = fs.writeFileSync;
+    const failingWrite = t.mock.method(fs, "writeFileSync", (filePath, ...rest) => {
+      if (String(filePath).endsWith(".tmp")) {
+        writeFileSync(filePath, "{ half", "utf8");
+        throw Object.assign(new Error("disk full"), { code: "ENOSPC" });
+      }
+      return writeFileSync(filePath, ...rest);
+    });
+    progress({ phase: "editing" });
+    failingWrite.mock.restore();
+    assert.equal(readJobFile(resolveJobFile(workspace, "task-full")).status, "running");
+    return execution;
+  });
+
+  const job = findJob(workspace, "task-full");
+  assert.equal(job.status, "completed");
+  assert.equal(job.pid, null);
+  assert.equal(readJobFile(resolveJobFile(workspace, "task-full")).rendered, "done\n");
+});
+
+test("a broken job file does not stop the final status write", async () => {
+  const workspace = makeTempDir();
+
+  await runTrackedJob({ id: "task-broken", workspaceRoot: workspace }, async () => {
+    fs.writeFileSync(resolveJobFile(workspace, "task-broken"), "", "utf8");
+    return execution;
+  });
+
+  assert.equal(findJob(workspace, "task-broken").status, "completed");
+  assert.equal(readJobFile(resolveJobFile(workspace, "task-broken")).rendered, "done\n");
+});
+
 test("runTrackedJob refuses a new job for a Claude session that has ended", async () => {
   const workspace = makeTempDir();
   updateState(workspace, (state) => {
