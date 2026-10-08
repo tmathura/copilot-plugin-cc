@@ -9,10 +9,13 @@ How work moves from an idea to `main`. The rules behind these steps are in the
 2. Make a branch `<type>/<n>-<slug>` from the latest `origin/main`, in its own worktree. The type is
    `bugfix` for an issue with the `bug` label, and `feature` for all others.
 3. Plan with Claude plan mode or with Spec Kit (below). Run the plan's Constitution Check.
-4. Make the change, with its tests and docs.
+4. Make the change, with its tests and docs. If the work departs from the spec, update the spec in
+   the same commit ("Keeping the spec current", below).
 5. Commit with the subject `[#n] Imperative description`.
 6. Run a Codex review of the branch. Fix confirmed findings, and record rejected ones with the reason.
-7. Open a PR into `main`. Copilot reviews each push. Answer and resolve every thread.
+7. Open a PR into `main`. The bot reviewers (today Copilot and CodeRabbit) review each push. Read
+   every review, including findings that are only in a review body or summary comment. Answer and
+   resolve every thread.
 8. Squash-merge when the reviews are done and CI passes. Until the repo has CI, run the tests and
    checks that exist on your own machine. They must pass.
 
@@ -65,6 +68,27 @@ Things to know:
   by hand, then run `/speckit-analyze` again.
 - The bundled Spec Kit workflow (`.specify/workflows/`) was deleted because nothing uses it. If an
   upgrade brings it back, delete it again.
+
+### Keeping the spec current
+
+While a feature is being built, its spec folder must describe the feature as it is being built
+(constitution, "Implementation-to-Spec Consistency"). Once the work has merged, the folder is
+history.
+
+When a decision, a count, the scope, the approach or the shape of a test departs from the spec, do
+one sweep before you push:
+
+1. In `research.md`, record the new decision with its date and reason. Keep the old decision as the
+   rejected alternative.
+2. Carry the change through the rest of the folder: a dated entry under "Clarifications" in
+   `spec.md`; `plan.md` (summary, Technical Context, Constitution Check, project structure and
+   phases); `data-model.md`; `contracts/`; the `tasks.md` task that did the work (add a suffixed
+   task, such as `T053b`, if work was added); `checklists/`; and any file the feature added.
+3. Rebuild any page that is built from the spec folder.
+4. Run `/speckit-analyze` and fix what it finds.
+5. Commit the spec changes with the code, in the same commit.
+
+A change written only in a PR body or a commit message does not count.
 
 ### Setup
 
