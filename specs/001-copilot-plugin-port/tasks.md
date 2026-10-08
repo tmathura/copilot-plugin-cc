@@ -409,10 +409,10 @@ and to `BLOCK`.
 - [ ] T083 Run the manual check in specs/001-copilot-plugin-port/quickstart.md with
   `claude --plugin-dir` on a throwaway git repo; record the results in the PR
 - [ ] T084 Set version 1.0.0 with `npm run bump-version -- 1.0.0`; `npm run check-version` passes
-- [ ] T085 Run `claude plugin validate .`, `npm run build` and `node --test tests/*.test.mjs`; all pass
-- [ ] T086 Give the owner the install commands:
+- [ ] T085 Give the owner the install commands:
   `claude plugin marketplace add tmathura/copilot-plugin-cc` and
   `claude plugin install copilot@tmathura-copilot`
+- [ ] T086 Run `claude plugin validate .`, `npm run build` and `node --test tests/*.test.mjs`; all pass
 
 ---
 

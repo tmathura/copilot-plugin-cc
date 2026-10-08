@@ -14,6 +14,18 @@ rescue (--background, --write, --model), status, result, cancel, setup, the copi
 and the optional Stop-hook review gate. Drop transfer. The first ticket chooses the Copilot transport
 (ACP or `copilot -p ... --output-format json`) and maps every Codex call site to its Copilot match."
 
+## Clarifications
+
+### Session 2026-10-08
+
+- Q: Which Copilot transport? → A: Prompt mode (`copilot --output-format json`, prompt on stdin).
+  ACP was chosen first and then rejected, because a live check showed it runs the reviewed
+  repository's hooks (research.md §2 and §6).
+- Q: How are `--write` tasks confined? → A: Edit tools plus the shell, with Copilot's `--sandbox` on a
+  best-effort basis (owner's decision). The User Story 3 test checks the requested edit and the
+  write profile, not that nothing outside the repository changes. Rejected alternatives: edits only,
+  with no shell; and refusing `--write` unless the sandbox is confirmed (research.md §3).
+
 ## User Scenarios & Testing *(mandatory)*
 
 The user is a developer who works in Claude Code and has the GitHub Copilot CLI. The owner is the
@@ -88,7 +100,9 @@ given. The user can choose a model with `--model`.
 **Why this priority**: Delegating work is the second main use, after review.
 
 **Independent Test**: Run a read-only task and a `--write` task in a test repository. Check that the
-read-only task changes nothing, and that the write task changes only files in the repository.
+read-only task changes nothing, and that the write task makes the requested edit in the repository
+and runs with the write profile, including `--sandbox` (research.md §3). Where the host cannot run
+Copilot's sandbox, shell commands are not confined; the README says so.
 
 **Acceptance Scenarios**:
 

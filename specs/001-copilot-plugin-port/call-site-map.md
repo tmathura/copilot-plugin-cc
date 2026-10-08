@@ -42,7 +42,7 @@ repo root.
 | `resolveProviderConfig`, `normalizeProviderId`, `formatProviderLabel`, `BUILTIN_PROVIDER_LABELS` | Reads the Codex model provider from config | Reads `COPILOT_PROVIDER_TYPE` and `COPILOT_PROVIDER_BASE_URL` for BYOK. Labels: `openai`, `azure`, `anthropic` | 4 |
 | `getSessionRuntimeStatus` | Reports "shared session" when a broker exists | Always reports "direct startup". The function stays, because setup and status show it | 3 |
 | `withAppServer`, `withDirectAppServer` | Connects, with a retry without the broker | `withPromptMode`: starts one process for the run and closes it at the end. No retry path | 4 |
-| `buildThreadParams`, `startThread` | `thread/start` with `cwd`, `model`, `approvalPolicy`, `sandbox`, `serviceName`, `ephemeral`; then `thread/name/set` | Arguments: `--session-id=<new uuid>`, `--model`, the profile flags; `cwd` is the process working folder. `ephemeral` and the thread name have no match (§7) | 4 |
+| `buildThreadParams`, `startThread` | `thread/start` with `cwd`, `model`, `approvalPolicy`, `sandbox`, `serviceName`, `ephemeral`; then `thread/name/set` | Arguments: `--session-id=<new uuid>`, `--model`, the profile flags; `cwd` is the process working folder. The thread name becomes `--name` when set (see `buildPersistentTaskThreadName`). `ephemeral` has no match (§7) | 4 |
 | `buildResumeParams`, `resumeThread` | `thread/resume` | Argument `--resume=<sessionId>`, with the same profile rules | 6 |
 | `buildTurnInput` | `[{ type: "text", text, text_elements: [] }]` | The prompt text, written to stdin | 4 |
 | `captureTurn` | Starts a turn, buffers notifications, waits for `turn/completed` | Same name. Feeds each JSON event to the state until the `result` event and process exit | 4 |
