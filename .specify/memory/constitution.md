@@ -131,4 +131,26 @@ Why: the owner follows upstream releases. An upstream change must land in the sa
   changes meaning, MINOR when a principle is added or grows, PATCH for wording.
 - Every plan and every PR review checks the work against this constitution.
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-08 | **Last Amended**: 2026-10-08
+### Implementation-to-Spec Consistency (non-negotiable)
+
+- Every session reads the feature's spec folder (`specs/NNN-<name>/`) first. While the feature is
+  being built, the folder MUST describe the feature as it is being built.
+- When the work departs from any file in the spec folder, in scope, approach, a decision, a count or
+  the shape of a test, those files MUST be updated in the same commit as the code, before the PR is
+  pushed.
+- The update MUST give the date and the reason. It MUST keep the earlier decision as the rejected
+  alternative.
+- The change MUST be carried through every file that repeats it. A decision changed in `research.md`
+  also appears in `plan.md` (summary, Technical Context, Constitution Check, project structure and
+  phases), in `data-model.md`, in `contracts/`, in the `tasks.md` task that did the work, in a dated
+  entry under "Clarifications" in `spec.md`, and in `checklists/`. Files that a feature adds, such as
+  a call-site map, count too.
+- A page built from the spec folder MUST be rebuilt in the same change.
+- `/speckit-analyze` MUST run on the result.
+- A change recorded only in a PR body or a commit message is a silent change. It is not allowed.
+- Once the feature has merged, its spec folder is history. Later work does not update it.
+
+Why: the agent trusts the spec folder at the start of each session. A decision changed in one file
+only leaves stale copies in the others, and reviews then find them one at a time.
+
+**Version**: 1.1.0 | **Ratified**: 2026-10-08 | **Last Amended**: 2026-10-08
