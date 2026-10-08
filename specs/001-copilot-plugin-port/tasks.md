@@ -313,7 +313,8 @@ cancel a second task; its process tree is gone.
   to completion before `enqueueBackgroundTask` continues, the job ends `completed`, not `queued`, and
   the late `pid` write does not overwrite that status; a job cancelled after its record is written
   but before its worker claims it never runs (the fake Copilot is never started) and stays
-  `cancelled`
+  `cancelled`; when the worker cannot start (a spawn stub that reports an error), the job is
+  `failed` with that error, not `queued`
 - [ ] T062 [P] [US3] Port the `rescue.md` checks in `tests/commands.test.mjs`
 
 ### Implementation for User Stories 3 and 4
@@ -324,11 +325,15 @@ cancel a second task; its process tree is gone.
 - [ ] T064 [US3] Add `task`, `task-worker` and `task-resume-candidate` to
   `P/scripts/copilot-companion.mjs` (`MODEL_ALIASES` empty, `VALID_REASONING_EFFORTS` as upstream);
   `enqueueBackgroundTask` writes the `queued` record before it starts the worker, and stores the
-  worker's `pid` only if the job is still `queued`; `task-worker` claims the job inside
+  worker's `pid` only if the job is still `queued`, or marks it `failed` if the worker cannot start;
+  `task-worker` claims the job inside
   `updateState` only if it is still `queued`, and exits without running a cancelled or missing job
   (research.md §7, background start order)
-- [ ] T065 [US4] Add `status`, `result` and `cancel` to `P/scripts/copilot-companion.mjs`; record
-  `copilotPid` when a run starts, and stop it on cancel (research.md §7, stopping a job)
+- [ ] T065 [US4] Add `status`, `result` and `cancel` to `P/scripts/copilot-companion.mjs`; start
+  Copilot inside `updateState` only if the job is still `running`, and write `copilotPid` in that
+  same step, as one synchronous block; if that save fails, kill the new Copilot tree before the
+  error is reported (tested with a state save that throws); stop it on cancel (research.md §7,
+  stopping a job and hook time budgets)
 - [ ] T066 [P] [US3] Port `U/commands/rescue.md` to `P/commands/rescue.md` (no `spark`)
 - [ ] T067 [P] [US4] Port `U/commands/status.md`, `U/commands/result.md` and `U/commands/cancel.md` to
   `P/commands/`
@@ -374,7 +379,11 @@ and to `BLOCK`.
   jobs, and also stops a job's Copilot process and its child when the job's companion is already
   dead; a job that another session adds during the `SessionEnd` wait keeps its record and log; with
   the state lock held by a live process, `SessionEnd` still ends within its 5 s timeout and leaves
-  `state.json` unchanged
+  `state.json` unchanged; a queued job whose worker tries to claim it during `SessionEnd` either is
+  stopped with the running jobs or finds itself cancelled, and no Copilot process is left after the
+  hook; with a pause between a companion's claim and its Copilot start, and a fake Copilot that
+  ignores `SIGTERM`, `SessionEnd` either kills that Copilot through the snapshot's `copilotPid` or the
+  companion never starts it
 
 ### Implementation for User Story 5
 
@@ -390,8 +399,10 @@ and to `BLOCK`.
   its process tree with `terminateProcessTree`, then stop the `copilotPid` of the companion's job
   record (found by the companion's `pid`; research.md §7, stopping a job)
 - [ ] T077 [US5] Port `U/scripts/session-lifecycle-hook.mjs` to `P/scripts/session-lifecycle-hook.mjs`
-  (no broker, no transcript path). `SessionEnd` signals the `pid` and `copilotPid` of every running
-  job first, waits once (up to 2 s), sends `SIGKILL` to survivors, then removes the session's jobs
+  (no broker, no transcript path). `SessionEnd` first, inside one `updateState`, marks the session's
+  queued and running jobs `cancelled` and reads the running jobs' `pid` and `copilotPid`; then
+  signals them,
+  waits once (up to 2 s), sends `SIGKILL` to survivors, then removes the session's jobs
   through `updateState` on fresh state with the lock wait limited to the time left (research.md §7,
   hook time budgets and locked state updates)
 - [ ] T078 [US5] Add the Phase 7 differences to the README section

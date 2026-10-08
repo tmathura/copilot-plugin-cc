@@ -324,6 +324,8 @@ Later tickets apply these rules. The call-site map uses them.
   overwrites a worker that has already moved the job on. Reason: correctness. Upstream starts the
   worker first; a worker that reads the job record before it exists exits at once, and the job stays
   `queued` forever. Rejected alternative: upstream's order, kept for parity.
+  If the worker cannot be started (`spawn` reports an error, or gives no `pid`), the companion marks
+  the job `failed` through `updateState` with the error, so it never stays `queued`.
   The worker claims the job inside `updateState`: only if the job is still `queued` does it set
   `running` and its own `pid`. Otherwise (cancelled or missing) it exits without running anything.
   Cancel also changes the job inside `updateState`, so a cancel and a claim never both win. Reason:
@@ -333,10 +335,22 @@ Later tickets apply these rules. The call-site map uses them.
   smaller budget.
   - `Stop`: the gate's run limit is 840 s (upstream: 900 s). The other 60 s cover collecting the
     context, the kill wait, removing the patch folder and printing the decision.
-  - `SessionEnd`: it sends `SIGTERM` to the `pid` and `copilotPid` of every running job of the
-    session first, then waits once, up to 2 s in total, then sends `SIGKILL` to what is still alive,
-    then removes the session's jobs through `updateState`, with the lock wait limited to the time
-    left in its 5 s budget. It never waits per job.
+  - `SessionEnd`: first, inside one `updateState`, it marks all the session's queued and running
+    jobs `cancelled` and reads the `pid` and `copilotPid` of the running ones. The worker claim and
+    the Copilot start use the same lock: a companion starts Copilot only inside `updateState`,
+    after it checks that its job is still `running`, and it writes `copilotPid` in that same step
+    (Node returns the child's `pid` from `spawn` at once). The check, the spawn and the save run as
+    one synchronous block (synchronous file calls, as upstream `state.mjs` uses), so no signal
+    handler runs inside it, and the plugin's own `SIGKILL` comes seconds after its `SIGTERM`. If the
+    save fails after the spawn, the companion kills the new Copilot process tree before it reports
+    the error. So
+    every Copilot child either is in the `SessionEnd` snapshot or is never started, and a worker
+    either claimed before this step or finds its job cancelled. Not covered: an outside `kill -9`
+    that lands inside that block. Rejected alternative: a supervisor process that gates every
+    Copilot start, which upstream does not have, for a window of a few milliseconds. Then it sends `SIGTERM` to every recorded `pid` and
+    `copilotPid`, waits once, up to 2 s in total, and sends `SIGKILL` to what is still alive. Last, it
+    removes the session's jobs through `updateState`. Each lock wait is limited to the time left in
+    its 5 s budget. It never waits per job.
 
 - **Locked state updates** (decided 2026-10-08, after Copilot PR review): `updateState` holds a lock
   file, `state.json.lock`, for the whole read, change, save and prune. It creates the lock with an

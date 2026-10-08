@@ -73,8 +73,8 @@ While a feature is being built, its spec folder must describe the feature as it 
 (constitution, "Implementation-to-Spec Consistency"). Once the work has merged, the folder is
 history.
 
-When a decision, a count, the scope or the shape of a test departs from the spec, do one sweep
-before you push:
+When a decision, a count, the scope, the approach or the shape of a test departs from the spec, do
+one sweep before you push:
 
 1. In `research.md`, record the new decision with its date and reason. Keep the old decision as the
    rejected alternative.
