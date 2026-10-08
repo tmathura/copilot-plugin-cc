@@ -59,38 +59,41 @@ Each ticket is one GitHub issue and one PR.
 **Purpose**: The repo is a valid marketplace with an empty plugin, a version check, CI and the test
 setup.
 
-- [ ] T006 [P] Add root `LICENSE` (Apache-2.0 text from upstream) and `NOTICE` (upstream notice text,
+- [X] T006 [P] Add root `LICENSE` (Apache-2.0 text from upstream) and `NOTICE` (upstream notice text,
   plus a "Changes" heading for files that cannot hold a change comment) at the repo root
-- [ ] T007 [P] Add `P/LICENSE`, `P/NOTICE` and `P/CHANGELOG.md` from `U/LICENSE`, `U/NOTICE` and
+- [X] T007 [P] Add `P/LICENSE`, `P/NOTICE` and `P/CHANGELOG.md` from `U/LICENSE`, `U/NOTICE` and
   `U/CHANGELOG.md`; the changelog starts a Copilot section
-- [ ] T008 [P] Port root `.claude-plugin/marketplace.json`: marketplace `tmathura-copilot`, owner
+- [X] T008 [P] Port root `.claude-plugin/marketplace.json`: marketplace `tmathura-copilot`, owner
   tmathura, one plugin `copilot` with `source: "./plugins/copilot"`, version `0.1.0`
-- [ ] T009 [P] Port `U/.claude-plugin/plugin.json` to `P/.claude-plugin/plugin.json`: `name:
+- [X] T009 [P] Port `U/.claude-plugin/plugin.json` to `P/.claude-plugin/plugin.json`: `name:
   "copilot"`, version `0.1.0`, author tmathura
-- [ ] T010 Port root `package.json`: name `copilot-plugin-cc`, private, `type: "module"`, `engines.node:
+- [X] T010 Port root `package.json`: name `copilot-plugin-cc`, private, `type: "module"`, `engines.node:
   ">=22"`, scripts `bump-version`, `check-version` and `test` as upstream; no `prebuild` or `build`
   yet (Phase 4 adds `build`); then run `npm install` to write `package-lock.json`
-- [ ] T011 Port root `scripts/bump-version.mjs` with `plugins/copilot` paths and the `copilot` plugin
+- [X] T011 Port root `scripts/bump-version.mjs` with `plugins/copilot` paths and the `copilot` plugin
   entry
-- [ ] T012 [P] Port `tests/bump-version.test.mjs`, including a test that `--check` fails when one
+- [X] T012 [P] Port `tests/bump-version.test.mjs`, including a test that `--check` fails when one
   manifest version differs
-- [ ] T013 [P] Port `tests/helpers.mjs` (temp folders and git repos)
-- [ ] T014 [P] Add `tests/fake-copilot-fixture.mjs` that answers `--version` with
+- [X] T013 [P] Port `tests/helpers.mjs` (temp folders and git repos); `run()` never uses a shell
+  (research.md §4, test helper; changed 2026-10-08), and `tests/helpers.test.mjs` checks that
+  spaces and shell characters reach the child unchanged
+- [X] T014 [P] Add `tests/fake-copilot-fixture.mjs` that answers `--version` with
   `GitHub Copilot CLI 1.0.93.` and `--help`; it reads its behaviour from an environment variable so
   later tests can make it fail. No prompt mode yet
-- [ ] T015 [P] Port `.github/workflows/pull-request-ci.yml`: same pinned actions, Node 22, a matrix of
+- [X] T015 [P] Port `.github/workflows/pull-request-ci.yml`: same pinned actions, Node 22, a matrix of
   `ubuntu-latest`, `macos-latest` and `windows-latest`, `npm ci`, `npm test`, and
-  `npm run check-version`; no Codex or Copilot install step
-- [ ] T016 [P] Update root `.gitignore`: add `node_modules/`; keep the existing entries
-- [ ] T017 [P] Add `UPSTREAM.md`: checked commit `db52e28f4d9ded852ab3942cea316258ae4ef346` (v1.0.6),
+  `npm run check-version`; no Codex or Copilot install step; the checkout sets
+  `persist-credentials: false`, so test code cannot read the token (added 2026-10-08, PR review)
+- [X] T016 [P] Update root `.gitignore`: add `node_modules/`; keep the existing entries
+- [X] T017 [P] Add `UPSTREAM.md`: checked commit `db52e28f4d9ded852ab3942cea316258ae4ef346` (v1.0.6),
   and the status table format (ported, pending, skipped with a reason)
-- [ ] T018 Write the `README.md` skeleton: what the plugin is, install commands
+- [X] T018 Write the `README.md` skeleton: what the plugin is, install commands
   `claude plugin marketplace add tmathura/copilot-plugin-cc` and
   `claude plugin install copilot@tmathura-copilot`, "work in progress", and the section "Differences
   from the Codex plugin" with the transport, the dropped broker, the dropped `transfer` and the CI
   matrix
-- [ ] T019 Add `npm test` and `npm run check-version` to the "Commands" table in `CLAUDE.md`
-- [ ] T020 Run `claude plugin validate .` and `node --test tests/*.test.mjs`; both pass
+- [X] T019 Add `npm test` and `npm run check-version` to the "Commands" table in `CLAUDE.md`
+- [X] T020 Run `claude plugin validate .` and `node --test tests/*.test.mjs`; both pass
 
 **Checkpoint**: `claude plugin marketplace add` of the branch works; the plugin has no commands yet.
 

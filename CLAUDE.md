@@ -16,9 +16,11 @@ This file only gives directions. The rules live in the files below.
 ## Layout
 
 ```
-.claude-plugin/marketplace.json   (planned) marketplace entry
-plugins/copilot/                  (planned) the plugin: commands, agents, hooks, skills, scripts
-tests/                            (planned) node --test suites
+.claude-plugin/marketplace.json   marketplace entry
+plugins/copilot/                  the plugin; commands, agents, hooks, skills and scripts are planned
+scripts/bump-version.mjs          sets and checks the version in every manifest
+tests/                            node --test suites, helpers and the fake copilot CLI
+UPSTREAM.md                       last upstream commit checked, and the status of later changes
 docs/                             conventions and development workflow
 specs/001-copilot-plugin-port/    the port spec: transport decision, call-site map, plan, tasks
 .specify/                         Spec Kit: constitution, templates, scripts
@@ -27,4 +29,8 @@ specs/001-copilot-plugin-port/    the port spec: transport decision, call-site m
 
 ## Commands
 
-None yet. The port adds `npm test`.
+| Purpose | Command |
+| --- | --- |
+| Test | `npm test` |
+| Check versions | `npm run check-version` |
+| Validate plugin | `claude plugin validate .` |

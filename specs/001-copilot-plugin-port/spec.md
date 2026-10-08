@@ -32,6 +32,10 @@ and the optional Stop-hook review gate. Drop transfer. The first ticket chooses 
   exited. The README says so.
   Rejected alternative: tracking every descendant through the process table (research.md §7,
   limit of stopping a job).
+- Q: Does the test helper `run()` keep upstream's shell on Windows? → A: No. It never uses a shell,
+  so paths with spaces or shell characters reach the child unchanged (decided 2026-10-08, after the
+  ticket 2 code review). Rejected alternative: upstream's shell, kept for parity (research.md §4,
+  test helper).
 
 ## User Scenarios & Testing *(mandatory)*
 
