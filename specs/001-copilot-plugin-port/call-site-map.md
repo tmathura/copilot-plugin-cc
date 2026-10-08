@@ -90,7 +90,7 @@ repo root.
 | `handleTaskWorker` | Checks that the job record and request exist, then runs the job | Claims the job inside `updateState` only if it is still `queued` (sets `running` and its `pid`); a cancelled or missing job exits without running (§7, background start order; correctness) | 6 |
 | `spawnDetachedTaskWorker` | Background worker with `process.execPath`, no shell | Rename only | 6 |
 | `handleStatus`, `waitForSingleJobSnapshot`, `handleResult` | Job state only | Rename only | 6 |
-| `handleCancel` | `interruptAppServerTurn`, then `terminateProcessTree` | `interruptPromptModeTurn` (not attempted), then `terminateProcessTree` on the job's `pid` and then on its `copilotPid` (§7, stopping a job) | 6 |
+| `handleCancel` | Picks the job, signals its recorded `pid` (`interruptAppServerTurn`, then `terminateProcessTree`), then saves `cancelled` | In one `updateState`, re-reads the job, marks it `cancelled` and reads its current `pid` and `copilotPid`; then `interruptPromptModeTurn` (not attempted) and `terminateProcessTree` on both (§7, stopping a job; correctness) | 6 |
 | `buildReviewJobMetadata`, `buildTaskRunMetadata`, `renderQueuedTaskLaunch` | "Codex Review", "Codex Task", `/codex:status` | Rename only | 5, 6 |
 | `STOP_REVIEW_TASK_MARKER` | Marks the stop-gate task | Rename only (the text has no Codex name) | 7 |
 | `handleTransfer`, `executeTransfer`, `renderTransferResult`, `transfer` case | Session transfer | Dropped | 4 |

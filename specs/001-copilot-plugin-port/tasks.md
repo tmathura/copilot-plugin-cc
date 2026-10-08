@@ -129,7 +129,8 @@ setup.
 - [ ] T030 [P] Port `tests/process.test.mjs`; add tests: `runCommand` never uses a shell; arguments
   with spaces, quotes, `&`, `|`, `;`, `$` and `%` reach the child unchanged; a non-zero exit gives
   `formatCommandFailure` text; `terminateProcessTree` kills a child started with `detached: true`
-  and its grandchild on macOS and Linux, and a child tree on Windows; it signals a child that leads
+  and its grandchild on macOS and Linux, and a child tree on Windows, including a child spawned with
+  `detached: true` whose parent still runs; it signals a child that leads
   no group; it sends `SIGKILL` to a child that ignores `SIGTERM` after the wait (short in tests);
   `resolveLauncher` on Windows (simulated with a temp PATH): an `.exe`, an npm global-package `.cmd`
   shim, `npm.cmd` with `node_modules/npm/bin/npm-cli.js`, an unknown `.cmd` (not found), and paths
@@ -318,7 +319,9 @@ cancel a second task; its process tree is gone.
   the late `pid` write does not overwrite that status; a job cancelled after its record is written
   but before its worker claims it never runs (the fake Copilot is never started) and stays
   `cancelled`; when the worker cannot start (a spawn stub that reports an error), the job is
-  `failed` with that error, not `queued`
+  `failed` with that error, not `queued`; with cancel paused after it picks a queued job while the
+  worker claims it and starts Copilot, the cancel still stops that Copilot (it reads the PIDs under
+  the lock) or the job never starts
 - [ ] T062 [P] [US3] Port the `rescue.md` checks in `tests/commands.test.mjs`
 
 ### Implementation for User Stories 3 and 4
@@ -336,8 +339,9 @@ cancel a second task; its process tree is gone.
 - [ ] T065 [US4] Add `status`, `result` and `cancel` to `P/scripts/copilot-companion.mjs`; start
   Copilot inside `updateState` only if the job is still `running`, and write `copilotPid` in that
   same step, as one synchronous block; if that save fails, kill the new Copilot tree before the
-  error is reported (tested with a state save that throws); stop it on cancel (research.md §7,
-  stopping a job and hook time budgets)
+  error is reported (tested with a state save that throws); `cancel` first re-reads the job, marks
+  it `cancelled` and reads its current `pid` and `copilotPid` in one `updateState`, then signals
+  both (research.md §7, stopping a job and hook time budgets)
 - [ ] T066 [P] [US3] Port `U/commands/rescue.md` to `P/commands/rescue.md` (no `spark`)
 - [ ] T067 [P] [US4] Port `U/commands/status.md`, `U/commands/result.md` and `U/commands/cancel.md` to
   `P/commands/`

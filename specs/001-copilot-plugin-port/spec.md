@@ -26,8 +26,10 @@ and the optional Stop-hook review gate. Drop transfer. The first ticket chooses 
   write profile, not that nothing outside the repository changes. Rejected alternatives: edits only,
   with no shell; and refusing `--write` unless the sandbox is confirmed (research.md §3).
 - Q: Which child processes does cancel stop (FR-024)? → A: The companion, the Copilot process and
-  every process in their process groups (the process tree on Windows). A program that a `--write`
-  task deliberately detaches into its own session or group is not stopped; the README says so.
+  every process in their process groups (the process tree on Windows). On macOS and Linux, a
+  program that a `--write` task deliberately detaches into its own session or group is not stopped.
+  On Windows, a detached child is stopped while its parent still runs, but not after its parent has
+  exited. The README says so.
   Rejected alternative: tracking every descendant through the process table (research.md §7,
   limit of stopping a job).
 
@@ -273,7 +275,8 @@ the matching function names in it.
 - **FR-023**: `/copilot:status`, `/copilot:result` and `/copilot:cancel` MUST show, return and stop
   background jobs for the current repository, as upstream does.
 - **FR-024**: Cancel MUST stop the Copilot process and its child processes, except programs that a
-  task deliberately detaches into their own session or group (see Clarifications).
+  task deliberately detaches out of reach: into their own session or group on macOS and Linux, or
+  past a parent that has exited on Windows (see Clarifications).
 
 **Review gate and session hooks**
 

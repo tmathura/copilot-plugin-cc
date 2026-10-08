@@ -304,8 +304,10 @@ Later tickets apply these rules. The call-site map uses them.
   `taskkill /T`, which follows the whole tree.
 - **Limit of stopping a job** (decided 2026-10-08, after Copilot PR review): cancel, the gate and
   `SessionEnd` stop the companion, the Copilot process and every process in their process groups
-  (the tree with `taskkill /T` on Windows). A program that a `--write` task deliberately detaches
-  (for example with `setsid` or a detached Node child) leaves those groups and is not stopped. The
+  (the tree with `taskkill /T` on Windows). On macOS and Linux, a program that a `--write` task
+  deliberately detaches (for example with `setsid` or a detached Node child) leaves those groups and
+  is not stopped. On Windows, `taskkill /T` follows the parent chain, so a detached child is stopped
+  while its parent still runs; a child whose parent has already exited is not. The
   README says so, next to the best-effort sandbox. Rejected alternative: tracking every descendant
   by polling the process table, which is different on each system and races with short-lived
   processes.
@@ -318,6 +320,12 @@ Later tickets apply these rules. The call-site map uses them.
   - The job record also keeps `copilotPid`, the Copilot child's process id, set when the run starts.
     Cancel stops the job's `pid` and then the `copilotPid` group, so a Copilot run whose companion
     was killed with `SIGKILL` is still stopped.
+  - Cancel first re-reads the job, marks it `cancelled` and reads its current `pid` and
+    `copilotPid` in one `updateState`, and only then sends signals, as `SessionEnd` does (decided
+    2026-10-08, after Copilot PR review). The worker claim and the Copilot start use the same lock,
+    so a job either was claimed and started before this step (its PIDs are read) or finds itself
+    cancelled and never starts. Upstream signals first and saves `cancelled` after (rejected: a job
+    that starts between the two steps escapes the kill).
   - The rule for every stopper (cancel, `SessionEnd`, the review gate): stop the companion, then
     stop the `copilotPid` of its job record itself. Never rely only on the companion's `SIGTERM`
     handler, because the companion can be killed before the handler finishes. The gate finds the
