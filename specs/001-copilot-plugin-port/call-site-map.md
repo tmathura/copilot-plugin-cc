@@ -124,6 +124,7 @@ repo root.
 | same → `pruneJobs` | Keeps the 50 most recently updated jobs, whatever their status | Keeps every queued or running job; the 50 cap applies to finished jobs only (§7, locked state updates; correctness) | 3 |
 | `scripts/lib/fs.mjs` → `createTempDir` | Prefix `codex-plugin-` | Prefix `copilot-plugin-` | 3 |
 | `scripts/lib/tracked-jobs.mjs` → `SESSION_ID_ENV`, `createProgressReporter` | `CODEX_COMPANION_SESSION_ID`, `[codex]` stderr prefix | `COPILOT_COMPANION_SESSION_ID`, `[copilot]` | 3 |
+| same → `runTrackedJob` | Writes `running` at the start and the final status at the end, unconditionally | Both writes go through `updateState` and never revive a `cancelled` or missing job; a cancelled job exits without running (§7, background start order; correctness) | 3 |
 | `scripts/lib/job-control.mjs` → import of `getSessionRuntimeStatus` | From `codex.mjs` | From `copilot.mjs`. Without a broker this function always reports "direct startup", so ticket 3 creates `copilot.mjs` with only this function. Ticket 4 adds the rest of the adapter | 3 |
 | same → `inferLegacyJobPhase` | Matches "starting codex", "codex error:" | Matches "starting copilot", "copilot error:" | 3 |
 | same → error text | `/codex:status`, `/codex:cancel`, "Codex jobs" | Rename only | 3 |

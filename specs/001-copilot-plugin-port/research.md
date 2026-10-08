@@ -330,6 +330,12 @@ Later tickets apply these rules. The call-site map uses them.
   `running` and its own `pid`. Otherwise (cancelled or missing) it exits without running anything.
   Cancel also changes the job inside `updateState`, so a cancel and a claim never both win. Reason:
   without the claim, a job cancelled before its worker starts would still run, even with `--write`.
+  `runTrackedJob` follows the same rule (decided 2026-10-08, after Copilot PR review). Its start
+  write goes through `updateState`: it creates a new foreground job, or keeps a job that this
+  process claimed, but it never sets `running` on a job that is `cancelled` or gone; then it exits
+  without running. Its final write (`completed` or `failed`) also happens only if the job is still
+  `running`, so a finished run never overwrites a cancel. Upstream writes `running` and the final
+  status unconditionally (rejected: it can revive a job that `SessionEnd` or cancel stopped).
 - **Hook time budgets**: Claude Code stops a hook at its `hooks.json` timeout (`Stop` 900 s,
   `SessionEnd` 5 s, as upstream), and then no cleanup runs. So each hook does its work inside a
   smaller budget.

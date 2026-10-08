@@ -115,7 +115,10 @@ setup.
   `state.json.lock` and write through a temp file and a rename (research.md §7, locked state
   updates)
 - [ ] T026 [P] Port `U/scripts/lib/tracked-jobs.mjs` to `P/scripts/lib/tracked-jobs.mjs`
-  (`COPILOT_COMPANION_SESSION_ID`, `[copilot]` prefix)
+  (`COPILOT_COMPANION_SESSION_ID`, `[copilot]` prefix); `runTrackedJob` writes its start and final
+  status through `updateState` and never revives a `cancelled` or missing job (research.md §7,
+  background start order); test that a job cancelled before `runTrackedJob` starts never runs, and
+  that a cancel during a run is not overwritten by the final write
 - [ ] T027 Create `P/scripts/lib/copilot.mjs` with only `getSessionRuntimeStatus`, which always
   returns `mode: "direct"`, `label: "direct startup"`
 - [ ] T028 Port `U/scripts/lib/job-control.mjs` to `P/scripts/lib/job-control.mjs` (import from
@@ -383,7 +386,8 @@ and to `BLOCK`.
   stopped with the running jobs or finds itself cancelled, and no Copilot process is left after the
   hook; with a pause between a companion's claim and its Copilot start, and a fake Copilot that
   ignores `SIGTERM`, `SessionEnd` either kills that Copilot through the snapshot's `copilotPid` or the
-  companion never starts it
+  companion never starts it; with a pause between a worker's claim and `runTrackedJob`, a
+  `SessionEnd` in that gap leaves the job `cancelled` and no Copilot process is started
 
 ### Implementation for User Story 5
 
