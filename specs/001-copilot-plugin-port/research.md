@@ -187,12 +187,15 @@ data model, the contracts, the plan and the tasks link here.
 - **Alternatives rejected**: `shell: true` (unsafe), `cmd.exe /c` with escaping (fragile), and
   hard-coding `copilot-win32-x64/copilot.exe` (it ties the plugin to one npm package layout and CPU).
 
-## 4b. Git calls without fsmonitor hooks or textconv programs
+## 4b. Git calls that write nothing and start no hooks
 
-- **Decision**: every `git` call in `scripts/lib/git.mjs` passes `-c core.fsmonitor=false`, and every
-  `git diff` call also passes `--no-textconv` next to upstream's `--no-ext-diff`. The git commands
-  that `commands/review.md` and `commands/adversarial-review.md` give Claude for the size estimate
-  get the same options.
+- **Decision**: every `git` call in `scripts/lib/git.mjs` passes the global options
+  `--no-optional-locks -c core.fsmonitor=false`, and every `git diff` call also passes
+  `--no-textconv` next to upstream's `--no-ext-diff`. The git commands that `commands/review.md` and
+  `commands/adversarial-review.md` give Claude for the size estimate get the same options.
+- **Rationale (index)**: correctness. `git status` can refresh cached file data in `.git/index`
+  while it reads; `--no-optional-locks` stops that (git-status manual). A review must leave the
+  repository byte for byte the same (spec User Story 2).
 - **Rationale**: security. `shell: false` stops a shell, but git itself can start a configured
   `core.fsmonitor` hook (on `git status`) or a `textconv` program (on `git diff`). Reviews and the
   gate run these calls before Copilot starts, so no Copilot control covers them. Neither is needed

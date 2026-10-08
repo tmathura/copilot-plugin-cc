@@ -116,7 +116,7 @@ repo root.
 | same → `terminateProcessTree` | Sends `SIGTERM` to the process group on macOS and Linux and returns; on `ESRCH` it does not signal the process itself; `taskkill /T /F` on Windows | Signals the process itself when there is no group, and sends `SIGKILL` to what is still alive after up to 5 seconds (§7, stopping a job). The callers start each process they may stop as its own group (§7, process groups) | 3, 4, 7 |
 | same → `formatCommandFailure` | No Codex calls | Rename only | 3 |
 | `scripts/lib/git.mjs` → `buildAdversarialCollectionGuidance` | Self-collect text: "inspect the target diff yourself with read-only git commands" | "Read the patch files listed below with the view tool". The companion writes the exact patches to a folder passed with `--add-dir` (§2, ticket 5). Copilot has no shell in reviews | 3, 5 |
-| same, rest of `git.mjs` | Runs `git` without a shell | Also passes `-c core.fsmonitor=false` to every call and `--no-textconv` to every `git diff` (§4b, security). Clean and process filters still run, as in any git call (§4b, limit) | 3 |
+| same, rest of `git.mjs` | Runs `git` without a shell | Also passes `--no-optional-locks -c core.fsmonitor=false` to every call and `--no-textconv` to every `git diff` (§4b: no index writes, no hooks). Clean and process filters still run, as in any git call (§4b, limit) | 3 |
 | `scripts/lib/state.mjs` → `FALLBACK_STATE_ROOT_DIR` | `<tmp>/codex-companion` | `<tmp>/copilot-companion` | 3 |
 | `scripts/lib/fs.mjs` → `createTempDir` | Prefix `codex-plugin-` | Prefix `copilot-plugin-` | 3 |
 | `scripts/lib/tracked-jobs.mjs` → `SESSION_ID_ENV`, `createProgressReporter` | `CODEX_COMPANION_SESSION_ID`, `[codex]` stderr prefix | `COPILOT_COMPANION_SESSION_ID`, `[copilot]` | 3 |
@@ -136,7 +136,7 @@ repo root.
 | (none upstream) | Codex's native reviewer needs no prompt | New `prompts/review.md`: the `/review` slash command and `{{REVIEW_INPUT}}` | 5 |
 | `prompts/stop-review-gate.md` | Mentions `/codex:setup` and `/codex:status` | Renamed, plus a `{{REVIEW_INPUT}}` block for the working-tree context | 7 |
 | `schemas/review-output.schema.json` | Output schema for Codex | Copied unchanged | 5 |
-| `commands/review.md`, `commands/adversarial-review.md` | Call `codex-companion.mjs`; "Codex" text; tell Claude to run `git status` and `git diff --shortstat` to estimate the review size | Renamed. The size-estimate commands get the §4b hardening: `git -c core.fsmonitor=false status ...` and `git -c core.fsmonitor=false diff --shortstat --no-textconv ...` (security) | 5 |
+| `commands/review.md`, `commands/adversarial-review.md` | Call `codex-companion.mjs`; "Codex" text; tell Claude to run `git status` and `git diff --shortstat` to estimate the review size | Renamed. The size-estimate commands get the §4b hardening: `git --no-optional-locks -c core.fsmonitor=false status ...` and `git --no-optional-locks -c core.fsmonitor=false diff --shortstat --no-textconv ...` (security, no index writes) | 5 |
 | `commands/rescue.md` | `codex:codex-rescue`, `--model <model\|spark>`, the `spark` mapping | `copilot:copilot-rescue`, `--model <model>`, no `spark` line | 6 |
 | `commands/status.md`, `commands/result.md`, `commands/cancel.md` | Call the companion | Rename only | 6 |
 | `commands/setup.md` | Offers `npm install -g @openai/codex`; keeps `!codex login` guidance | Offers `npm install -g @github/copilot`; keeps `!copilot login` guidance | 4 |

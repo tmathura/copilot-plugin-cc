@@ -107,7 +107,7 @@ setup.
   add `resolveLauncher(name)` (research.md §4) and use it in `binaryAvailable`
 - [ ] T024 Port `U/scripts/lib/git.mjs` to `P/scripts/lib/git.mjs`; change the self-collect guidance
   in `buildAdversarialCollectionGuidance` to "Read the patch files listed below with the view tool"
-  (research.md §2, self-collect); pass `-c core.fsmonitor=false` to every git call and `--no-textconv`
+  (research.md §2, self-collect); pass `--no-optional-locks -c core.fsmonitor=false` to every git call and `--no-textconv`
   to every `git diff` (research.md §4b)
 - [ ] T025 [P] Port `U/scripts/lib/state.mjs` to `P/scripts/lib/state.mjs` (fallback root
   `<tmp>/copilot-companion`); keep `MAX_JOBS = 50` and `STATE_VERSION = 1`
@@ -129,7 +129,8 @@ setup.
   with spaces; `binaryAvailable("npm")` finds npm on Windows with no shell
 - [ ] T031 [P] Port `tests/git.test.mjs`, including a repository path with spaces, and a repository
   with a configured `core.fsmonitor` hook and a `textconv` driver: context collection runs neither
-  (each would write a marker file)
+  (each would write a marker file); with stale cached file data (a tracked file touched after
+  `git add`), context collection leaves the SHA-256 of `.git/index` unchanged
 - [ ] T032 [P] Port `tests/state.test.mjs` and `tests/render.test.mjs`
 - [ ] T033 [P] Add `tests/job-control.test.mjs` for job lookup by id and prefix, ambiguous prefixes,
   and the "still running" errors
@@ -237,7 +238,7 @@ after; a write attempt is rejected.
   unknown `verdict`, a finding without `file`) is rejected by `validateReviewOutput`: `parseError` is
   set, the job is `failed`, and the raw output is kept
 - [ ] T050 [P] [US2] Port `tests/commands.test.mjs` for `review.md` and `adversarial-review.md`;
-  check that every `git` command in them has `-c core.fsmonitor=false`, and every `git diff` also
+  check that every `git` command in them has `--no-optional-locks -c core.fsmonitor=false`, and every `git diff` also
   `--no-textconv`
 
 ### Implementation for User Story 2
@@ -258,7 +259,7 @@ after; a write attempt is rejected.
   (`executeReviewRun`, `handleReviewCommand`, `validateNativeReviewRequest`,
   `buildAdversarialReviewPrompt`, `buildReviewJobMetadata`)
 - [ ] T056 [P] [US2] Port `U/commands/review.md` and `U/commands/adversarial-review.md` to
-  `P/commands/`; the size-estimate git commands get `-c core.fsmonitor=false`, and the diffs also
+  `P/commands/`; the size-estimate git commands get `--no-optional-locks -c core.fsmonitor=false`, and the diffs also
   `--no-textconv` (research.md §4b)
 - [ ] T057 [P] [US2] Port `U/skills/codex-result-handling/SKILL.md` to
   `P/skills/copilot-result-handling/SKILL.md`
