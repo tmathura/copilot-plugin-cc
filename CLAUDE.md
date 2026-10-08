@@ -19,6 +19,7 @@ This file only gives directions. The rules live in the files below.
 plugins/copilot/                  (planned) the plugin: commands, agents, hooks, skills, scripts
 tests/                            (planned) node --test suites
 docs/                             conventions and development workflow
+specs/001-copilot-plugin-port/    the port spec: transport decision, call-site map, plan, tasks
 .specify/                         Spec Kit: constitution, templates, scripts
 .claude/skills/speckit-*          Spec Kit skills (managed, do not edit)
 ```
