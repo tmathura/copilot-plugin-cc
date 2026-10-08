@@ -110,7 +110,8 @@ setup.
   (research.md §2, self-collect); pass `--no-optional-locks -c core.fsmonitor=false` to every git call and `--no-textconv`
   to every `git diff` (research.md §4b)
 - [ ] T025 [P] Port `U/scripts/lib/state.mjs` to `P/scripts/lib/state.mjs` (fallback root
-  `<tmp>/copilot-companion`); keep `MAX_JOBS = 50` and `STATE_VERSION = 1`; lock `updateState` with
+  `<tmp>/copilot-companion`); keep `MAX_JOBS = 50` for finished jobs and never prune a queued or
+  running job; keep `STATE_VERSION = 1`; lock `updateState` (with an optional shorter wait) with
   `state.json.lock` and write through a temp file and a rename (research.md §7, locked state
   updates)
 - [ ] T026 [P] Port `U/scripts/lib/tracked-jobs.mjs` to `P/scripts/lib/tracked-jobs.mjs`
@@ -140,7 +141,8 @@ setup.
   (short in tests) without changing `state.json`; a holder never removes a lock with another token;
   two reclaimers of the same dead lock, with the second paused after it saw the dead owner, let only
   one live holder in (the reclaim lock serializes them); a reclaim lock with a dead owner gives the
-  clear error that names it
+  clear error that names it; with 55 newer finished jobs, an older running job keeps its record and
+  log and can still be cancelled
 - [ ] T033 [P] Add `tests/job-control.test.mjs` for job lookup by id and prefix, ambiguous prefixes,
   and the "still running" errors
 - [ ] T034 Add the Phase 3 differences (no shell in `runCommand`, the self-collect text) to the
@@ -362,7 +364,9 @@ and to `BLOCK`.
   timeout; `SessionStart` writes `COPILOT_COMPANION_SESSION_ID` to `CLAUDE_ENV_FILE`; `SessionEnd`
   stops and removes the session's running jobs, finishing within its 5 s timeout with three running
   jobs, and also stops a job's Copilot process and its child when the job's companion is already
-  dead
+  dead; a job that another session adds during the `SessionEnd` wait keeps its record and log; with
+  the state lock held by a live process, `SessionEnd` still ends within its 5 s timeout and leaves
+  `state.json` unchanged
 
 ### Implementation for User Story 5
 
@@ -379,8 +383,9 @@ and to `BLOCK`.
   record (found by the companion's `pid`; research.md §7, stopping a job)
 - [ ] T077 [US5] Port `U/scripts/session-lifecycle-hook.mjs` to `P/scripts/session-lifecycle-hook.mjs`
   (no broker, no transcript path). `SessionEnd` signals the `pid` and `copilotPid` of every running
-  job first, waits once (up to 2 s), sends `SIGKILL` to survivors, then prunes (research.md §7, hook
-  time budgets)
+  job first, waits once (up to 2 s), sends `SIGKILL` to survivors, then removes the session's jobs
+  through `updateState` on fresh state with the lock wait limited to the time left (research.md §7,
+  hook time budgets and locked state updates)
 - [ ] T078 [US5] Add the Phase 7 differences to the README section
 - [ ] T079 [US5] Run `claude plugin validate .`, `npm run build` and `node --test tests/*.test.mjs`;
   all pass

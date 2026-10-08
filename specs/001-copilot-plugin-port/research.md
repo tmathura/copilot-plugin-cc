@@ -325,12 +325,14 @@ Later tickets apply these rules. The call-site map uses them.
     context, the kill wait, removing the patch folder and printing the decision.
   - `SessionEnd`: it sends `SIGTERM` to the `pid` and `copilotPid` of every running job of the
     session first, then waits once, up to 2 s in total, then sends `SIGKILL` to what is still alive,
-    then prunes the jobs. It never waits per job.
+    then removes the session's jobs through `updateState`, with the lock wait limited to the time
+    left in its 5 s budget. It never waits per job.
 
 - **Locked state updates** (decided 2026-10-08, after Copilot PR review): `updateState` holds a lock
   file, `state.json.lock`, for the whole read, change, save and prune. It creates the lock with an
   exclusive create (`wx`) and writes its owner into it: its `pid` and a random token. It retries for
-  up to 5 seconds, then fails with a clear error and changes nothing. It reclaims a lock only when
+  up to 5 seconds by default; a caller can pass a shorter limit. Then it fails with a clear error and
+  changes nothing. It reclaims a lock only when
   the owner's `pid` is no longer running, never because of age alone. Reclaiming is serialized by a
   second lock, `state.json.lock.reclaim`, also created with `wx` and holding a `pid` and token. Only
   its holder reads the main lock, checks that its owner is dead, and deletes it. A new main lock can
@@ -341,6 +343,10 @@ Later tickets apply these rules. The call-site map uses them.
   renames it over the old file, so a reader never sees half a file. Reason: correctness. Two
   companions that save at the same time can otherwise drop each other's job, and pruning then
   deletes that job's record and log, so cancel and `SessionEnd` lose its `pid` and `copilotPid`.
+  Pruning keeps every queued or running job and applies the 50-job cap to finished jobs only,
+  because upstream's cap counts running jobs too and can delete a long task's record. Every writer,
+  `SessionEnd` included, changes state only through `updateState` on the state it read under the
+  lock, never by saving an earlier snapshot.
   Rejected alternative: keep upstream's unlocked update for parity; upstream has the same race, but
   this port relies on the job records to stop processes.
 
