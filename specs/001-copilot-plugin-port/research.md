@@ -279,11 +279,14 @@ data model, the contracts, the plan and the tasks link here.
   package cache", so a bare `--version` can report a different build from the one that runs. Setup
   refuses older versions and says how to update. Raise the floor only after a test run on the newer
   version. The check has a 30-second limit, and a check that passes it reports that `--version` did
-  not answer (decided 2026-10-08, ticket 4 Codex review). Reason: the check is a blocking
-  `spawnSync`, so no later time limit or signal handler can run while it waits. At the limit it
-  sends `SIGKILL`, because `spawnSync` keeps waiting for a program that ignores `SIGTERM` (Codex
-  review round 2). Rejected alternatives: no limit, as upstream's `binaryAvailable`; the default
-  `SIGTERM`.
+  not answer (decided 2026-10-08, ticket 4 Codex review). The check is an async child process in a
+  group of its own on macOS and Linux, and at the limit `terminateProcessTree` stops its whole tree
+  (`SIGKILL` after the wait). Reason: Copilot's npm loader runs the native binary with
+  `spawnSync(..., { stdio: "inherit" })` (seen in `npm-loader.js`, Codex review round 3), so a
+  stalled binary holds the check's pipes after the loader is killed, and a blocking `spawnSync`
+  check would wait for them with no timer or signal handler able to run. Rejected alternatives: no
+  limit, as upstream's `binaryAvailable`; `spawnSync` with a `timeout` and `SIGTERM`, and then
+  `SIGKILL` (rounds 1 and 2), which stop only the loader.
 - **Rationale**: The prompt-mode event format has no published schema, so the plugin claims only what
   was tested. Most users run the newest version, because Copilot updates itself by default.
 

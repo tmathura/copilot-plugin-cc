@@ -17,6 +17,25 @@ const ALLOW_ALL_FLAGS = ["--allow-all-tools", "--allow-all", "--yolo", "--allow-
 const SECRET_FLAG = "--secret-env-vars=GH_TOKEN,COPILOT_PROVIDER_API_KEY,COPILOT_PROVIDER_BEARER_TOKEN";
 const COMMON_ARGS = ["--output-format", "json", "--no-ask-user", "--no-auto-update", SECRET_FLAG];
 
+function isAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code !== "ESRCH";
+  }
+}
+
+async function waitFor(predicate, timeoutMs = 10000) {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate()) {
+    if (Date.now() > deadline) {
+      throw new Error(`Condition not met within ${timeoutMs} ms`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}
+
 // Spaces in the launcher folder, the working folder and the data folder must reach Copilot unchanged.
 function setUp(behavior = "ok", extraEnv = {}) {
   const root = makeTempDir();
@@ -103,30 +122,34 @@ test("the write environment keeps the user's home and drops allow-all", () => {
   assert.deepEqual(env, { COPILOT_HOME: "user-home" });
 });
 
-test("the version check uses --no-auto-update and enforces the 1.0.93 floor", () => {
-  assert.deepEqual(getCopilotAvailability(".", { env: setUp("ok").env }), {
+test("the version check uses --no-auto-update and enforces the 1.0.93 floor", async () => {
+  assert.deepEqual(await getCopilotAvailability(".", { env: setUp("ok").env }), {
     available: true,
     detail: "GitHub Copilot CLI 1.0.93",
     version: "1.0.93"
   });
 
-  const old = getCopilotAvailability(".", { env: setUp("old-version").env });
+  const old = await getCopilotAvailability(".", { env: setUp("old-version").env });
   assert.equal(old.available, false);
   assert.equal(old.version, "1.0.92");
   assert.match(old.detail, /1\.0\.93 or later is needed/);
 
   // A bare --version reports a newer cached build; the pinned launch is the one that runs.
-  assert.equal(getCopilotAvailability(".", { env: setUp("pinned-old-version").env }).available, false);
+  assert.equal((await getCopilotAvailability(".", { env: setUp("pinned-old-version").env })).available, false);
 });
 
-test("a version check that does not answer is stopped at its time limit", () => {
-  const status = getCopilotAvailability(".", { env: setUp("hang-version").env, timeoutMs: 500 });
+test("a version check that does not answer is stopped at its time limit, with the child that holds its pipes", async () => {
+  const { binDir, env } = setUp("hang-version");
+
+  const status = await getCopilotAvailability(".", { env, timeoutMs: 500 });
 
   assert.deepEqual(status, {
     available: false,
     detail: "copilot --version did not answer within 0.5 seconds",
     version: null
   });
+  const pids = JSON.parse(fs.readFileSync(path.join(binDir, "fake-copilot-pids.json"), "utf8"));
+  await waitFor(() => pids.every((pid) => !isAlive(pid)));
 });
 
 test("a read-only run starts the resolved launcher with the read-only arguments and environment", async () => {

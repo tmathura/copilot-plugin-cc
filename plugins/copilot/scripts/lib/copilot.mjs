@@ -19,13 +19,14 @@
  *   onProgress: ProgressReporter | null
  * }} TurnCaptureState
  */
+import { spawn } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 
 import { CopilotPromptModeClient } from "./prompt-mode.mjs";
-import { binaryAvailable, resolveLauncher } from "./process.mjs";
+import { resolveLauncher, terminateProcessTree } from "./process.mjs";
 import { ensurePluginDataDir, resolvePluginDataDir } from "./state.mjs";
 
 const MIN_COPILOT_VERSION = [1, 0, 93];
@@ -433,23 +434,61 @@ function buildAuthStatus(fields = {}) {
   };
 }
 
+// The npm loader runs the native binary with inherited pipes, so a stalled binary would keep a
+// synchronous probe waiting after the loader is killed. The probe gets its own group, and the limit
+// stops the whole tree.
+function runVersionProbe(cwd, env, timeoutMs) {
+  const launcher = resolveLauncher("copilot", { env });
+  if (!launcher.command) {
+    return Promise.resolve({ available: false, detail: launcher.detail });
+  }
+
+  return new Promise((resolve) => {
+    const child = spawn(launcher.command, [...launcher.args, "--no-auto-update", "--version"], {
+      cwd,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: false,
+      detached: process.platform !== "win32",
+      windowsHide: true
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8").on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.setEncoding("utf8").on("data", (chunk) => {
+      stderr += chunk;
+    });
+
+    const timer = setTimeout(() => {
+      const detail = `copilot --version did not answer within ${timeoutMs / 1000} seconds`;
+      terminateProcessTree(child.pid)
+        .catch(() => {})
+        .finally(() => resolve({ available: false, detail }));
+    }, timeoutMs);
+    child.on("error", (error) => {
+      clearTimeout(timer);
+      const code = /** @type {NodeJS.ErrnoException} */ (error).code;
+      resolve({ available: false, detail: code === "ENOENT" ? "not found" : error.message });
+    });
+    child.on("close", (code, signal) => {
+      clearTimeout(timer);
+      if (code !== 0) {
+        resolve({ available: false, detail: stderr.trim() || stdout.trim() || (signal ? `signal ${signal}` : `exit ${code}`) });
+        return;
+      }
+      resolve({ available: true, detail: stdout.trim() || stderr.trim() || "ok" });
+    });
+  });
+}
+
 // The version check runs the same launch as a real run: --no-auto-update makes Copilot ignore a newer
 // build in its package cache, which a bare --version could report.
-// The probe blocks the event loop, so it needs its own limit: no later timer or signal handler can run.
-// SIGKILL, because spawnSync keeps waiting for a program that ignores SIGTERM.
-export function getCopilotAvailability(cwd, options = {}) {
-  const timeout = options.timeoutMs ?? VERSION_CHECK_TIMEOUT_MS;
-  const status = binaryAvailable("copilot", ["--no-auto-update", "--version"], {
-    cwd,
-    env: options.env,
-    timeout,
-    killSignal: "SIGKILL"
-  });
+export async function getCopilotAvailability(cwd, options = {}) {
+  const status = await runVersionProbe(cwd, options.env ?? process.env, options.timeoutMs ?? VERSION_CHECK_TIMEOUT_MS);
   if (!status.available) {
-    const detail = /ETIMEDOUT/.test(status.detail)
-      ? `copilot --version did not answer within ${timeout / 1000} seconds`
-      : status.detail;
-    return { available: false, detail, version: null };
+    return { available: false, detail: status.detail, version: null };
   }
 
   const firstLine = status.detail.split(/\r?\n/)[0].trim().replace(/\.$/, "");
@@ -478,7 +517,7 @@ export function getSessionRuntimeStatus() {
 
 export async function getCopilotAuthStatus(cwd, options = {}) {
   const env = options.env ?? process.env;
-  const availability = getCopilotAvailability(cwd, { env });
+  const availability = await getCopilotAvailability(cwd, { env });
   if (!availability.available) {
     return buildAuthStatus({ available: false, detail: availability.detail, source: "availability" });
   }
@@ -535,7 +574,7 @@ function oneLine(text) {
 }
 
 export async function runPromptModeTurn(cwd, options = {}) {
-  const availability = getCopilotAvailability(cwd, { env: options.env });
+  const availability = await getCopilotAvailability(cwd, { env: options.env });
   if (!availability.available) {
     throw new Error(formatUnavailableError(availability));
   }

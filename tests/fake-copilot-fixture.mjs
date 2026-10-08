@@ -24,7 +24,7 @@ export const NOT_LOGGED_IN_STDERR = [
 //                       line that is not an event
 //   old-version         --version reports 1.0.92
 //   pinned-old-version  1.0.99 without --no-auto-update, 1.0.92 with it
-//   hang-version        --version never answers and ignores SIGTERM
+//   hang-version        --version starts a child with the same pipes, and neither answers
 //   not-logged-in       the real "no authentication" output
 //   bad-json            a line that is not JSON, then exits
 //   truncated           exits 1 before the result event
@@ -41,11 +41,14 @@ const { spawn } = require("node:child_process");
 
 const BEHAVIOR = process.env.FAKE_COPILOT_BEHAVIOR || ${JSON.stringify(behavior)};
 const RECORD_PATH = ${JSON.stringify(recordPath)};
+const PIDS_PATH = ${JSON.stringify(path.join(binDir, "fake-copilot-pids.json"))};
 const NOT_LOGGED_IN_STDERR = ${JSON.stringify(NOT_LOGGED_IN_STDERR)};
 
 const args = process.argv.slice(2);
 if (args.includes("--version") && BEHAVIOR === "hang-version") {
-  process.on("SIGTERM", () => {});
+  // Like the npm loader: a native child that inherits the pipes, and both stall.
+  const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "inherit" });
+  fs.writeFileSync(PIDS_PATH, JSON.stringify([process.pid, child.pid]));
   setInterval(() => {}, 1000);
   return;
 }

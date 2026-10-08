@@ -62,7 +62,7 @@ async function buildSetupReport(cwd, actionsTaken = []) {
   const workspaceRoot = resolveWorkspaceRoot(cwd);
   const nodeStatus = binaryAvailable("node", ["--version"], { cwd });
   const npmStatus = binaryAvailable("npm", ["--version"], { cwd });
-  const copilotStatus = getCopilotAvailability(cwd);
+  const copilotStatus = await getCopilotAvailability(cwd);
   const authStatus = await getCopilotAuthStatus(cwd);
   const config = getConfig(workspaceRoot);
 
