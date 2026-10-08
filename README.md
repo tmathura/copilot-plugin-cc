@@ -54,7 +54,8 @@ claude plugin install copilot@tmathura-copilot
 - There is no shared broker process (upstream `app-server-broker.mjs`, `broker-endpoint.mjs` and
   `broker-lifecycle.mjs`). Each `copilot` run stands alone, so there is nothing to share.
 - CI runs the tests on Ubuntu, macOS and Windows, not only Ubuntu, because the plugin must work the
-  same on all three. CI does not install a real CLI. The tests use a fake `copilot`.
+  same on all three. CI does not install a real CLI. The tests use a fake `copilot`. The checkout
+  does not keep the GitHub token, so code under test cannot read it.
 
 ## Development
 

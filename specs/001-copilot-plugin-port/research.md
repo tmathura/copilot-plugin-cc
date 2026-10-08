@@ -212,6 +212,7 @@ data model, the contracts, the plan and the tasks link here.
   command name on Windows. Node then joins the arguments without quotes, so a temp path with a space
   splits in two, and `&` or `^` in a path runs as shell text. `node` and `git` start without a shell
   on every system. A test that must start `npm` or `copilot` goes through `resolveLauncher`.
+  `tests/helpers.test.mjs` checks that spaces and shell characters reach the child unchanged.
   Rejected alternative: upstream's shell on Windows, kept for parity.
 
 ## 4b. Git calls that write nothing and start no hooks

@@ -75,13 +75,15 @@ setup.
 - [X] T012 [P] Port `tests/bump-version.test.mjs`, including a test that `--check` fails when one
   manifest version differs
 - [X] T013 [P] Port `tests/helpers.mjs` (temp folders and git repos); `run()` never uses a shell
-  (research.md §4, test helper; changed 2026-10-08)
+  (research.md §4, test helper; changed 2026-10-08), and `tests/helpers.test.mjs` checks that
+  spaces and shell characters reach the child unchanged
 - [X] T014 [P] Add `tests/fake-copilot-fixture.mjs` that answers `--version` with
   `GitHub Copilot CLI 1.0.93.` and `--help`; it reads its behaviour from an environment variable so
   later tests can make it fail. No prompt mode yet
 - [X] T015 [P] Port `.github/workflows/pull-request-ci.yml`: same pinned actions, Node 22, a matrix of
   `ubuntu-latest`, `macos-latest` and `windows-latest`, `npm ci`, `npm test`, and
-  `npm run check-version`; no Codex or Copilot install step
+  `npm run check-version`; no Codex or Copilot install step; the checkout sets
+  `persist-credentials: false`, so test code cannot read the token (added 2026-10-08, PR review)
 - [X] T016 [P] Update root `.gitignore`: add `node_modules/`; keep the existing entries
 - [X] T017 [P] Add `UPSTREAM.md`: checked commit `db52e28f4d9ded852ab3942cea316258ae4ef346` (v1.0.6),
   and the status table format (ported, pending, skipped with a reason)

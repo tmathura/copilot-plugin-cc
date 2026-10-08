@@ -161,7 +161,7 @@ repo root.
 | `package.json` | `@openai/codex-plugin-cc`, Node 18.18+, `prebuild` runs `codex app-server generate-ts`, `build` runs `tsc` | `copilot-plugin-cc`, Node 22+, no `prebuild`, `build` runs `tsc -p tsconfig.prompt-mode.json` | 2 (scripts), 4 (`build`) |
 | `package-lock.json` | Locks the devDependencies | Same | 2 |
 | `scripts/bump-version.mjs` | Checks and sets the version in package, lock, plugin and marketplace files | Same, with `plugins/copilot` paths and the `copilot` plugin entry | 2 |
-| `.github/workflows/pull-request-ci.yml` | Ubuntu, Node 22, installs `@openai/codex` for type generation, runs tests and build | Runs on Ubuntu, macOS and Windows (Principle V). No Copilot install: tests use the fake CLI, and the types are hand-written | 2 |
+| `.github/workflows/pull-request-ci.yml` | Ubuntu, Node 22, installs `@openai/codex` for type generation, runs tests and build | Runs on Ubuntu, macOS and Windows (Principle V). No Copilot install: tests use the fake CLI, and the types are hand-written. The checkout does not keep the token (`persist-credentials: false`; security, added 2026-10-08) | 2 |
 | `.gitignore` | Ignores `plugins/codex/.generated/` | Drops that line; nothing is generated | 2 |
 | `README.md` | Codex install and command docs | New README with "Differences from the Codex plugin" (ticket 8 writes it in full; each earlier ticket adds its own differences) | 2 to 8 |
 | `LICENSE`, `NOTICE` | Apache-2.0 and OpenAI notice | Kept, plus a notice that names the changes | 2 |
