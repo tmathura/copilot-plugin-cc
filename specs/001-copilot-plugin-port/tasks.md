@@ -110,7 +110,8 @@ setup.
   (research.md §2, self-collect); pass `--no-optional-locks -c core.fsmonitor=false` to every git call and `--no-textconv`
   to every `git diff` (research.md §4b)
 - [ ] T025 [P] Port `U/scripts/lib/state.mjs` to `P/scripts/lib/state.mjs` (fallback root
-  `<tmp>/copilot-companion`); keep `MAX_JOBS = 50` for finished jobs and never prune a queued or
+  `~/.copilot-companion/state`, never the shared temp folder; test that the fallback is under the
+  home folder); keep `MAX_JOBS = 50` for finished jobs and never prune a queued or
   running job; keep `STATE_VERSION = 1`; lock `updateState` (with an optional shorter wait) with
   `state.json.lock` and write through a temp file and a rename (research.md §7, locked state
   updates); add `closedSessions` (entries kept 30 days, no count cap) to the state; a companion that

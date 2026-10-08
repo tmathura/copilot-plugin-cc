@@ -119,7 +119,7 @@ repo root.
 | same → `formatCommandFailure` | No Codex calls | Rename only | 3 |
 | `scripts/lib/git.mjs` → `buildAdversarialCollectionGuidance` | Self-collect text: "inspect the target diff yourself with read-only git commands" | "Read the patch files listed below with the view tool". The companion writes the exact patches to a folder passed with `--add-dir` (§2, ticket 5). Copilot has no shell in reviews | 3, 5 |
 | same, rest of `git.mjs` | Runs `git` without a shell | Also passes `--no-optional-locks -c core.fsmonitor=false` to every call and `--no-textconv` to every `git diff` (§4b: no index writes, no hooks). Clean and process filters still run, as in any git call (§4b, limit) | 3 |
-| `scripts/lib/state.mjs` → `FALLBACK_STATE_ROOT_DIR` | `<tmp>/codex-companion` | `<tmp>/copilot-companion` | 3 |
+| `scripts/lib/state.mjs` → `FALLBACK_STATE_ROOT_DIR` | `<tmp>/codex-companion`, a shared folder another local user can create first | `~/.copilot-companion/state`, owned by the user; never the shared temp folder (§7, locked state updates; security) | 3 |
 | same → `updateState`, `saveState` | Read, change, save and prune with no lock between processes; plain overwrite | Hold the `state.json.lock` lock for the whole update, and write through a temp file and a rename (§7, locked state updates; correctness) | 3 |
 | same → `pruneJobs` | Keeps the 50 most recently updated jobs, whatever their status | Keeps every queued or running job; the 50 cap applies to finished jobs only (§7, locked state updates; correctness) | 3 |
 | `scripts/lib/fs.mjs` → `createTempDir` | Prefix `codex-plugin-` | Prefix `copilot-plugin-` | 3 |

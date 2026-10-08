@@ -21,8 +21,8 @@ this research, the map and this plan. Tickets 2 to 8 build the plugin in the pha
 **Primary Dependencies**: none at runtime. The Copilot CLI 1.0.93 or later is an external program.
 devDependencies for the type check only: `typescript` and `@types/node`
 
-**Storage**: JSON files per workspace under `$CLAUDE_PLUGIN_DATA/state/` (fallback
-`<tmp>/copilot-companion/`), as upstream `state.mjs`
+**Storage**: JSON files per workspace under `$CLAUDE_PLUGIN_DATA/state/`, as upstream `state.mjs`.
+The fallback is `~/.copilot-companion/state/`, not upstream's shared temp folder (research §7)
 
 **Testing**: `node --test tests/*.test.mjs` with a fake `copilot` CLI; `claude plugin validate .`;
 a manual run with `claude --plugin-dir` before release

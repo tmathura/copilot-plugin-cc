@@ -7,7 +7,8 @@ upstream changes to them port cleanly. Only the meaning of some fields changes, 
 
 One file per workspace, at `<state root>/<slug>-<hash>/state.json`.
 
-- `<state root>` is `$CLAUDE_PLUGIN_DATA/state`, or `<tmp>/copilot-companion` without it.
+- `<state root>` is `$CLAUDE_PLUGIN_DATA/state`, or `~/.copilot-companion/state` without it. It is never
+  in the shared temp folder, where another local user could plant job records.
 - `<slug>` is the workspace folder name with unsafe characters replaced.
 - `<hash>` is the first 16 hex characters of the SHA-256 of the real workspace path.
 

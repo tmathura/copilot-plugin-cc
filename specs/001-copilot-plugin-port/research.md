@@ -401,6 +401,11 @@ Later tickets apply these rules. The call-site map uses them.
   lock, never by saving an earlier snapshot.
   Rejected alternative: keep upstream's unlocked update for parity; upstream has the same race, but
   this port relies on the job records to stop processes.
+  Without `CLAUDE_PLUGIN_DATA`, the state lives in `~/.copilot-companion/state`, owned by the user,
+  as the plugin's Copilot home does (§3). Decided 2026-10-08, after Copilot PR review. Reason:
+  security. Upstream uses `<tmp>/codex-companion`, which another local user can create first and
+  fill with job records; cancel and `SessionEnd` would then signal PIDs that user chose. Rejected
+  alternative: upstream's shared temp folder.
 
 ## 8. Effect on the ticket split
 
