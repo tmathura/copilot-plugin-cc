@@ -63,16 +63,16 @@ async function buildSetupReport(cwd, actionsTaken = []) {
   const nodeStatus = binaryAvailable("node", ["--version"], { cwd });
   const npmStatus = binaryAvailable("npm", ["--version"], { cwd });
   const copilotStatus = await getCopilotAvailability(cwd);
-  const authStatus = await getCopilotAuthStatus(cwd);
+  const authStatus = await getCopilotAuthStatus(cwd, { availability: copilotStatus });
   const config = getConfig(workspaceRoot);
 
   const nextSteps = [];
-  if (!copilotStatus.available) {
-    nextSteps.push(
-      copilotStatus.version
-        ? "Update Copilot with `npm install -g @github/copilot`."
-        : "Install Copilot with `npm install -g @github/copilot`."
-    );
+  if (copilotStatus.missing) {
+    nextSteps.push("Install Copilot with `npm install -g @github/copilot`.");
+  } else if (copilotStatus.version && !copilotStatus.available) {
+    nextSteps.push("Update Copilot with `npm install -g @github/copilot`.");
+  } else if (!copilotStatus.available) {
+    nextSteps.push("Check that `copilot --no-auto-update --version` works, then rerun `/copilot:setup`.");
   }
   if (copilotStatus.available && !authStatus.loggedIn && authStatus.requiresGithubAuth) {
     nextSteps.push("Run `!copilot login`.");

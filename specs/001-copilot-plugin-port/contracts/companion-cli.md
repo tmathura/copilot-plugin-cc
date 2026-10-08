@@ -6,7 +6,7 @@ subcommand takes `--cwd <path>` (alias `-C`) and, where upstream does, `--json`.
 
 | Subcommand | Flags | Output | Change from upstream |
 | --- | --- | --- | --- |
-| `setup` | `--enable-review-gate`, `--disable-review-gate`, `--json` | Setup report: `ready`, `node`, `npm`, `copilot` (was `codex`), `auth`, `sessionRuntime`, `reviewGateEnabled`, `actionsTaken`, `nextSteps` | **changed**: `copilot` key, version floor, Copilot next steps |
+| `setup` | `--enable-review-gate`, `--disable-review-gate`, `--json` | Setup report: `ready`, `node`, `npm`, `copilot` (was `codex`; adds `version` and `missing`), `auth`, `sessionRuntime`, `reviewGateEnabled`, `actionsTaken`, `nextSteps` | **changed**: `copilot` key, version floor, Copilot next steps; `/copilot:setup` offers the install only when `copilot.missing` is true (added 2026-10-08, PR review) |
 | `review` | `--wait`, `--background`, `--base <ref>`, `--scope auto\|working-tree\|branch`, `--model`/`-m`, `--json` | Rendered review text, or the payload with `--json` | **changed**: Copilot's `/review` with inline context instead of the native reviewer |
 | `adversarial-review` | Same as `review`, plus focus text | Rendered findings, or the payload | **changed**: schema sent in the prompt |
 | `task` | `--background`, `--write`, `--resume-last`, `--resume`, `--fresh`, `--model`/`-m <model>`, `--effort <none\|minimal\|low\|medium\|high\|xhigh>`, `--prompt-file <path>`, `--json`, prompt text or stdin; internal `--context-dir <path>` (review gate only) | Task output, or "started in the background as <id>" | **changed**: no `spark` alias; `--context-dir` |

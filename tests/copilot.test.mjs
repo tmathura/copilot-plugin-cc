@@ -126,7 +126,8 @@ test("the version check uses --no-auto-update and enforces the 1.0.93 floor", as
   assert.deepEqual(await getCopilotAvailability(".", { env: setUp("ok").env }), {
     available: true,
     detail: "GitHub Copilot CLI 1.0.93",
-    version: "1.0.93"
+    version: "1.0.93",
+    missing: false
   });
 
   const old = await getCopilotAvailability(".", { env: setUp("old-version").env });
@@ -146,10 +147,23 @@ test("a version check that does not answer is stopped at its time limit, with th
   assert.deepEqual(status, {
     available: false,
     detail: "copilot --version did not answer within 0.5 seconds",
-    version: null
+    version: null,
+    missing: false
   });
   const pids = readFakeVersionPids(binDir).flat();
   await waitFor(() => pids.every((pid) => !isAlive(pid)));
+});
+
+test("only an absent program counts as missing, not a copilot.cmd that cannot start", async () => {
+  assert.equal((await getCopilotAvailability(".", { env: buildEnv(makeTempDir(), { PATH: makeTempDir() }) })).missing, true);
+
+  if (process.platform === "win32") {
+    const dir = makeTempDir();
+    fs.writeFileSync(path.join(dir, "copilot.cmd"), "@echo off\r\necho not an npm shim\r\n");
+    const status = await getCopilotAvailability(".", { env: buildEnv(makeTempDir(), { PATH: dir }) });
+    assert.equal(status.missing, false);
+    assert.match(status.detail, /not an npm shim/);
+  }
 });
 
 test("a read-only run starts the resolved launcher with the read-only arguments and environment", async () => {
@@ -269,6 +283,17 @@ test("a login check that hangs is stopped at its time limit", async () => {
 
   assert.equal(auth.loggedIn, false);
   assert.match(auth.detail, /did not finish within 0\.3 seconds/);
+});
+
+test("the login check reuses a version result that it is given", async () => {
+  const { env, runs } = setUp("ok");
+  const availability = { available: false, detail: "given result", version: null, missing: true };
+
+  const auth = await getCopilotAuthStatus(".", { env, availability });
+
+  assert.equal(auth.available, false);
+  assert.equal(auth.detail, "given result");
+  assert.deepEqual(runs(), []);
 });
 
 test("a BYOK provider counts as logged in without a GitHub login check", async () => {

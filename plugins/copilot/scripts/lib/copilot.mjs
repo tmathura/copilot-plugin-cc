@@ -436,7 +436,8 @@ function buildAuthStatus(fields = {}) {
 async function runVersionProbe(cwd, env, timeoutMs) {
   const launcher = resolveLauncher("copilot", { env });
   if (!launcher.command) {
-    return { available: false, detail: launcher.detail };
+    // A copilot.cmd that exists but is not an npm shim is a broken install, not a missing one.
+    return { available: false, detail: launcher.detail, missing: launcher.detail === "not found" };
   }
 
   const run = await runShortCommand(cwd, {
@@ -452,7 +453,9 @@ async function runVersionProbe(cwd, env, timeoutMs) {
   }
   if (run.error) {
     const code = /** @type {NodeJS.ErrnoException} */ (run.error).code;
-    return { available: false, detail: code === "ENOENT" ? "not found" : run.error.message };
+    return code === "ENOENT"
+      ? { available: false, detail: "not found", missing: true }
+      : { available: false, detail: run.error.message };
   }
   if (run.exitCode !== 0) {
     return { available: false, detail: stderr || stdout || (run.signal ? `signal ${run.signal}` : `exit ${run.exitCode}`) };
@@ -461,26 +464,33 @@ async function runVersionProbe(cwd, env, timeoutMs) {
 }
 
 // The version check runs the same launch as a real run: --no-auto-update makes Copilot ignore a newer
-// build in its package cache, which a bare --version could report.
+// build in its package cache, which a bare --version could report. `missing` is true only when no
+// Copilot program was found, so setup offers an install only then.
 export async function getCopilotAvailability(cwd, options = {}) {
   const status = await runVersionProbe(cwd, options.env ?? process.env, options.timeoutMs ?? VERSION_CHECK_TIMEOUT_MS);
   if (!status.available) {
-    return { available: false, detail: status.detail, version: null };
+    return { available: false, detail: status.detail, version: null, missing: Boolean(status.missing) };
   }
 
   const firstLine = status.detail.split(/\r?\n/)[0].trim().replace(/\.$/, "");
   const version = parseVersion(firstLine);
   if (!version) {
-    return { available: false, detail: `cannot read the Copilot version from "${firstLine}"`, version: null };
+    return {
+      available: false,
+      detail: `cannot read the Copilot version from "${firstLine}"`,
+      version: null,
+      missing: false
+    };
   }
   if (isBelowMinimum(version)) {
     return {
       available: false,
       detail: `${firstLine} is not supported; Copilot CLI ${MIN_COPILOT_VERSION.join(".")} or later is needed`,
-      version: version.join(".")
+      version: version.join("."),
+      missing: false
     };
   }
-  return { available: true, detail: firstLine, version: version.join(".") };
+  return { available: true, detail: firstLine, version: version.join("."), missing: false };
 }
 
 export function getSessionRuntimeStatus() {
@@ -494,7 +504,8 @@ export function getSessionRuntimeStatus() {
 
 export async function getCopilotAuthStatus(cwd, options = {}) {
   const env = options.env ?? process.env;
-  const availability = await getCopilotAvailability(cwd, { env });
+  // Setup passes the result it already has, so a stalled CLI costs one version limit, not two.
+  const availability = options.availability ?? (await getCopilotAvailability(cwd, { env }));
   if (!availability.available) {
     return buildAuthStatus({ available: false, detail: availability.detail, source: "availability" });
   }

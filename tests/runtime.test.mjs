@@ -66,6 +66,7 @@ test("setup reports a missing CLI, and that npm is available to install it", () 
 
   assert.equal(payload.ready, false);
   assert.equal(payload.copilot.available, false);
+  assert.equal(payload.copilot.missing, true);
   assert.equal(payload.npm.available, true);
   assert.ok(payload.nextSteps.includes("Install Copilot with `npm install -g @github/copilot`."));
   assert.deepEqual(runs(), []);
@@ -77,10 +78,21 @@ test("setup refuses a Copilot version below 1.0.93", () => {
     const payload = parsePayload(result);
 
     assert.equal(payload.ready, false, behavior);
+    assert.equal(payload.copilot.missing, false, behavior);
     assert.match(payload.copilot.detail, /1\.0\.92 is not supported/);
     assert.ok(payload.nextSteps.includes("Update Copilot with `npm install -g @github/copilot`."));
     assert.deepEqual(runs(), []);
   }
+});
+
+test("setup asks to check an installed Copilot whose version cannot be read, not to install it", () => {
+  const payload = parsePayload(runSetup("unreadable-version").result);
+
+  assert.equal(payload.ready, false);
+  assert.equal(payload.copilot.missing, false);
+  assert.match(payload.copilot.detail, /cannot read the Copilot version/);
+  assert.ok(payload.nextSteps.includes("Check that `copilot --no-auto-update --version` works, then rerun `/copilot:setup`."));
+  assert.ok(!payload.nextSteps.some((step) => step.startsWith("Install Copilot")));
 });
 
 test("setup without a login names copilot login and the token variable", () => {
@@ -191,6 +203,7 @@ test("the setup command file runs the companion and offers the Copilot npm packa
   const command = fs.readFileSync(path.join(PLUGIN_ROOT, "commands", "setup.md"), "utf8");
 
   assert.match(command, /copilot-companion\.mjs" setup --json \$ARGUMENTS/);
+  assert.match(command, /Copilot is missing \(`copilot\.missing` is `true`\) and npm is available/);
   assert.match(command, /npm install -g @github\/copilot/);
   assert.match(command, /!copilot login/);
 });

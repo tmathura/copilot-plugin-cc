@@ -24,6 +24,7 @@ export const NOT_LOGGED_IN_STDERR = [
 //                       line that is not an event
 //   old-version         --version reports 1.0.92
 //   pinned-old-version  1.0.99 without --no-auto-update, 1.0.92 with it
+//   unreadable-version  --version prints no version number
 //   hang-version        --version starts a child with the same pipes, and neither answers
 //   not-logged-in       the real "no authentication" output
 //   bad-json            a line that is not JSON, then exits
@@ -51,6 +52,10 @@ if (args.includes("--version") && BEHAVIOR === "hang-version") {
   fs.appendFileSync(PIDS_PATH, JSON.stringify([process.pid, child.pid]) + "\\n");
   setInterval(() => {}, 1000);
   return;
+}
+if (args.includes("--version") && BEHAVIOR === "unreadable-version") {
+  console.log("GitHub Copilot CLI dev build");
+  process.exit(0);
 }
 if (args.includes("--version")) {
   let version = BEHAVIOR === "old-version" ? "1.0.92" : "1.0.93";

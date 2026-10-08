@@ -10,7 +10,7 @@ Run:
 node "${CLAUDE_PLUGIN_ROOT}/scripts/copilot-companion.mjs" setup --json $ARGUMENTS
 ```
 
-If the result says Copilot is unavailable and npm is available:
+If the result says Copilot is missing (`copilot.missing` is `true`) and npm is available:
 - Use `AskUserQuestion` exactly once to ask whether Claude should install Copilot now.
 - Put the install option first and suffix it with `(Recommended)`.
 - Use these two options:
@@ -28,8 +28,8 @@ npm install -g @github/copilot
 node "${CLAUDE_PLUGIN_ROOT}/scripts/copilot-companion.mjs" setup --json $ARGUMENTS
 ```
 
-If Copilot is already installed or npm is unavailable:
-- Do not ask about installation.
+If Copilot is already installed, even in an unsupported version, or npm is unavailable:
+- Do not ask about installation. The setup output gives the next step.
 
 Output rules:
 - Present the final setup output to the user.
