@@ -292,11 +292,11 @@ async function executeReviewRun(request) {
     status: result.status,
     failureMessage
   });
-  // A stopped run failed, even if it sent JSON first. Codex enforced the schema; here an answer of the
-  // wrong shape fails the job like broken JSON.
+  // A failed or stopped run failed, even if it sent JSON first. Codex enforced the schema; here an
+  // answer of the wrong shape fails the job like broken JSON.
   let reviewError = parsed.parseError;
-  if (result.error) {
-    reviewError = failureMessage;
+  if (result.status !== 0) {
+    reviewError = failureMessage || `Copilot reported a failed run (exit code ${result.result?.exitCode ?? "unknown"}).`;
   } else if (!reviewError) {
     const schemaError = validateReviewOutput(parsed.parsed, schema);
     reviewError = schemaError && `The JSON does not match the review schema: ${schemaError}`;

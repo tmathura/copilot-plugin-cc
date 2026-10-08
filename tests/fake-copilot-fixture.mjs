@@ -29,7 +29,7 @@ export const NOT_LOGGED_IN_STDERR = [
 //   not-logged-in       the real "no authentication" output
 //   bad-json            a line that is not JSON, then exits
 //   truncated           exits 1 before the result event
-//   fail                a result with exitCode 1, then exits 1
+//   fail                sends FAKE_COPILOT_ANSWER if set, a result with exitCode 1, then exits 1
 //   forbidden-tool      sends FAKE_COPILOT_ANSWER if set, starts the create tool, then runs until killed
 //   hang                starts a child, then runs until killed
 //   hang-after-result   a full successful turn, then runs until killed
@@ -156,6 +156,9 @@ process.stdin.on("end", () => {
       break;
     case "fail":
       emit({ type: "assistant.turn_start", data: { turnId: "0" } });
+      if (process.env.FAKE_COPILOT_ANSWER) {
+        emit({ type: "assistant.message", data: { content: process.env.FAKE_COPILOT_ANSWER } });
+      }
       process.stderr.write("\\nfake copilot: model request failed\\n\\n");
       emitResult(1);
       process.exit(1);

@@ -496,18 +496,31 @@ test("a review whose Copilot starts a write tool is stopped and its process is k
   }
 });
 
-test("an adversarial review that is stopped after it sent valid JSON still fails and says why", () => {
-  const { result } = runReview("adversarial-review", makeRepo(), {
-    behavior: "forbidden-tool",
-    args: ["--json"],
-    env: { FAKE_COPILOT_ANSWER: REVIEW_JSON }
-  });
-  const payload = JSON.parse(result.stdout);
+test("an adversarial review whose run fails or is stopped after valid JSON still fails and says why", () => {
+  const approval = JSON.stringify({ verdict: "approve", summary: "Ship it.", findings: [], next_steps: [] });
+  const cases = [
+    ["forbidden-tool", /Copilot started the tool "create"/],
+    ["fail", /fake copilot: model request failed/]
+  ];
 
-  assert.equal(result.status, 1);
-  assert.equal(payload.result, null);
-  assert.equal(payload.rawOutput, REVIEW_JSON);
-  assert.match(payload.parseError, /Copilot started the tool "create"/);
+  for (const [behavior, expectedError] of cases) {
+    const { result } = runReview("adversarial-review", makeRepo(), {
+      behavior,
+      args: ["--json"],
+      env: { FAKE_COPILOT_ANSWER: approval }
+    });
+    const payload = JSON.parse(result.stdout);
+
+    assert.equal(result.status, 1, behavior);
+    assert.equal(payload.result, null, behavior);
+    assert.equal(payload.rawOutput, approval, behavior);
+    assert.match(payload.parseError, expectedError);
+
+    const rendered = runReview("adversarial-review", makeRepo(), { behavior, env: { FAKE_COPILOT_ANSWER: approval } });
+    assert.equal(rendered.result.status, 1, behavior);
+    assert.doesNotMatch(rendered.result.stdout, /Verdict: approve/);
+    assert.match(rendered.result.stdout, expectedError);
+  }
 });
 
 test("above the inline limit, a working-tree review reads the exact patches from a folder that is then removed", () => {
