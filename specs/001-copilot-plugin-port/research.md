@@ -302,6 +302,13 @@ Later tickets apply these rules. The call-site map uses them.
   `SIGINT`: it kills its Copilot child's group, then exits. A cancel or gate timeout that stops a
   companion therefore stops its Copilot process and Copilot's own children too. Windows keeps
   `taskkill /T`, which follows the whole tree.
+- **Limit of stopping a job** (decided 2026-10-08, after Copilot PR review): cancel, the gate and
+  `SessionEnd` stop the companion, the Copilot process and every process in their process groups
+  (the tree with `taskkill /T` on Windows). A program that a `--write` task deliberately detaches
+  (for example with `setsid` or a detached Node child) leaves those groups and is not stopped. The
+  README says so, next to the best-effort sandbox. Rejected alternative: tracking every descendant
+  by polling the process table, which is different on each system and races with short-lived
+  processes.
 - **Stopping a job**: `terminateProcessTree` changes in two ways (correctness, spec SC-007).
   - If the group signal finds no group (`ESRCH`), it signals the process itself. A companion that
     Claude's Bash tool started (a foreground or Bash-background review) is not a group leader, and
@@ -344,10 +351,11 @@ Later tickets apply these rules. The call-site map uses them.
   - `SessionEnd`: first, inside one `updateState`, it adds the session id to `closedSessions`,
     marks all the session's queued and running jobs `cancelled`, and reads the `pid` and
     `copilotPid` of the running ones. Creating a job, claiming one and starting Copilot all happen
-    inside `updateState` and are refused for a session in `closedSessions`, so a job that a
-    companion was still preparing can never start after the snapshot. Entries stay for 30 days, with
-    no count cap, so newer sessions cannot push an entry out early. Not covered: a companion paused
-    for longer than 30 days. The worker claim and
+    inside `updateState` and are refused when the companion process started before the session's
+    `closedAt`, so a job that a companion was still preparing can never start after the snapshot.
+    A resumed conversation keeps its session id (`claude --resume`), but its new companions start
+    after `closedAt` and are allowed. Entries stay for 30 days, with no count cap, so newer sessions
+    cannot push an entry out early. Not covered: a companion paused for longer than 30 days. The worker claim and
     the Copilot start use the same lock: a companion starts Copilot only inside `updateState`,
     after it checks that its job is still `running`, and it writes `copilotPid` in that same step
     (Node returns the child's `pid` from `spawn` at once). The check, the spawn and the save run as
@@ -360,7 +368,8 @@ Later tickets apply these rules. The call-site map uses them.
     that lands inside that block. Rejected alternative: a supervisor process that gates every
     Copilot start, which upstream does not have, for a window of a few milliseconds. Then it sends `SIGTERM` to every recorded `pid` and
     `copilotPid`, waits once, up to 2 s in total, and sends `SIGKILL` to what is still alive. Last, it
-    removes the session's jobs through `updateState`. Each lock wait is limited to the time left in
+    removes, through `updateState`, only the job ids it captured in the first step, so a job that a
+    resumed session starts meanwhile keeps its record. Each lock wait is limited to the time left in
     its 5 s budget. It never waits per job.
 
 - **Locked state updates** (decided 2026-10-08, after Copilot PR review): `updateState` holds a lock

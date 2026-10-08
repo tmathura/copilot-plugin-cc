@@ -113,9 +113,8 @@ setup.
   `<tmp>/copilot-companion`); keep `MAX_JOBS = 50` for finished jobs and never prune a queued or
   running job; keep `STATE_VERSION = 1`; lock `updateState` (with an optional shorter wait) with
   `state.json.lock` and write through a temp file and a rename (research.md §7, locked state
-  updates); add `closedSessions` (entries kept 30 days, no count cap) to the state, and refuse to
-  create a job for a closed
-  session (data-model.md)
+  updates); add `closedSessions` (entries kept 30 days, no count cap) to the state; a companion that
+  started before a session's `closedAt` cannot create a job for that session (data-model.md)
 - [ ] T026 [P] Port `U/scripts/lib/tracked-jobs.mjs` to `P/scripts/lib/tracked-jobs.mjs`
   (`COPILOT_COMPANION_SESSION_ID`, `[copilot]` prefix); `runTrackedJob` writes its start and final
   status through `updateState` and never revives a `cancelled` or missing job (research.md §7,
@@ -391,7 +390,10 @@ and to `BLOCK`.
   companion never starts it; with a pause between a worker's claim and `runTrackedJob`, a
   `SessionEnd` in that gap leaves the job `cancelled` and no Copilot process is started; a
   foreground or background job that a companion creates after the `SessionEnd` snapshot is refused
-  with a clear error and never starts Copilot
+  with a clear error and never starts Copilot; after `SessionEnd`, a resumed session with the same
+  id can start new jobs, while a companion from the old launch (started before `closedAt`) is still
+  refused; a job that the resumed session starts during the `SessionEnd` kill wait keeps its record
+  and log and can still be cancelled
 
 ### Implementation for User Story 5
 
@@ -411,7 +413,7 @@ and to `BLOCK`.
   `closedSessions`, marks the session's queued and running jobs `cancelled` and reads the running
   jobs' `pid` and `copilotPid` (job creation, claim and Copilot start refuse a closed session); then
   signals them,
-  waits once (up to 2 s), sends `SIGKILL` to survivors, then removes the session's jobs
+  waits once (up to 2 s), sends `SIGKILL` to survivors, then removes only the job ids captured in the first step
   through `updateState` on fresh state with the lock wait limited to the time left (research.md §7,
   hook time budgets and locked state updates)
 - [ ] T078 [US5] Add the Phase 7 differences to the README section
