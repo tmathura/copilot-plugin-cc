@@ -361,6 +361,14 @@ test("review rejects focus text because it is native-review only", () => {
   assert.deepEqual(runs, []);
 });
 
+test("review refuses --write instead of running a review that can write", () => {
+  const { result, runs } = runReview("review", makeRepo(), { args: ["--write"] });
+
+  assert.equal(result.status > 0, true);
+  assert.match(result.stderr, /does not support custom focus text/i);
+  assert.deepEqual(runs, []);
+});
+
 test("review and adversarial review reject staged-only scope", () => {
   for (const subcommand of ["review", "adversarial-review"]) {
     const repo = makeRepo();
