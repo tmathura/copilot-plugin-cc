@@ -2,6 +2,7 @@
 // against the fake copilot CLI. Reviews, tasks, jobs and hooks come in later tickets.
 import fs from "node:fs";
 import path from "node:path";
+import { spawn } from "node:child_process";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
@@ -12,6 +13,25 @@ import { makeTempDir, run } from "./helpers.mjs";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PLUGIN_ROOT = path.join(ROOT, "plugins", "copilot");
 const SCRIPT = path.join(PLUGIN_ROOT, "scripts", "copilot-companion.mjs");
+
+function isAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code !== "ESRCH";
+  }
+}
+
+async function waitFor(predicate, timeoutMs = 10000) {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate()) {
+    if (Date.now() > deadline) {
+      throw new Error(`Condition not met within ${timeoutMs} ms`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}
 
 function runSetup(behavior, options = {}) {
   const binDir = makeTempDir();
@@ -89,6 +109,31 @@ test(
 
     assert.equal(parsePayload(result).ready, true);
     assert.equal(fs.statSync(path.join(home, ".copilot-companion")).mode & 0o777, 0o700);
+  }
+);
+
+test(
+  "a companion stopped during a stalled version check stops the whole check",
+  { skip: process.platform === "win32" && "Windows stops the tree with taskkill /T" },
+  async () => {
+    for (const [signal, exitCode] of [["SIGTERM", 143], ["SIGINT", 130]]) {
+      const binDir = makeTempDir();
+      installFakeCopilot(binDir, "hang-version");
+      const pidsPath = path.join(binDir, "fake-copilot-pids.json");
+      const companion = spawn(process.execPath, [SCRIPT, "setup", "--json"], {
+        cwd: makeTempDir(),
+        env: buildEnv(binDir, { CLAUDE_PLUGIN_DATA: makeTempDir() }),
+        stdio: "ignore"
+      });
+      const exited = new Promise((resolve) => companion.on("exit", (code) => resolve(code)));
+      await waitFor(() => fs.existsSync(pidsPath) && fs.readFileSync(pidsPath, "utf8"));
+      const pids = JSON.parse(fs.readFileSync(pidsPath, "utf8"));
+
+      companion.kill(signal);
+
+      assert.equal(await exited, exitCode, signal);
+      await waitFor(() => pids.every((pid) => !isAlive(pid)));
+    }
   }
 );
 

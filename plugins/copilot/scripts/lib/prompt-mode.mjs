@@ -41,6 +41,60 @@ function untrackClient(client) {
   }
 }
 
+// A short command such as --version: its whole output, a time limit, and the same stop on SIGTERM and
+// SIGINT as a run. The npm loader runs the native binary with inherited pipes, so the limit stops the
+// whole tree; killing the loader alone would leave the pipes open.
+export function runShortCommand(cwd, options) {
+  return new Promise((resolve) => {
+    const child = spawn(options.command, options.args, {
+      cwd,
+      env: options.env ?? process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: false,
+      detached: process.platform !== "win32",
+      windowsHide: true
+    });
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
+    let done = false;
+    let stopping = null;
+    const handle = {
+      close() {
+        stopping ??= terminateProcessTree(child.pid).then(() => {});
+        return stopping;
+      }
+    };
+    trackClient(handle);
+
+    const finish = (outcome) => {
+      if (done) {
+        return;
+      }
+      done = true;
+      clearTimeout(timer);
+      untrackClient(handle);
+      resolve({ exitCode: null, signal: null, error: null, ...outcome, stdout, stderr, timedOut });
+    };
+    const timer = setTimeout(() => {
+      timedOut = true;
+      handle
+        .close()
+        .catch(() => {})
+        .finally(() => finish({}));
+    }, options.timeoutMs);
+
+    child.stdout.setEncoding("utf8").on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.setEncoding("utf8").on("data", (chunk) => {
+      stderr += chunk;
+    });
+    child.on("error", (error) => finish({ error }));
+    child.on("close", (code, signal) => finish({ exitCode: code, signal }));
+  });
+}
+
 export class CopilotPromptModeClient {
   /**
    * @param {string} cwd

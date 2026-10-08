@@ -19,14 +19,13 @@
  *   onProgress: ProgressReporter | null
  * }} TurnCaptureState
  */
-import { spawn } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 
-import { CopilotPromptModeClient } from "./prompt-mode.mjs";
-import { resolveLauncher, terminateProcessTree } from "./process.mjs";
+import { CopilotPromptModeClient, runShortCommand } from "./prompt-mode.mjs";
+import { resolveLauncher } from "./process.mjs";
 import { ensurePluginDataDir, resolvePluginDataDir } from "./state.mjs";
 
 const MIN_COPILOT_VERSION = [1, 0, 93];
@@ -434,53 +433,31 @@ function buildAuthStatus(fields = {}) {
   };
 }
 
-// The npm loader runs the native binary with inherited pipes, so a stalled binary would keep a
-// synchronous probe waiting after the loader is killed. The probe gets its own group, and the limit
-// stops the whole tree.
-function runVersionProbe(cwd, env, timeoutMs) {
+async function runVersionProbe(cwd, env, timeoutMs) {
   const launcher = resolveLauncher("copilot", { env });
   if (!launcher.command) {
-    return Promise.resolve({ available: false, detail: launcher.detail });
+    return { available: false, detail: launcher.detail };
   }
 
-  return new Promise((resolve) => {
-    const child = spawn(launcher.command, [...launcher.args, "--no-auto-update", "--version"], {
-      cwd,
-      env,
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: false,
-      detached: process.platform !== "win32",
-      windowsHide: true
-    });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.setEncoding("utf8").on("data", (chunk) => {
-      stdout += chunk;
-    });
-    child.stderr.setEncoding("utf8").on("data", (chunk) => {
-      stderr += chunk;
-    });
-
-    const timer = setTimeout(() => {
-      const detail = `copilot --version did not answer within ${timeoutMs / 1000} seconds`;
-      terminateProcessTree(child.pid)
-        .catch(() => {})
-        .finally(() => resolve({ available: false, detail }));
-    }, timeoutMs);
-    child.on("error", (error) => {
-      clearTimeout(timer);
-      const code = /** @type {NodeJS.ErrnoException} */ (error).code;
-      resolve({ available: false, detail: code === "ENOENT" ? "not found" : error.message });
-    });
-    child.on("close", (code, signal) => {
-      clearTimeout(timer);
-      if (code !== 0) {
-        resolve({ available: false, detail: stderr.trim() || stdout.trim() || (signal ? `signal ${signal}` : `exit ${code}`) });
-        return;
-      }
-      resolve({ available: true, detail: stdout.trim() || stderr.trim() || "ok" });
-    });
+  const run = await runShortCommand(cwd, {
+    command: launcher.command,
+    args: [...launcher.args, "--no-auto-update", "--version"],
+    env,
+    timeoutMs
   });
+  const stdout = run.stdout.trim();
+  const stderr = run.stderr.trim();
+  if (run.timedOut) {
+    return { available: false, detail: `copilot --version did not answer within ${timeoutMs / 1000} seconds` };
+  }
+  if (run.error) {
+    const code = /** @type {NodeJS.ErrnoException} */ (run.error).code;
+    return { available: false, detail: code === "ENOENT" ? "not found" : run.error.message };
+  }
+  if (run.exitCode !== 0) {
+    return { available: false, detail: stderr || stdout || (run.signal ? `signal ${run.signal}` : `exit ${run.exitCode}`) };
+  }
+  return { available: true, detail: stdout || stderr || "ok" };
 }
 
 // The version check runs the same launch as a real run: --no-auto-update makes Copilot ignore a newer

@@ -286,7 +286,9 @@ data model, the contracts, the plan and the tasks link here.
   stalled binary holds the check's pipes after the loader is killed, and a blocking `spawnSync`
   check would wait for them with no timer or signal handler able to run. Rejected alternatives: no
   limit, as upstream's `binaryAvailable`; `spawnSync` with a `timeout` and `SIGTERM`, and then
-  `SIGKILL` (rounds 1 and 2), which stop only the loader.
+  `SIGKILL` (rounds 1 and 2), which stop only the loader. The check runs through `runShortCommand`
+  in `prompt-mode.mjs`, so a companion stopped with `SIGTERM` or `SIGINT` during the check stops
+  its tree too, as for a run (Codex review round 4).
 - **Rationale**: The prompt-mode event format has no published schema, so the plugin claims only what
   was tested. Most users run the newest version, because Copilot updates itself by default.
 
@@ -392,7 +394,7 @@ Later tickets apply these rules. The call-site map uses them.
   `SIGINT`: it kills its Copilot child's group, then exits. A cancel or gate timeout that stops a
   companion therefore stops its Copilot process and Copilot's own children too. Windows keeps
   `taskkill /T`, which follows the whole tree. The handlers live in `prompt-mode.mjs` and are active
-  only while a Copilot child runs (decided 2026-10-08, ticket 4). Reason: only that module holds the
+  only while a Copilot child runs, a prompt run or the version check (decided 2026-10-08, ticket 4). Reason: only that module holds the
   child, and Principle III lets no other module import it. They exit with 143 for `SIGTERM` and 130
   for `SIGINT`. Rejected alternative: handlers in the companion script, which would need the child
   from the transport helper.
