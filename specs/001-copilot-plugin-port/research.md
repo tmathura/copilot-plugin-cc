@@ -90,7 +90,7 @@ Evidence, run on 2026-10-08:
 | **Login check** | `authenticate` returned success even for an unknown method id (tested), so it proves nothing. | No login request. A tiny prompt is the only sure check; it costs one premium request. |
 | **CLI versions** | `--acp` since 0.0.397; tool flags work in ACP from 1.0.60. The docs mark ACP as **public preview, subject to change**. | `--output-format json` since 0.0.422; `--available-tools` since 0.0.370. The documented automation path, not marked preview. The event format has no published schema. |
 | **Closeness to upstream** | Close: JSON-RPC client, threads to sessions, turns to prompts, `turn/interrupt` to `session/cancel`. | Further: one process per run. `app-server.mjs`, the broker files and the notification routing become one JSON event reader. |
-| **Code size** | Larger. | Smaller. |
+| **Code size** | A JSON-RPC client like upstream's: `app-server.mjs` at commit `db52e28` is 354 lines (`wc -l`), plus a permission handler. Not measured for the port, because no code exists yet. | A line reader for JSON events and no request handling. Expected to be smaller than the client on the left; not measured, because no code exists yet. |
 
 ### What neither option can do
 
