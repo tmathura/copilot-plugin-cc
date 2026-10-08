@@ -177,7 +177,7 @@ test("a command killed by a signal is not reported as a success", { skip: isWind
   assert.equal(result.status, null);
   assert.equal(result.signal, "SIGTERM");
   assert.throws(() => runCommandChecked(process.execPath, killSelf), /signal=SIGTERM/);
-  assert.equal(binaryAvailable(process.execPath, killSelf).available, false);
+  assert.deepEqual(binaryAvailable(process.execPath, killSelf), { available: false, detail: "signal SIGTERM" });
 });
 
 test("terminateProcessTree never signals for a pid that is not a positive integer", async () => {
