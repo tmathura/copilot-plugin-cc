@@ -272,8 +272,10 @@ Later tickets apply these rules. The call-site map uses them.
   keeps the `tsc` check with `typescript` and `@types/node` as devDependencies.
 
 - **Process groups**: upstream `terminateProcessTree` signals the process group (`-pid`) on macOS
-  and Linux, and `taskkill /T` on Windows. A group signal reaches only a process that leads its own
-  group. So on macOS and Linux every process the plugin may have to stop starts with
+  and Linux, and `taskkill /T` on Windows. `kill(-pid)` signals every process in the group whose ID
+  is `pid`, and that group exists only if the process with that `pid` leads it. In Node on macOS and
+  Linux, `detached: true` makes the child the leader of a new process group and session, so its
+  `pid` is the group ID. So on macOS and Linux every process the plugin may have to stop starts with
   `detached: true`: the background worker (as upstream), each Copilot child of `prompt-mode.mjs`,
   and the companion that the review gate starts. Each companion also handles `SIGTERM` and
   `SIGINT`: it kills its Copilot child's group, then exits. A cancel or gate timeout that stops a

@@ -101,7 +101,8 @@ repo root.
 | same → `handleSessionEnd` | Shuts down the broker, kills the session's running jobs, clears broker state | Kills the session's running jobs and prunes them. No broker | 7 |
 | same → `shellEscape`, `appendEnvVar` | Writes `export` lines to `CLAUDE_ENV_FILE` | Rename only | 7 |
 | `scripts/stop-review-gate-hook.mjs` → `buildSetupNote` | `getCodexAvailability`, "Run /codex:setup" | `getCopilotAvailability`, "Run /copilot:setup" | 7 |
-| same → `runStopReview` | Runs `codex-companion.mjs task --json <prompt>` (read-only) with `spawnSync` and a 15-minute limit; the limit kills only the companion | Runs `copilot-companion.mjs task --json <prompt>` with the read-only profile and the same limit. On the limit it kills the companion's whole process tree with `terminateProcessTree`, so no Copilot process is left (correctness) | 7 |
+| same → `runStopReview` | Runs `codex-companion.mjs task --json <prompt>` (read-only) with `spawnSync` and a 15-minute limit; the limit kills only the companion | Runs `copilot-companion.mjs task --json` with the prompt on stdin, because Claude's last message can pass the Windows command-line limit (platform support). Read-only profile, same limit. On the limit it kills the companion's whole process tree with `terminateProcessTree`, so no Copilot process is left (correctness) | 7 |
+| same → `buildStopReviewPrompt` | Instructions and Claude's last message; Codex inspects the repository with read-only `git` | Also fills `{{REVIEW_INPUT}}` with the working-tree context from `collectReviewContext`, and the patch folder above the inline limit (§2). The read-only profile has no shell, so Copilot cannot run `git` itself | 7 |
 | same → `parseStopReviewOutput`, messages | `ALLOW:` or `BLOCK:` first line; "Codex" in reasons | Rename only | 7 |
 
 ## Shared modules
@@ -131,7 +132,7 @@ repo root.
 | --- | --- | --- | --- |
 | `prompts/adversarial-review.md` | "You are Codex"; "matching the provided schema" (Codex gets the schema separately) | "You are Copilot"; adds an `{{OUTPUT_SCHEMA}}` block (§7) | 5 |
 | (none upstream) | Codex's native reviewer needs no prompt | New `prompts/review.md`: the `/review` slash command and `{{REVIEW_INPUT}}` | 5 |
-| `prompts/stop-review-gate.md` | Mentions `/codex:setup` and `/codex:status` | Rename only | 7 |
+| `prompts/stop-review-gate.md` | Mentions `/codex:setup` and `/codex:status` | Renamed, plus a `{{REVIEW_INPUT}}` block for the working-tree context | 7 |
 | `schemas/review-output.schema.json` | Output schema for Codex | Copied unchanged | 5 |
 | `commands/review.md`, `commands/adversarial-review.md` | Call `codex-companion.mjs`; "Codex" text | Rename only | 5 |
 | `commands/rescue.md` | `codex:codex-rescue`, `--model <model\|spark>`, the `spark` mapping | `copilot:copilot-rescue`, `--model <model>`, no `spark` line | 6 |

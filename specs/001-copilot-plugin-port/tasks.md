@@ -279,11 +279,12 @@ cancel a second task; its process tree is gone.
   in either direction (a read-only task is not resumed by a `--write` run, and the reverse), and the
   error says to use `--fresh`; `task-resume-candidate` reports the candidate's `write` value
 - [ ] T061 [P] [US4] Add job tests to `tests/runtime.test.mjs`: background task queued then completed;
-  `status` table and single job; `result` output with `copilot --resume=<id>` for a write task and none for a read-only task; cancel kills the
-  worker, the fake Copilot process and a child that the fake starts, within 10 seconds (poll with a
-  time limit, no fixed sleep); a foreground `close` (forbidden tool, grace kill) also leaves no
-  Copilot child or grandchild
-  and marks the job `cancelled`; `status --wait --timeout-ms` returns `waitTimedOut` for a job that
+  `status` table and single job; `result` output with `copilot --resume=<id>` for a write task and
+  none for a read-only task; cancel kills the worker, the fake Copilot process and a child that the
+  fake starts, within 10 seconds (poll with a time limit, no fixed sleep), and marks the job
+  `cancelled`; a forbidden tool marks the job `failed`, and a grace kill after `result` keeps the
+  status from `result.exitCode`, and in both cases no Copilot child or grandchild is left;
+  `status --wait --timeout-ms` returns `waitTimedOut` for a job that
   keeps running; jobs are filtered by `COPILOT_COMPANION_SESSION_ID`; with `GH_TOKEN` set to a
   marker value, no state, job or log file contains the marker
 - [ ] T062 [P] [US3] Port the `rescue.md` checks in `tests/commands.test.mjs`
@@ -330,16 +331,21 @@ and to `BLOCK`.
   missing Copilot gives a setup note and does not block; the gate run uses the read-only profile; a
   gate run past its time limit blocks with upstream's timeout message, and the companion, the fake
   Copilot and their child processes are gone afterwards (the 15-minute limit is passed in through an
-  option, so the test can use a short one); `SessionStart` writes `COPILOT_COMPANION_SESSION_ID` to `CLAUDE_ENV_FILE`; `SessionEnd` kills and
+  option, so the test can use a short one); a 100 KB last Claude message reaches the companion on
+  stdin and the gate runs; the gate prompt holds the working-tree context, and above the inline
+  limit the patch folder is passed with `--add-dir`; `SessionStart` writes `COPILOT_COMPANION_SESSION_ID` to `CLAUDE_ENV_FILE`; `SessionEnd` kills and
   removes the session's running jobs
 
 ### Implementation for User Story 5
 
 - [ ] T074 [P] [US5] Port `U/hooks/hooks.json` to `P/hooks/hooks.json`
-- [ ] T075 [P] [US5] Port `U/prompts/stop-review-gate.md` to `P/prompts/stop-review-gate.md`
-- [ ] T076 [US5] Port `U/scripts/stop-review-gate-hook.mjs` to `P/scripts/stop-review-gate-hook.mjs`;
-  start the companion with `detached: true` on macOS and Linux, and on the time limit kill its
-  process tree with `terminateProcessTree`
+- [ ] T075 [P] [US5] Port `U/prompts/stop-review-gate.md` to `P/prompts/stop-review-gate.md`, with a
+  `{{REVIEW_INPUT}}` block for the working-tree context
+- [ ] T076 [US5] Port `U/scripts/stop-review-gate-hook.mjs` to `P/scripts/stop-review-gate-hook.mjs`:
+  collect the working-tree context with `collectReviewContext` (and the patch folder above the
+  inline limit, as T053b) and put it in the prompt; send the prompt to `task --json` on stdin, not
+  as an argument; start the companion with `detached: true` on macOS and Linux, and on the time limit
+  kill its process tree with `terminateProcessTree`
 - [ ] T077 [US5] Port `U/scripts/session-lifecycle-hook.mjs` to `P/scripts/session-lifecycle-hook.mjs`
   (no broker, no transcript path)
 - [ ] T078 [US5] Add the Phase 7 differences to the README section
