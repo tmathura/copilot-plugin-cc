@@ -13,7 +13,9 @@ How work moves from an idea to `main`. The rules behind these steps are in the
    the same commit ("Keeping the spec current", below).
 5. Commit with the subject `[#n] Imperative description`.
 6. Run a Codex review of the branch. Fix confirmed findings, and record rejected ones with the reason.
-7. Open a PR into `main`. Copilot reviews each push. Answer and resolve every thread.
+7. Open a PR into `main`. The bot reviewers (today Copilot and CodeRabbit) review each push. Read
+   every review, including findings that are only in a review body or summary comment. Answer and
+   resolve every thread.
 8. Squash-merge when the reviews are done and CI passes. Until the repo has CI, run the tests and
    checks that exist on your own machine. They must pass.
 

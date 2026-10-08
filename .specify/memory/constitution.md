@@ -116,7 +116,8 @@ Why: the owner follows upstream releases. An upstream change must land in the sa
 - Test proof is checked at merge and at release, not at plan time.
 - A PR is merged only when:
   - tests and CI pass, where they exist;
-  - the Codex and Copilot review loops have finished, or the PR says a reviewer was not available;
+  - the Codex review loop and the review loop of every bot reviewer on the PR have finished, or the
+    PR says a reviewer was not available;
   - each finding is fixed, or recorded with the reason it was rejected.
 - `UPSTREAM.md` records the upstream commit that was last checked. It gives each upstream change a
   status: ported, pending, or skipped with a reason. The checked commit moves forward only when every
@@ -153,4 +154,4 @@ Why: the owner follows upstream releases. An upstream change must land in the sa
 Why: the agent trusts the spec folder at the start of each session. A decision changed in one file
 only leaves stale copies in the others, and reviews then find them one at a time.
 
-**Version**: 1.1.0 | **Ratified**: 2026-10-08 | **Last Amended**: 2026-10-08
+**Version**: 1.1.1 | **Ratified**: 2026-10-08 | **Last Amended**: 2026-10-08
