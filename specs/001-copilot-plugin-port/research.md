@@ -190,7 +190,9 @@ data model, the contracts, the plan and the tasks link here.
 ## 4b. Git calls without fsmonitor hooks or textconv programs
 
 - **Decision**: every `git` call in `scripts/lib/git.mjs` passes `-c core.fsmonitor=false`, and every
-  `git diff` call also passes `--no-textconv` next to upstream's `--no-ext-diff`.
+  `git diff` call also passes `--no-textconv` next to upstream's `--no-ext-diff`. The git commands
+  that `commands/review.md` and `commands/adversarial-review.md` give Claude for the size estimate
+  get the same options.
 - **Rationale**: security. `shell: false` stops a shell, but git itself can start a configured
   `core.fsmonitor` hook (on `git status`) or a `textconv` program (on `git diff`). Reviews and the
   gate run these calls before Copilot starts, so no Copilot control covers them. Neither is needed

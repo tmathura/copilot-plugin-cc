@@ -236,7 +236,9 @@ after; a write attempt is rejected.
   `parseError`; JSON inside a code fence parses; valid JSON with the wrong shape (`null`, `{}`, an
   unknown `verdict`, a finding without `file`) is rejected by `validateReviewOutput`: `parseError` is
   set, the job is `failed`, and the raw output is kept
-- [ ] T050 [P] [US2] Port `tests/commands.test.mjs` for `review.md` and `adversarial-review.md`
+- [ ] T050 [P] [US2] Port `tests/commands.test.mjs` for `review.md` and `adversarial-review.md`;
+  check that every `git` command in them has `-c core.fsmonitor=false`, and every `git diff` also
+  `--no-textconv`
 
 ### Implementation for User Story 2
 
@@ -256,7 +258,8 @@ after; a write attempt is rejected.
   (`executeReviewRun`, `handleReviewCommand`, `validateNativeReviewRequest`,
   `buildAdversarialReviewPrompt`, `buildReviewJobMetadata`)
 - [ ] T056 [P] [US2] Port `U/commands/review.md` and `U/commands/adversarial-review.md` to
-  `P/commands/`
+  `P/commands/`; the size-estimate git commands get `-c core.fsmonitor=false`, and the diffs also
+  `--no-textconv` (research.md §4b)
 - [ ] T057 [P] [US2] Port `U/skills/codex-result-handling/SKILL.md` to
   `P/skills/copilot-result-handling/SKILL.md`
 - [ ] T058 [US2] Add the Phase 5 differences (`/review` with inline context instead of the native
