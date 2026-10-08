@@ -36,6 +36,7 @@ A summary lives in `state.json`. The full record lives in `jobs/<id>.json`, and 
 | `threadId` | string or null | **Copilot session id**, set with `--session-id` before the run starts (upstream: Codex thread id) |
 | `turnId` | string or null | **`turnId` of the last `assistant.turn_start` event** (upstream: Codex turn id) |
 | `pid` | number or null | The process to kill on cancel: the worker for background jobs, the companion for foreground jobs |
+| `copilotPid` | number or null | The Copilot child's process id while a run is active; cancel stops its group too (research §7) |
 | `write` | boolean | `true` only for `task --write` |
 | `logFile` | string | Path of `jobs/<id>.log` |
 | `request` | object | Background tasks only: the stored task request for `task-worker` |

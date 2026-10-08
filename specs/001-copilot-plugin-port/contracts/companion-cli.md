@@ -9,7 +9,7 @@ subcommand takes `--cwd <path>` (alias `-C`) and, where upstream does, `--json`.
 | `setup` | `--enable-review-gate`, `--disable-review-gate`, `--json` | Setup report: `ready`, `node`, `npm`, `copilot` (was `codex`), `auth`, `sessionRuntime`, `reviewGateEnabled`, `actionsTaken`, `nextSteps` | **changed**: `copilot` key, version floor, Copilot next steps |
 | `review` | `--wait`, `--background`, `--base <ref>`, `--scope auto\|working-tree\|branch`, `--model`/`-m`, `--json` | Rendered review text, or the payload with `--json` | **changed**: Copilot's `/review` with inline context instead of the native reviewer |
 | `adversarial-review` | Same as `review`, plus focus text | Rendered findings, or the payload | **changed**: schema sent in the prompt |
-| `task` | `--background`, `--write`, `--resume-last`, `--resume`, `--fresh`, `--model`/`-m <model>`, `--effort <none\|minimal\|low\|medium\|high\|xhigh>`, `--prompt-file <path>`, `--json`, prompt text or stdin | Task output, or "started in the background as <id>" | **changed**: no `spark` alias |
+| `task` | `--background`, `--write`, `--resume-last`, `--resume`, `--fresh`, `--model`/`-m <model>`, `--effort <none\|minimal\|low\|medium\|high\|xhigh>`, `--prompt-file <path>`, `--json`, prompt text or stdin; internal `--context-dir <path>` (review gate only) | Task output, or "started in the background as <id>" | **changed**: no `spark` alias; `--context-dir` |
 | `task-worker` | `--job-id <id>` | None (internal) | none |
 | `task-resume-candidate` | `--json` | `available`, `sessionId`, `candidate`; the candidate also reports its `write` value | **changed**: `write` field |
 | `status` | `[job-id]`, `--all`, `--wait`, `--timeout-ms`, `--poll-interval-ms`, `--json` | Status table or one job report | none |

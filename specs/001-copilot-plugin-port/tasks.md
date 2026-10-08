@@ -121,7 +121,8 @@ setup.
 - [ ] T030 [P] Port `tests/process.test.mjs`; add tests: `runCommand` never uses a shell; arguments
   with spaces, quotes, `&`, `|`, `;`, `$` and `%` reach the child unchanged; a non-zero exit gives
   `formatCommandFailure` text; `terminateProcessTree` kills a child started with `detached: true`
-  and its grandchild on macOS and Linux, and a child tree on Windows;
+  and its grandchild on macOS and Linux, and a child tree on Windows; it signals a child that leads
+  no group; it sends `SIGKILL` to a child that ignores `SIGTERM` after the wait (short in tests);
   `resolveLauncher` on Windows (simulated with a temp PATH): an `.exe`, an npm global-package `.cmd`
   shim, `npm.cmd` with `node_modules/npm/bin/npm-cli.js`, an unknown `.cmd` (not found), and paths
   with spaces; `binaryAvailable("npm")` finds npm on Windows with no shell
@@ -284,6 +285,8 @@ cancel a second task; its process tree is gone.
   fake starts, within 10 seconds (poll with a time limit, no fixed sleep), and marks the job
   `cancelled`; a forbidden tool marks the job `failed`, and a grace kill after `result` keeps the
   status from `result.exitCode`, and in both cases no Copilot child or grandchild is left;
+  cancel of a review companion that is not a group leader also stops its Copilot child (through
+  `copilotPid`); a Copilot child that ignores `SIGTERM` is gone within 10 seconds;
   `status --wait --timeout-ms` returns `waitTimedOut` for a job that
   keeps running; jobs are filtered by `COPILOT_COMPANION_SESSION_ID`; with `GH_TOKEN` set to a
   marker value, no state, job or log file contains the marker
@@ -296,7 +299,8 @@ cancel a second task; its process tree is gone.
   `interruptPromptModeTurn` (not attempted) to `P/scripts/lib/copilot.mjs`
 - [ ] T064 [US3] Add `task`, `task-worker` and `task-resume-candidate` to
   `P/scripts/copilot-companion.mjs` (`MODEL_ALIASES` empty, `VALID_REASONING_EFFORTS` as upstream)
-- [ ] T065 [US4] Add `status`, `result` and `cancel` to `P/scripts/copilot-companion.mjs`
+- [ ] T065 [US4] Add `status`, `result` and `cancel` to `P/scripts/copilot-companion.mjs`; record
+  `copilotPid` when a run starts, and stop it on cancel (research.md §7, stopping a job)
 - [ ] T066 [P] [US3] Port `U/commands/rescue.md` to `P/commands/rescue.md` (no `spark`)
 - [ ] T067 [P] [US4] Port `U/commands/status.md`, `U/commands/result.md` and `U/commands/cancel.md` to
   `P/commands/`
@@ -333,7 +337,8 @@ and to `BLOCK`.
   Copilot and their child processes are gone afterwards (the 15-minute limit is passed in through an
   option, so the test can use a short one); a 100 KB last Claude message reaches the companion on
   stdin and the gate runs; the gate prompt holds the working-tree context, and above the inline
-  limit the patch folder is passed with `--add-dir`; `SessionStart` writes `COPILOT_COMPANION_SESSION_ID` to `CLAUDE_ENV_FILE`; `SessionEnd` kills and
+  limit the patch folder reaches Copilot as `--add-dir` through `--context-dir`, and is removed after
+  success, failure and a timeout; `SessionStart` writes `COPILOT_COMPANION_SESSION_ID` to `CLAUDE_ENV_FILE`; `SessionEnd` kills and
   removes the session's running jobs
 
 ### Implementation for User Story 5
@@ -343,8 +348,9 @@ and to `BLOCK`.
   `{{REVIEW_INPUT}}` block for the working-tree context
 - [ ] T076 [US5] Port `U/scripts/stop-review-gate-hook.mjs` to `P/scripts/stop-review-gate-hook.mjs`:
   collect the working-tree context with `collectReviewContext` (and the patch folder above the
-  inline limit, as T053b) and put it in the prompt; send the prompt to `task --json` on stdin, not
-  as an argument; start the companion with `detached: true` on macOS and Linux, and on the time limit
+  inline limit, as T053b) and put it in the prompt; pass the patch folder with the internal
+  `task --context-dir <path>` option and remove it in a `finally` step; send the prompt to
+  `task --json` on stdin, not as an argument; start the companion with `detached: true` on macOS and Linux, and on the time limit
   kill its process tree with `terminateProcessTree`
 - [ ] T077 [US5] Port `U/scripts/session-lifecycle-hook.mjs` to `P/scripts/session-lifecycle-hook.mjs`
   (no broker, no transcript path)

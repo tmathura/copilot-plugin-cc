@@ -281,6 +281,18 @@ Later tickets apply these rules. The call-site map uses them.
   `SIGINT`: it kills its Copilot child's group, then exits. A cancel or gate timeout that stops a
   companion therefore stops its Copilot process and Copilot's own children too. Windows keeps
   `taskkill /T`, which follows the whole tree.
+- **Stopping a job**: `terminateProcessTree` changes in two ways (correctness, spec SC-007).
+  - If the group signal finds no group (`ESRCH`), it signals the process itself. A companion that
+    Claude's Bash tool started (a foreground or Bash-background review) is not a group leader, and
+    upstream returns without signalling it.
+  - It waits up to 5 seconds (an option, so tests can use less). If the process or its group is
+    still alive, it sends `SIGKILL` to it. Windows already uses `taskkill /T /F`.
+  - The job record also keeps `copilotPid`, the Copilot child's process id, set when the run starts.
+    Cancel stops the job's `pid` and then the `copilotPid` group, so a Copilot run whose companion
+    was killed with `SIGKILL` is still stopped.
+- **Gate context folder**: the gate hook writes the patch folder (§2) and passes it to the companion
+  with the internal `task` option `--context-dir <path>`. The adapter turns it into `--add-dir`. The
+  hook removes the folder in a `finally` step, after success, failure or a timeout kill.
 
 ## 8. Effect on the ticket split
 
