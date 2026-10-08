@@ -220,13 +220,15 @@ function formatSection(title, body) {
 function formatUntrackedFile(cwd, relativePath) {
   const absolutePath = path.join(cwd, relativePath);
   let stat;
+  let isSymlink;
   try {
     stat = fs.statSync(absolutePath);
+    isSymlink = fs.lstatSync(absolutePath).isSymbolicLink();
   } catch {
     return `### ${relativePath}\n(skipped: broken symlink or unreadable file)`;
   }
   // A link can point outside the repository, for example at a key file.
-  if (fs.lstatSync(absolutePath).isSymbolicLink()) {
+  if (isSymlink) {
     return `### ${relativePath}\n(skipped: symlink)`;
   }
   if (stat.isDirectory()) {

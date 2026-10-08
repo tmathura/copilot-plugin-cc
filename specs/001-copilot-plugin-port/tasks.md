@@ -164,7 +164,7 @@ setup.
   and the "still running" errors
 - [X] T034 Add the Phase 3 differences (no shell in `runCommand`, the self-collect text) to the
   README section
-- [ ] T035 Run `claude plugin validate .` and `node --test tests/*.test.mjs`; both pass
+- [X] T035 Run `claude plugin validate .` and `node --test tests/*.test.mjs`; both pass
 
 **Checkpoint**: shared modules are ported and tested.
 

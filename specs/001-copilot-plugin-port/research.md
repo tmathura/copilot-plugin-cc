@@ -412,7 +412,8 @@ Later tickets apply these rules. The call-site map uses them.
   has removed it. Rejected alternative: upstream's `upsertJob`. A progress write that cannot take the
   state lock is skipped and does not fail the run; the job log still gets the line. The final status
   write runs outside the runner's error handling, so a failed write never turns a finished run into a
-  failed one (both added 2026-10-08, ticket 3 code review). A progress value counts as written only
+  failed one (both added 2026-10-08, ticket 3 code review). If that write fails, the error goes to
+  the job log and `runTrackedJob` still returns the run's result (added 2026-10-08, PR review). A progress value counts as written only
   after its write succeeds, so the next event retries it (added 2026-10-08, PR review).
 - **Hook time budgets**: Claude Code stops a hook at its `hooks.json` timeout (`Stop` 900 s,
   `SessionEnd` 5 s, as upstream), and then no cleanup runs. So each hook does its work inside a

@@ -247,6 +247,26 @@ test("collectReviewContext never reads the target of an untracked symlink", () =
   }
 });
 
+test("collectReviewContext skips an untracked file that disappears while it is checked", (t) => {
+  const cwd = makeTempDir();
+  initGitRepo(cwd);
+  fs.writeFileSync(path.join(cwd, "app.js"), "console.log('v1');\n");
+  run("git", ["add", "app.js"], { cwd });
+  run("git", ["commit", "-m", "init"], { cwd });
+  fs.writeFileSync(path.join(cwd, "vanishing.js"), "export {};\n");
+  const lstatSync = fs.lstatSync;
+  t.mock.method(fs, "lstatSync", (filePath, ...rest) => {
+    if (String(filePath).endsWith("vanishing.js")) {
+      throw Object.assign(new Error("no such file"), { code: "ENOENT" });
+    }
+    return lstatSync(filePath, ...rest);
+  });
+
+  const context = collectReviewContext(cwd, resolveReviewTarget(cwd, {}));
+
+  assert.match(context.content, /### vanishing\.js\n\(skipped: broken symlink or unreadable file\)/);
+});
+
 test("collectReviewContext works in a repository path with spaces and shell characters", () => {
   const cwd = makeTempDir("copilot plugin test & repo ");
   initGitRepo(cwd);

@@ -212,33 +212,46 @@ export async function runTrackedJob(job, runner, options = {}) {
     throw error;
   }
 
-  // Outside the runner's try: a failed status write must not turn a finished run into a failed one.
+  // A failed status write must not turn a finished run into a failed one, or hide its result.
+  const logFile = options.logFile ?? job.logFile ?? null;
   const completionStatus = execution.exitStatus === 0 ? "completed" : "failed";
   const completedAt = nowIso();
-  updateRunningJob(
-    job.workspaceRoot,
-    job.id,
-    () => ({
-      ...runningRecord,
-      status: completionStatus,
-      threadId: execution.threadId ?? null,
-      turnId: execution.turnId ?? null,
-      pid: null,
-      phase: completionStatus === "completed" ? "done" : "failed",
-      completedAt,
-      result: execution.payload,
-      rendered: execution.rendered
-    }),
-    {
-      status: completionStatus,
-      threadId: execution.threadId ?? null,
-      turnId: execution.turnId ?? null,
-      summary: execution.summary,
-      phase: completionStatus === "completed" ? "done" : "failed",
-      pid: null,
-      completedAt
+  try {
+    updateRunningJob(
+      job.workspaceRoot,
+      job.id,
+      () => ({
+        ...runningRecord,
+        status: completionStatus,
+        threadId: execution.threadId ?? null,
+        turnId: execution.turnId ?? null,
+        pid: null,
+        phase: completionStatus === "completed" ? "done" : "failed",
+        completedAt,
+        result: execution.payload,
+        rendered: execution.rendered
+      }),
+      {
+        status: completionStatus,
+        threadId: execution.threadId ?? null,
+        turnId: execution.turnId ?? null,
+        summary: execution.summary,
+        phase: completionStatus === "completed" ? "done" : "failed",
+        pid: null,
+        completedAt
+      }
+    );
+  } catch (error) {
+    try {
+      appendLogLine(logFile, `Could not save the final job status: ${error instanceof Error ? error.message : error}`);
+    } catch {
+      // The log lives on the same storage; the result below matters more.
     }
-  );
-  appendLogBlock(options.logFile ?? job.logFile ?? null, "Final output", execution.rendered);
+  }
+  try {
+    appendLogBlock(logFile, "Final output", execution.rendered);
+  } catch {
+    // As above: a log write never hides a finished run's result.
+  }
   return execution;
 }

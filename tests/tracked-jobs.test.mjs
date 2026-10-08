@@ -3,7 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { makeTempDir } from "./helpers.mjs";
-import { createJobProgressUpdater, runTrackedJob } from "../plugins/copilot/scripts/lib/tracked-jobs.mjs";
+import { createJobLogFile, createJobProgressUpdater, runTrackedJob } from "../plugins/copilot/scripts/lib/tracked-jobs.mjs";
 import { listJobs, readJobFile, resolveJobFile, updateState, upsertJob } from "../plugins/copilot/scripts/lib/state.mjs";
 
 process.env.CLAUDE_PLUGIN_DATA = makeTempDir();
@@ -139,6 +139,41 @@ test("a progress value whose write failed is written by the next event", async (
     assert.equal(findJob(workspace, "task-retry").phase, "editing");
     return execution;
   });
+});
+
+test("a failed final status write still returns the finished run and logs the error", async (t) => {
+  const workspace = makeTempDir();
+  const logFile = createJobLogFile(workspace, "task-final", "Copilot Task");
+
+  const result = await runTrackedJob({ id: "task-final", workspaceRoot: workspace }, async () => {
+    t.mock.method(fs, "renameSync", () => {
+      throw Object.assign(new Error("disk full"), { code: "ENOSPC" });
+    });
+    return execution;
+  }, { logFile });
+  t.mock.restoreAll();
+
+  assert.equal(result, execution);
+  const log = fs.readFileSync(logFile, "utf8");
+  assert.match(log, /Could not save the final job status: disk full/);
+  assert.match(log, /Final output\ndone/);
+});
+
+test("a finished run returns its result even when the state and the log cannot be written", async (t) => {
+  const workspace = makeTempDir();
+  const logFile = createJobLogFile(workspace, "task-full-disk", "Copilot Task");
+
+  const result = await runTrackedJob({ id: "task-full-disk", workspaceRoot: workspace }, async () => {
+    for (const method of ["renameSync", "appendFileSync"]) {
+      t.mock.method(fs, method, () => {
+        throw Object.assign(new Error("disk full"), { code: "ENOSPC" });
+      });
+    }
+    return execution;
+  }, { logFile });
+  t.mock.restoreAll();
+
+  assert.equal(result, execution);
 });
 
 test("a broken job file does not stop the final status write", async () => {
