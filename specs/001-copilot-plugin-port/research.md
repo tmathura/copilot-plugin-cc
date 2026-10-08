@@ -54,6 +54,27 @@ GitHub search (repos, more than 20 stars, pushed on or after 2026-07-08): no oth
 Copilot CLI plugin matched. The hits with more than 20 stars (superpowers-zh, squeez, Formic) are
 not delegation plugins. The other `copilot-plugin-cc` repos have fewer than 20 stars.
 
+Evidence, run on 2026-10-08:
+
+- `gh search repos "claude code copilot cli" --stars ">20" --updated ">=2026-07-08"` returned
+  `jnMetaCode/superpowers-zh` (8268 stars, pushed 2026-10-04), `claudioemmanuel/squeez` (216,
+  2026-10-07) and `rickywo/Formic` (41, 2026-07-13). None hands reviews or tasks from Claude Code to
+  the Copilot CLI.
+- `gh search repos "copilot-plugin-cc"` returned 24 repos. Only `wagnersza/copilot-plugin-cc` has
+  more than 20 stars (45), and its last push is 2026-04-02.
+- `gh api repos/<owner>/copilot-plugin-cc` gave the star counts and push dates in the table above.
+- The live checks used Copilot CLI 1.0.93 in a throwaway git repo:
+  - `copilot --output-format json` with the prompt on stdin, with `--available-tools=view` and with
+    `--available-tools=view,create` (denied `create`: `"code":"denied"`).
+  - A `.github/hooks/*.json` hook that writes a file, in prompt mode (not run) and in ACP mode (run).
+  - `--resume=<id>` in a new process.
+  - An ACP client written for the check: `initialize`, `session/new`, `session/prompt`,
+    `session/request_permission` (rejected), `session/cancel` (`stopReason: "cancelled"`) and
+    `authenticate`.
+  - `--deny-tool='shell(git push)'` against `git -C . push` and `git -c core.askPass=x push`
+    (both denied).
+  The event names and fields in §7 are copied from those runs.
+
 ### Comparison on the points of Principle III
 
 | Point | A. ACP | B. Prompt mode |

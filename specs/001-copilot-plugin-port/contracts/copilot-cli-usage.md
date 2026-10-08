@@ -18,6 +18,8 @@ was seen on Copilot CLI 1.0.93 (research §2), unless marked "ticket 4 checks".
 - Environment: the profile environment (research §3).
 - Working folder: the workspace root. For the login check: the plugin data folder.
 - Stdin: the prompt text, then end of input.
+- Large reviews: when a review is above the inline limit, also pass `--add-dir=<patch folder>`
+  (research §2).
 - Stdout: one JSON event per line.
 - Stderr: kept for error reports, after `cleanCopilotStderr`.
 - No shell, on every system.
