@@ -311,7 +311,9 @@ cancel a second task; its process tree is gone.
   keeps running; jobs are filtered by `COPILOT_COMPANION_SESSION_ID`; with `GH_TOKEN` set to a
   marker value, no state, job or log file contains the marker; with a spawn stub that runs the worker
   to completion before `enqueueBackgroundTask` continues, the job ends `completed`, not `queued`, and
-  the late `pid` write does not overwrite that status
+  the late `pid` write does not overwrite that status; a job cancelled after its record is written
+  but before its worker claims it never runs (the fake Copilot is never started) and stays
+  `cancelled`
 - [ ] T062 [P] [US3] Port the `rescue.md` checks in `tests/commands.test.mjs`
 
 ### Implementation for User Stories 3 and 4
@@ -322,7 +324,9 @@ cancel a second task; its process tree is gone.
 - [ ] T064 [US3] Add `task`, `task-worker` and `task-resume-candidate` to
   `P/scripts/copilot-companion.mjs` (`MODEL_ALIASES` empty, `VALID_REASONING_EFFORTS` as upstream);
   `enqueueBackgroundTask` writes the `queued` record before it starts the worker, and stores the
-  worker's `pid` only if the job is still `queued` (research.md §7, background start order)
+  worker's `pid` only if the job is still `queued`; `task-worker` claims the job inside
+  `updateState` only if it is still `queued`, and exits without running a cancelled or missing job
+  (research.md §7, background start order)
 - [ ] T065 [US4] Add `status`, `result` and `cancel` to `P/scripts/copilot-companion.mjs`; record
   `copilotPid` when a run starts, and stop it on cancel (research.md §7, stopping a job)
 - [ ] T066 [P] [US3] Port `U/commands/rescue.md` to `P/commands/rescue.md` (no `spark`)

@@ -324,6 +324,10 @@ Later tickets apply these rules. The call-site map uses them.
   overwrites a worker that has already moved the job on. Reason: correctness. Upstream starts the
   worker first; a worker that reads the job record before it exists exits at once, and the job stays
   `queued` forever. Rejected alternative: upstream's order, kept for parity.
+  The worker claims the job inside `updateState`: only if the job is still `queued` does it set
+  `running` and its own `pid`. Otherwise (cancelled or missing) it exits without running anything.
+  Cancel also changes the job inside `updateState`, so a cancel and a claim never both win. Reason:
+  without the claim, a job cancelled before its worker starts would still run, even with `--write`.
 - **Hook time budgets**: Claude Code stops a hook at its `hooks.json` timeout (`Stop` 900 s,
   `SessionEnd` 5 s, as upstream), and then no cleanup runs. So each hook does its work inside a
   smaller budget.

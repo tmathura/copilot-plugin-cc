@@ -87,7 +87,8 @@ repo root.
 | `handleTaskResumeCandidate` | Reports the newest finished task | Same, and the candidate also reports its `write` value (§7) | 6 |
 | `handleTask`, `buildTaskRequest` | Parse task options and build the request | Also accept the internal `--context-dir <path>` option, which only the review gate uses (§7, gate context folder) | 6, 7 |
 | `enqueueBackgroundTask` | Starts the worker, then writes the `queued` job record | Writes the `queued` record with its request first, then starts the worker, then stores its `pid` only if the job is still `queued` (§7, background start order; correctness) | 6 |
-| `spawnDetachedTaskWorker`, `handleTaskWorker` | Background worker with `process.execPath`, no shell | Rename only | 6 |
+| `handleTaskWorker` | Checks that the job record and request exist, then runs the job | Claims the job inside `updateState` only if it is still `queued` (sets `running` and its `pid`); a cancelled or missing job exits without running (§7, background start order; correctness) | 6 |
+| `spawnDetachedTaskWorker` | Background worker with `process.execPath`, no shell | Rename only | 6 |
 | `handleStatus`, `waitForSingleJobSnapshot`, `handleResult` | Job state only | Rename only | 6 |
 | `handleCancel` | `interruptAppServerTurn`, then `terminateProcessTree` | `interruptPromptModeTurn` (not attempted), then `terminateProcessTree` on the job's `pid` and then on its `copilotPid` (§7, stopping a job) | 6 |
 | `buildReviewJobMetadata`, `buildTaskRunMetadata`, `renderQueuedTaskLaunch` | "Codex Review", "Codex Task", `/codex:status` | Rename only | 5, 6 |
