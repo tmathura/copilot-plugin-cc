@@ -280,8 +280,9 @@ after; a write attempt is rejected.
 - [X] T053 [P] [US2] Add `P/prompts/review.md`: the `/review` slash command, the target label and
   `{{REVIEW_INPUT}}`
 - [X] T053b [US2] In `P/scripts/copilot-companion.mjs`, when `collectReviewContext` returns
-  `inputMode: "self-collect"`, write the exact patches (staged, unstaged and untracked for a working
-  tree; the merge-base range for a branch) to a new folder for the run, pass it with `--add-dir`
+  `inputMode: "self-collect"`, write the exact patches (staged and unstaged for a working tree, plus
+  the untracked files as the inline context shows them; the merge-base range for a branch; wording
+  changed 2026-10-09, research §2) to a new folder for the run, pass it with `--add-dir`
   through the adapter, name the files in the prompt, and delete the folder after the run (and when
   the companion is stopped with `SIGTERM` or `SIGINT`; the folder is the job's `jobs/<id>.patches`,
   and removing the job record removes it; added 2026-10-09, research §2)

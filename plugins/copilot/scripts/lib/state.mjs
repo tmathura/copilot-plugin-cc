@@ -310,12 +310,18 @@ export function updateState(cwd, mutate, options = {}) {
       if (retainedIds.has(job.id)) {
         continue;
       }
-      try {
-        removeJobFile(resolveJobFile(cwd, job.id));
-        removeFileIfExists(job.logFile);
-        fs.rmSync(resolveJobPatchDir(cwd, job.id), { recursive: true, force: true });
-      } catch {
-        // The update is saved; a file that cannot be removed now is only left behind.
+      // The update is saved; a file that cannot be removed now is only left behind, and must not keep
+      // the job's other files from going.
+      for (const remove of [
+        () => removeJobFile(resolveJobFile(cwd, job.id)),
+        () => removeFileIfExists(job.logFile),
+        () => fs.rmSync(resolveJobPatchDir(cwd, job.id), { recursive: true, force: true })
+      ]) {
+        try {
+          remove();
+        } catch {
+          // Left behind.
+        }
       }
     }
     return nextState;
