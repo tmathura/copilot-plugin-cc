@@ -187,9 +187,25 @@ data model, the contracts, the plan and the tasks link here.
 - **Alternatives rejected**: `shell: true` (unsafe), `cmd.exe /c` with escaping (fragile), and
   hard-coding `copilot-win32-x64/copilot.exe` (it ties the plugin to one npm package layout and CPU).
 
+## 4b. Git calls without fsmonitor hooks or textconv programs
+
+- **Decision**: every `git` call in `scripts/lib/git.mjs` passes `-c core.fsmonitor=false`, and every
+  `git diff` call also passes `--no-textconv` next to upstream's `--no-ext-diff`.
+- **Rationale**: security. `shell: false` stops a shell, but git itself can start a configured
+  `core.fsmonitor` hook (on `git status`) or a `textconv` program (on `git diff`). Reviews and the
+  gate run these calls before Copilot starts, so no Copilot control covers them. Neither is needed
+  for a review, and raw patches are the right input.
+- **Limit**: clean and process filters (`filter.<driver>.clean` and `.process`, for example Git LFS)
+  still run, as they do in every `git status` or `git diff` the user runs. They are needed for a
+  correct diff. Their commands come from the user's own git config; a cloned repository can only name
+  a driver in `.gitattributes`, not define its command.
+
 ## 5. Supported Copilot CLI versions
 
 - **Decision**: The lowest supported version is **1.0.93**, the version tested in this ticket. Setup
+  checks it with `--no-auto-update --version`, the same flag every run uses. `copilot help
+  environment` says `--no-auto-update` "makes launches ignore any newer version already in the
+  package cache", so a bare `--version` can report a different build from the one that runs. Setup
   refuses older versions and says how to update. Raise the floor only after a test run on the newer
   version.
 - **Rationale**: The prompt-mode event format has no published schema, so the plugin claims only what

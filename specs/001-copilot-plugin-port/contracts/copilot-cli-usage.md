@@ -6,7 +6,7 @@ was seen on Copilot CLI 1.0.93 (research §2), unless marked "ticket 4 checks".
 
 ## Version check
 
-- Command: the resolved launcher (research §4) with `--version`.
+- Command: the resolved launcher (research §4) with `--no-auto-update --version` (research §5).
 - Output: `GitHub Copilot CLI <x.y.z>.` on stdout. Setup refuses versions below 1.0.93.
 
 ## One run

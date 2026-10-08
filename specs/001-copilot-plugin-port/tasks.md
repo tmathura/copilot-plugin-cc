@@ -107,7 +107,8 @@ setup.
   add `resolveLauncher(name)` (research.md §4) and use it in `binaryAvailable`
 - [ ] T024 Port `U/scripts/lib/git.mjs` to `P/scripts/lib/git.mjs`; change the self-collect guidance
   in `buildAdversarialCollectionGuidance` to "Read the patch files listed below with the view tool"
-  (research.md §2, self-collect)
+  (research.md §2, self-collect); pass `-c core.fsmonitor=false` to every git call and `--no-textconv`
+  to every `git diff` (research.md §4b)
 - [ ] T025 [P] Port `U/scripts/lib/state.mjs` to `P/scripts/lib/state.mjs` (fallback root
   `<tmp>/copilot-companion`); keep `MAX_JOBS = 50` and `STATE_VERSION = 1`
 - [ ] T026 [P] Port `U/scripts/lib/tracked-jobs.mjs` to `P/scripts/lib/tracked-jobs.mjs`
@@ -126,7 +127,9 @@ setup.
   `resolveLauncher` on Windows (simulated with a temp PATH): an `.exe`, an npm global-package `.cmd`
   shim, `npm.cmd` with `node_modules/npm/bin/npm-cli.js`, an unknown `.cmd` (not found), and paths
   with spaces; `binaryAvailable("npm")` finds npm on Windows with no shell
-- [ ] T031 [P] Port `tests/git.test.mjs`, including a repository path with spaces
+- [ ] T031 [P] Port `tests/git.test.mjs`, including a repository path with spaces, and a repository
+  with a configured `core.fsmonitor` hook and a `textconv` driver: context collection runs neither
+  (each would write a marker file)
 - [ ] T032 [P] Port `tests/state.test.mjs` and `tests/render.test.mjs`
 - [ ] T033 [P] Add `tests/job-control.test.mjs` for job lookup by id and prefix, ambiguous prefixes,
   and the "still running" errors
@@ -160,7 +163,9 @@ logged in, and ready.
   prints `result` and then does not exit is killed after the grace period, the result is kept, and
   the run counts as a success when `result.exitCode` is 0
   (the grace period is an option, so the test can use a short one)
-- [ ] T038 [P] [US1] Add `tests/copilot.test.mjs`: version parse and floor 1.0.93; the adapter
+- [ ] T038 [P] [US1] Add `tests/copilot.test.mjs`: version parse and floor 1.0.93; the version check
+  uses `--no-auto-update --version` (the fake reports a newer version without the flag and an old one
+  with it, and setup refuses); the adapter
   starts Copilot through `resolveLauncher` and never with `shell: true`; read-only and write profiles build exactly the arguments and environment in research.md §3 (the
   read-only environment has the plugin `COPILOT_HOME` and no `COPILOT_ALLOW_ALL` or
   `GITHUB_COPILOT_PROMPT_MODE_*`); both profiles pass

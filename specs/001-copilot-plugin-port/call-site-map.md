@@ -36,7 +36,7 @@ repo root.
 | --- | --- | --- | --- |
 | (none upstream) | Codex is found on the PATH by the shell | `resolveLauncher("copilot")` from `process.mjs` (§4) | 4 |
 | (none upstream) | Codex gets `sandbox` and `approvalPolicy` per thread | `buildCopilotArgs` and `buildCopilotEnv`: the read-only and write profiles (§3), the plugin-owned `COPILOT_HOME`, and the scrubbed environment. Only this module builds Copilot arguments | 4 |
-| `getCodexAvailability` | Runs `codex --version` and `codex app-server --help` | `getCopilotAvailability`: runs `copilot --version`, parses `GitHub Copilot CLI <x.y.z>`, and refuses versions below 1.0.93 (§5) | 4 |
+| `getCodexAvailability` | Runs `codex --version` and `codex app-server --help` | `getCopilotAvailability`: runs `copilot --no-auto-update --version` (§5), parses `GitHub Copilot CLI <x.y.z>`, and refuses versions below 1.0.93 (§5) | 4 |
 | `getCodexAuthStatus`, `getCodexAuthStatusFromClient` | `account/read` and `config/read` over the app server | `getCopilotAuthStatus`: one tiny read-only prompt in the plugin data folder; reads the `result` event (§7) | 4 |
 | `buildAppServerAuthStatus`, `buildAuthStatus` | Builds the auth report from the Codex account | Builds it from the check run. Sources: stored login, a token variable (name only, never the value), or BYOK. `requiresOpenaiAuth` becomes `requiresGithubAuth` | 4 |
 | `resolveProviderConfig`, `normalizeProviderId`, `formatProviderLabel`, `BUILTIN_PROVIDER_LABELS` | Reads the Codex model provider from config | Reads `COPILOT_PROVIDER_TYPE` and `COPILOT_PROVIDER_BASE_URL` for BYOK. Labels: `openai`, `azure`, `anthropic` | 4 |
@@ -116,7 +116,7 @@ repo root.
 | same → `terminateProcessTree` | Sends `SIGTERM` to the process group on macOS and Linux and returns; on `ESRCH` it does not signal the process itself; `taskkill /T /F` on Windows | Signals the process itself when there is no group, and sends `SIGKILL` to what is still alive after up to 5 seconds (§7, stopping a job). The callers start each process they may stop as its own group (§7, process groups) | 3, 4, 7 |
 | same → `formatCommandFailure` | No Codex calls | Rename only | 3 |
 | `scripts/lib/git.mjs` → `buildAdversarialCollectionGuidance` | Self-collect text: "inspect the target diff yourself with read-only git commands" | "Read the patch files listed below with the view tool". The companion writes the exact patches to a folder passed with `--add-dir` (§2, ticket 5). Copilot has no shell in reviews | 3, 5 |
-| same, rest of `git.mjs` | Runs `git` without a shell | Rename only | 3 |
+| same, rest of `git.mjs` | Runs `git` without a shell | Also passes `-c core.fsmonitor=false` to every call and `--no-textconv` to every `git diff` (§4b, security). Clean and process filters still run, as in any git call (§4b, limit) | 3 |
 | `scripts/lib/state.mjs` → `FALLBACK_STATE_ROOT_DIR` | `<tmp>/codex-companion` | `<tmp>/copilot-companion` | 3 |
 | `scripts/lib/fs.mjs` → `createTempDir` | Prefix `codex-plugin-` | Prefix `copilot-plugin-` | 3 |
 | `scripts/lib/tracked-jobs.mjs` → `SESSION_ID_ENV`, `createProgressReporter` | `CODEX_COMPANION_SESSION_ID`, `[codex]` stderr prefix | `COPILOT_COMPANION_SESSION_ID`, `[copilot]` | 3 |
