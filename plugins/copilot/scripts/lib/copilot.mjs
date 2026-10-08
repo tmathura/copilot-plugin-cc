@@ -436,9 +436,15 @@ function buildAuthStatus(fields = {}) {
 // The version check runs the same launch as a real run: --no-auto-update makes Copilot ignore a newer
 // build in its package cache, which a bare --version could report.
 // The probe blocks the event loop, so it needs its own limit: no later timer or signal handler can run.
+// SIGKILL, because spawnSync keeps waiting for a program that ignores SIGTERM.
 export function getCopilotAvailability(cwd, options = {}) {
   const timeout = options.timeoutMs ?? VERSION_CHECK_TIMEOUT_MS;
-  const status = binaryAvailable("copilot", ["--no-auto-update", "--version"], { cwd, env: options.env, timeout });
+  const status = binaryAvailable("copilot", ["--no-auto-update", "--version"], {
+    cwd,
+    env: options.env,
+    timeout,
+    killSignal: "SIGKILL"
+  });
   if (!status.available) {
     const detail = /ETIMEDOUT/.test(status.detail)
       ? `copilot --version did not answer within ${timeout / 1000} seconds`

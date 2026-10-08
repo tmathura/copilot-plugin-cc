@@ -280,8 +280,10 @@ data model, the contracts, the plan and the tasks link here.
   refuses older versions and says how to update. Raise the floor only after a test run on the newer
   version. The check has a 30-second limit, and a check that passes it reports that `--version` did
   not answer (decided 2026-10-08, ticket 4 Codex review). Reason: the check is a blocking
-  `spawnSync`, so no later time limit or signal handler can run while it waits. Rejected
-  alternative: no limit, as upstream's `binaryAvailable`.
+  `spawnSync`, so no later time limit or signal handler can run while it waits. At the limit it
+  sends `SIGKILL`, because `spawnSync` keeps waiting for a program that ignores `SIGTERM` (Codex
+  review round 2). Rejected alternatives: no limit, as upstream's `binaryAvailable`; the default
+  `SIGTERM`.
 - **Rationale**: The prompt-mode event format has no published schema, so the plugin claims only what
   was tested. Most users run the newest version, because Copilot updates itself by default.
 

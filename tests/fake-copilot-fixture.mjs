@@ -24,7 +24,7 @@ export const NOT_LOGGED_IN_STDERR = [
 //                       line that is not an event
 //   old-version         --version reports 1.0.92
 //   pinned-old-version  1.0.99 without --no-auto-update, 1.0.92 with it
-//   hang-version        --version never answers
+//   hang-version        --version never answers and ignores SIGTERM
 //   not-logged-in       the real "no authentication" output
 //   bad-json            a line that is not JSON, then exits
 //   truncated           exits 1 before the result event
@@ -45,6 +45,7 @@ const NOT_LOGGED_IN_STDERR = ${JSON.stringify(NOT_LOGGED_IN_STDERR)};
 
 const args = process.argv.slice(2);
 if (args.includes("--version") && BEHAVIOR === "hang-version") {
+  process.on("SIGTERM", () => {});
   setInterval(() => {}, 1000);
   return;
 }
