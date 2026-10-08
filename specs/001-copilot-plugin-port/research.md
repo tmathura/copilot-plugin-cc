@@ -366,6 +366,8 @@ Later tickets apply these rules. The call-site map uses them.
     upstream returns without signalling it.
   - It waits up to 5 seconds (an option, so tests can use less). If the process or its group is
     still alive, it sends `SIGKILL` to it. Windows already uses `taskkill /T /F`.
+  - A pid that is not a positive integer is never signalled: `kill(0)` would signal the caller's own
+    group (added 2026-10-08, PR review; upstream accepts any finite number).
   - The wait does not block the event loop, so `terminateProcessTree` returns a promise (decided
     2026-10-08, ticket 3 code review). Reason: correctness. Node reaps the caller's own exited child
     only from the event loop; until then it still answers a signal check, so a blocking wait always
@@ -413,7 +415,9 @@ Later tickets apply these rules. The call-site map uses them.
   state lock is skipped and does not fail the run; the job log still gets the line. The final status
   write runs outside the runner's error handling, so a failed write never turns a finished run into a
   failed one (both added 2026-10-08, ticket 3 code review). If that write fails, the error goes to
-  the job log and `runTrackedJob` still returns the run's result (added 2026-10-08, PR review). A progress value counts as written only
+  the job log and `runTrackedJob` still returns the run's result (added 2026-10-08, PR review).
+  Likewise, if the runner fails and its `failed` status cannot be saved, the caller still gets the
+  runner's own error (added 2026-10-08, PR review). A progress value counts as written only
   after its write succeeds, so the next event retries it (added 2026-10-08, PR review).
 - **Hook time budgets**: Claude Code stops a hook at its `hooks.json` timeout (`Stop` 900 s,
   `SessionEnd` 5 s, as upstream), and then no cleanup runs. So each hook does its work inside a
@@ -465,7 +469,11 @@ Later tickets apply these rules. The call-site map uses them.
   lock, never by saving an earlier snapshot. So upstream's `saveState`, which saves a snapshot the
   caller read earlier, is not ported (decided 2026-10-08, ticket 3 code review; rejected alternative:
   a locked `saveState`, which still drops a job added after the caller's read). When the lock file
-  has no readable owner, the timeout error says to delete it if no companion is running.
+  has no readable owner, the timeout error says to delete it if no companion is running. A process
+  that creates a lock but cannot write its owner removes that lock again, so it never leaves an
+  unreadable one (added 2026-10-08, PR review). A session counts as closed for a companion if any
+  `closedSessions` entry with its id is newer than the companion's start, so a resumed session that
+  closes again is caught (added 2026-10-08, PR review).
   An update that cannot read or parse an existing `state.json` stops with an error that names the
   file and changes nothing; plain readers still fall back to the empty state, as upstream. Pruned
   jobs' files and logs are deleted only after the new `state.json` is saved, and a failed delete

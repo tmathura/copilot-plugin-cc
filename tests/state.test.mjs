@@ -349,6 +349,27 @@ test("a lock with no readable owner stays, and the error says how to clear it", 
   assert.equal(fs.existsSync(lockFile), true);
 });
 
+test("a lock whose owner cannot be written is removed, so a later update succeeds", (t) => {
+  const workspace = makeTempDir();
+  const lockFile = `${resolveStateFile(workspace)}.lock`;
+  const writeFileSync = fs.writeFileSync;
+  const failingWrite = t.mock.method(fs, "writeFileSync", (target, ...rest) => {
+    if (typeof target === "number") {
+      throw Object.assign(new Error("disk full"), { code: "ENOSPC" });
+    }
+    return writeFileSync(target, ...rest);
+  });
+
+  assert.throws(() => updateState(workspace, () => {}), /disk full/);
+  assert.equal(fs.existsSync(lockFile), false);
+
+  failingWrite.mock.restore();
+  updateState(workspace, (state) => {
+    state.config.stopReviewGate = true;
+  });
+  assert.equal(loadState(workspace).config.stopReviewGate, true);
+});
+
 test("a lock holder never removes a lock that holds another token", () => {
   const workspace = makeTempDir();
   const lockFile = `${resolveStateFile(workspace)}.lock`;
@@ -430,6 +451,22 @@ test("upsertJob accepts a job from a resumed session whose companion started aft
   upsertJob(workspace, { id: "task-resumed", status: "running", sessionId: "resumed-session" });
 
   assert.deepEqual(listJobs(workspace).map((job) => job.id), ["task-resumed"]);
+});
+
+test("upsertJob refuses a job when a later closure of a resumed session is newer than this process", () => {
+  const workspace = makeTempDir();
+  const processStartedAt = Date.now() - process.uptime() * 1000;
+  updateState(workspace, (state) => {
+    state.closedSessions = [
+      { id: "twice-closed", closedAt: new Date(processStartedAt - 60000).toISOString() },
+      { id: "twice-closed", closedAt: new Date().toISOString() }
+    ];
+  });
+
+  assert.throws(
+    () => upsertJob(workspace, { id: "task-late", status: "running", sessionId: "twice-closed" }),
+    /Claude session twice-closed has ended/
+  );
 });
 
 test("closed sessions are kept for 30 days", () => {

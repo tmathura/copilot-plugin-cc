@@ -176,6 +176,21 @@ test("a finished run returns its result even when the state and the log cannot b
   assert.equal(result, execution);
 });
 
+test("the runner's error is kept when its failed status cannot be saved", async (t) => {
+  const workspace = makeTempDir();
+
+  await assert.rejects(
+    runTrackedJob({ id: "task-double-fail", workspaceRoot: workspace }, async () => {
+      t.mock.method(fs, "renameSync", () => {
+        throw Object.assign(new Error("disk full"), { code: "ENOSPC" });
+      });
+      throw new Error("copilot exited with code 1");
+    }),
+    /copilot exited with code 1/
+  );
+  t.mock.restoreAll();
+});
+
 test("a broken job file does not stop the final status write", async () => {
   const workspace = makeTempDir();
 

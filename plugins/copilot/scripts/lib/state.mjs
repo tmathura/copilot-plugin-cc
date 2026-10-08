@@ -152,9 +152,9 @@ function readLockOwner(lockFile) {
 }
 
 function tryCreateLock(lockFile, owner) {
+  let fd;
   try {
-    fs.writeFileSync(lockFile, JSON.stringify(owner), { encoding: "utf8", flag: "wx" });
-    return true;
+    fd = fs.openSync(lockFile, "wx");
   } catch (error) {
     // Windows reports EPERM while another process is still deleting the old lock file.
     if (error?.code === "EEXIST" || (error?.code === "EPERM" && process.platform === "win32")) {
@@ -162,6 +162,16 @@ function tryCreateLock(lockFile, owner) {
     }
     throw error;
   }
+  try {
+    fs.writeFileSync(fd, JSON.stringify(owner), "utf8");
+  } catch (error) {
+    // A lock with no readable owner is never reclaimed, so this attempt must not leave one.
+    fs.closeSync(fd);
+    fs.rmSync(lockFile, { force: true });
+    throw error;
+  }
+  fs.closeSync(fd);
+  return true;
 }
 
 function releaseLock(lockFile, token) {
@@ -289,8 +299,10 @@ export function assertSessionOpen(state, sessionId, startedAtMs = processStarted
   if (!sessionId) {
     return;
   }
-  const closed = (state.closedSessions ?? []).find((entry) => entry?.id === sessionId);
-  if (closed && Date.parse(closed.closedAt) > startedAtMs) {
+  const closedSinceStart = (state.closedSessions ?? []).some(
+    (entry) => entry?.id === sessionId && Date.parse(entry.closedAt) > startedAtMs
+  );
+  if (closedSinceStart) {
     throw new Error(`Claude session ${sessionId} has ended. Start a new Copilot job from the current session.`);
   }
 }

@@ -150,7 +150,8 @@ async function forceKillAfterWait(target, options, killImpl) {
 }
 
 export async function terminateProcessTree(pid, options = {}) {
-  if (!Number.isFinite(pid)) {
+  // kill(0) signals the caller's own group, and a negative pid flips the group target.
+  if (!Number.isInteger(pid) || pid <= 0) {
     return { attempted: false, delivered: false, method: null };
   }
 

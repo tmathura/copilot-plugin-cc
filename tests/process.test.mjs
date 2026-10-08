@@ -180,6 +180,19 @@ test("a command killed by a signal is not reported as a success", { skip: isWind
   assert.equal(binaryAvailable(process.execPath, killSelf).available, false);
 });
 
+test("terminateProcessTree never signals for a pid that is not a positive integer", async () => {
+  for (const pid of [0, -5, 1.5, Number.NaN, undefined]) {
+    const outcome = await terminateProcessTree(pid, {
+      platform: "linux",
+      killImpl() {
+        throw new Error(`signalled for pid ${pid}`);
+      }
+    });
+
+    assert.deepEqual(outcome, { attempted: false, delivered: false, method: null });
+  }
+});
+
 test("terminateProcessTree signals the process itself when it leads no group", async () => {
   const calls = [];
   const outcome = await terminateProcessTree(1234, {

@@ -141,6 +141,19 @@ export function createProgressReporter({ stderr = false, logFile = null, onEvent
   };
 }
 
+function messageOf(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+// The log lives on the same storage as the state, so it can fail with it; the run's outcome matters more.
+function logQuietly(logFile, message) {
+  try {
+    appendLogLine(logFile, message);
+  } catch {
+    // Nothing more to do.
+  }
+}
+
 // A new foreground job has no status yet. A stored job runs only while queued, or once this process
 // has claimed it; a cancelled or removed job must never start.
 function canStartJob(job, existing) {
@@ -184,31 +197,36 @@ export async function runTrackedJob(job, runner, options = {}) {
   try {
     execution = await runner();
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage = messageOf(error);
     const completedAt = nowIso();
-    updateRunningJob(
-      job.workspaceRoot,
-      job.id,
-      (storedJob) => {
-        const existing = storedJob ?? runningRecord;
-        return {
-          ...existing,
+    try {
+      updateRunningJob(
+        job.workspaceRoot,
+        job.id,
+        (storedJob) => {
+          const existing = storedJob ?? runningRecord;
+          return {
+            ...existing,
+            status: "failed",
+            phase: "failed",
+            errorMessage,
+            pid: null,
+            completedAt,
+            logFile: options.logFile ?? job.logFile ?? existing.logFile ?? null
+          };
+        },
+        {
           status: "failed",
           phase: "failed",
-          errorMessage,
           pid: null,
-          completedAt,
-          logFile: options.logFile ?? job.logFile ?? existing.logFile ?? null
-        };
-      },
-      {
-        status: "failed",
-        phase: "failed",
-        pid: null,
-        errorMessage,
-        completedAt
-      }
-    );
+          errorMessage,
+          completedAt
+        }
+      );
+    } catch (saveError) {
+      // The runner's own error is the one the caller must see.
+      logQuietly(options.logFile ?? job.logFile ?? null, `Could not save the failed job status: ${messageOf(saveError)}`);
+    }
     throw error;
   }
 
@@ -242,16 +260,12 @@ export async function runTrackedJob(job, runner, options = {}) {
       }
     );
   } catch (error) {
-    try {
-      appendLogLine(logFile, `Could not save the final job status: ${error instanceof Error ? error.message : error}`);
-    } catch {
-      // The log lives on the same storage; the result below matters more.
-    }
+    logQuietly(logFile, `Could not save the final job status: ${messageOf(error)}`);
   }
   try {
     appendLogBlock(logFile, "Final output", execution.rendered);
   } catch {
-    // As above: a log write never hides a finished run's result.
+    // A log write never hides a finished run's result.
   }
   return execution;
 }
