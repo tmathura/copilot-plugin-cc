@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { pathToFileURL } from "node:url";
 
 import { CopilotPromptModeClient } from "../plugins/copilot/scripts/lib/prompt-mode.mjs";
+import { terminateProcessTree } from "../plugins/copilot/scripts/lib/process.mjs";
 import { buildEnv, installFakeCopilot, readFakeCopilotRuns } from "./fake-copilot-fixture.mjs";
 import { makeTempDir } from "./helpers.mjs";
 
@@ -135,6 +136,24 @@ test("a run that passes its time limit is stopped with an error", async () => {
 
   assert.match(client.protocolError.message, /did not finish within 0\.3 seconds/);
   assert.equal(isAlive(client.proc.pid), false);
+});
+
+test("a run whose process cannot be stopped still ends, with the kill error", async () => {
+  const binDir = makeTempDir();
+  const { scriptPath } = installFakeCopilot(binDir, "hang");
+  const client = CopilotPromptModeClient.start(binDir, {
+    command: process.execPath,
+    args: [scriptPath, "--output-format", "json"],
+    prompt: "hello",
+    timeoutMs: 200,
+    terminateImpl: () => Promise.reject(new Error("kill EPERM"))
+  });
+
+  const exit = await client.exitPromise;
+
+  assert.equal(exit.error.message, "Copilot could not be stopped: kill EPERM");
+  assert.match(client.protocolError.message, /did not finish within 0\.2 seconds/);
+  await terminateProcessTree(client.proc.pid);
 });
 
 test("a missing program ends the run with the spawn error", async () => {

@@ -340,7 +340,9 @@ Later tickets apply these rules. The call-site map uses them.
   the forced exit does not. There is no other run deadline,
   as upstream has none; cancel and the review gate's 840 s limit stop long runs. The one exception is
   setup's login check, which has a 60 s limit (login check, below). A stdout line that is valid JSON
-  but not an object with a `type` is ignored like an unknown event (ticket 4 code review).
+  but not an object with a `type` is ignored like an unknown event (ticket 4 code review). If the
+  helper's tree kill fails, the run still ends, with the error "Copilot could not be stopped" (ticket
+  4 Codex review round 6); otherwise a stopped run would wait forever for the child to close.
 - **Structured output**: prompt mode has no output schema setting, unlike Codex `turn/start`
   (`outputSchema`). The adversarial-review prompt puts the schema text in the prompt.
   `parseStructuredOutput` also accepts JSON inside one surrounding code fence. Then

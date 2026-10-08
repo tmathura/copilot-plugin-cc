@@ -52,6 +52,7 @@ export interface CopilotPromptModeClientOptions {
   onEvent?: PromptModeEventHandler;
   resultGraceMs?: number;
   timeoutMs?: number;
+  terminateImpl?: (pid: number) => Promise<unknown>;
 }
 
 export interface PromptModeExit {

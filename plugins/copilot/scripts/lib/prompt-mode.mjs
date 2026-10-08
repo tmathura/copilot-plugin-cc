@@ -251,9 +251,24 @@ export class CopilotPromptModeClient {
     this.resolveExit(exit);
   }
 
+  // A failed kill must still end the run: the caller waits on exitPromise, which only the child's
+  // close would settle.
   async close() {
     if (!this.stopping) {
-      this.stopping = this.exited ? Promise.resolve() : terminateProcessTree(this.proc.pid).then(() => {});
+      const terminate = this.options.terminateImpl ?? terminateProcessTree;
+      this.stopping = this.exited
+        ? Promise.resolve()
+        : terminate(this.proc.pid).then(
+            () => {},
+            (error) => {
+              this.finish({
+                exitCode: null,
+                signal: null,
+                error: new Error(`Copilot could not be stopped: ${error.message}`)
+              });
+              throw error;
+            }
+          );
     }
     await this.stopping;
     await this.exitPromise;
