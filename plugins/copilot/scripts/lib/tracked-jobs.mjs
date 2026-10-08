@@ -179,6 +179,8 @@ export async function runTrackedJob(job, runner, options = {}) {
     if (!canStartJob(job, existing)) {
       return;
     }
+    // The stored record can hold the session even when the caller's copy of the job does not.
+    assertSessionOpen(state, existing?.sessionId);
     assertSessionOpen(state, job.sessionId);
     writeJobFile(job.workspaceRoot, job.id, runningRecord);
     const timestamp = nowIso();

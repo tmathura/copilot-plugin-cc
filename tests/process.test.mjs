@@ -377,6 +377,10 @@ test("resolveLauncher resolves an explicit .cmd path in its own folder", () => {
   const launcher = resolveLauncher(npmCmd, { platform: "win32", env: { PATH: "" }, execPath: "node.exe" });
 
   assert.deepEqual(launcher, { command: "node.exe", args: [npmCli], detail: null });
+
+  fs.rmSync(npmCmd);
+  const missing = resolveLauncher(npmCmd, { platform: "win32", env: { PATH: "" }, execPath: "node.exe" });
+  assert.deepEqual(missing, { command: null, args: [], detail: "not found" });
 });
 
 test("resolveLauncher refuses an unknown .cmd file and a missing command", () => {

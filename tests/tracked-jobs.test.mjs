@@ -203,6 +203,26 @@ test("a broken job file does not stop the final status write", async () => {
   assert.equal(readJobFile(resolveJobFile(workspace, "task-broken")).rendered, "done\n");
 });
 
+test("runTrackedJob checks the session in the stored record, not only the caller's copy", async () => {
+  const workspace = makeTempDir();
+  upsertJob(workspace, { id: "task-queued", status: "queued", sessionId: "ended-later" });
+  updateState(workspace, (state) => {
+    state.closedSessions = [{ id: "ended-later", closedAt: new Date().toISOString() }];
+  });
+  let ran = false;
+
+  await assert.rejects(
+    runTrackedJob({ id: "task-queued", workspaceRoot: workspace, status: "queued" }, async () => {
+      ran = true;
+      return execution;
+    }),
+    /Claude session ended-later has ended/
+  );
+
+  assert.equal(ran, false);
+  assert.equal(findJob(workspace, "task-queued").status, "queued");
+});
+
 test("runTrackedJob refuses a new job for a Claude session that has ended", async () => {
   const workspace = makeTempDir();
   updateState(workspace, (state) => {

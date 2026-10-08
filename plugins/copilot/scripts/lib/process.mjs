@@ -58,6 +58,9 @@ function readNpmShimScript(shimPath) {
 }
 
 function resolveCmdShim(cmdPath, nodePath) {
+  if (!fs.existsSync(cmdPath)) {
+    return { command: null, args: [], detail: "not found" };
+  }
   const npmCli = path.join(path.dirname(cmdPath), "node_modules", "npm", "bin", "npm-cli.js");
   const isNpm = path.basename(cmdPath).toLowerCase() === "npm.cmd";
   const script = isNpm && fs.existsSync(npmCli) ? npmCli : readNpmShimScript(cmdPath);
