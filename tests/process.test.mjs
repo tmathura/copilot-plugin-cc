@@ -327,12 +327,14 @@ test("resolveLauncher finds a Windows .exe on the PATH", () => {
   const exeDir = makeDir(root, "Program Files");
   writeFile(path.join(exeDir, "copilot.exe"));
 
-  const launcher = resolveLauncher("copilot", {
-    platform: "win32",
-    env: { PATH: `${emptyDir};"${exeDir}"` }
-  });
+  for (const name of ["copilot", "copilot.exe"]) {
+    const launcher = resolveLauncher(name, {
+      platform: "win32",
+      env: { PATH: `${emptyDir};"${exeDir}"` }
+    });
 
-  assert.deepEqual(launcher, { command: path.join(exeDir, "copilot.exe"), args: [], detail: null });
+    assert.deepEqual(launcher, { command: path.join(exeDir, "copilot.exe"), args: [], detail: null });
+  }
 });
 
 test("resolveLauncher runs an npm global-package shim with node", () => {

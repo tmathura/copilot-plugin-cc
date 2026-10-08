@@ -10,8 +10,7 @@ import { resolveWorkspaceRoot } from "./workspace.mjs";
 
 const STATE_VERSION = 1;
 const PLUGIN_DATA_ENV = "CLAUDE_PLUGIN_DATA";
-// Not the shared temp folder: another local user could create it first and plant job records.
-const FALLBACK_STATE_ROOT_DIR = path.join(os.homedir(), ".copilot-companion", "state");
+const FALLBACK_DIR_NAME = ".copilot-companion";
 const STATE_FILE_NAME = "state.json";
 const JOBS_DIR_NAME = "jobs";
 const MAX_JOBS = 50;
@@ -58,8 +57,13 @@ export function resolveStateDir(cwd) {
   const slug = slugSource.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "workspace";
   const hash = createHash("sha256").update(canonicalWorkspaceRoot).digest("hex").slice(0, 16);
   const pluginDataDir = process.env[PLUGIN_DATA_ENV];
-  const stateRoot = pluginDataDir ? path.join(pluginDataDir, "state") : FALLBACK_STATE_ROOT_DIR;
+  const stateRoot = pluginDataDir ? path.join(pluginDataDir, "state") : path.join(fallbackDir(), "state");
   return path.join(stateRoot, `${slug}-${hash}`);
+}
+
+// Not the shared temp folder: another local user could create it first and plant job records.
+function fallbackDir() {
+  return path.join(os.homedir(), FALLBACK_DIR_NAME);
 }
 
 export function resolveStateFile(cwd) {
@@ -71,6 +75,12 @@ export function resolveJobsDir(cwd) {
 }
 
 export function ensureStateDir(cwd) {
+  if (!process.env[PLUGIN_DATA_ENV] && process.platform !== "win32") {
+    // Others must not read the logs, or change the pids that cancel signals. A folder that already
+    // exists keeps its old mode unless it is changed here. A Windows profile folder is private already.
+    fs.mkdirSync(fallbackDir(), { recursive: true, mode: 0o700 });
+    fs.chmodSync(fallbackDir(), 0o700);
+  }
   fs.mkdirSync(resolveJobsDir(cwd), { recursive: true });
 }
 

@@ -65,6 +65,7 @@ export function resolveLauncher(name, options = {}) {
     return { command: name, args: [], detail: null };
   }
 
+  const baseName = name.replace(/\.(exe|cmd)$/i, "");
   const env = options.env ?? process.env;
   const nodePath = options.execPath ?? process.execPath;
   const pathValue = env.PATH ?? env.Path ?? "";
@@ -74,17 +75,17 @@ export function resolveLauncher(name, options = {}) {
       continue;
     }
 
-    const exePath = path.join(dir, `${name}.exe`);
+    const exePath = path.join(dir, `${baseName}.exe`);
     if (fs.existsSync(exePath)) {
       return { command: exePath, args: [], detail: null };
     }
 
-    const cmdPath = path.join(dir, `${name}.cmd`);
+    const cmdPath = path.join(dir, `${baseName}.cmd`);
     if (!fs.existsSync(cmdPath)) {
       continue;
     }
     const npmCli = path.join(dir, "node_modules", "npm", "bin", "npm-cli.js");
-    const script = name === "npm" && fs.existsSync(npmCli) ? npmCli : readNpmShimScript(cmdPath);
+    const script = baseName === "npm" && fs.existsSync(npmCli) ? npmCli : readNpmShimScript(cmdPath);
     if (script && fs.existsSync(script)) {
       return { command: nodePath, args: [script], detail: null };
     }

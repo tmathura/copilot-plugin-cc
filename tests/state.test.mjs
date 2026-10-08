@@ -62,6 +62,28 @@ test("resolveStateDir falls back to a per-workspace folder under the home folder
   }
 });
 
+test("the fallback folder is made owner-only, also when it already exists", { skip: process.platform === "win32" }, () => {
+  const home = makeTempDir();
+  const fallbackDir = path.join(home, ".copilot-companion");
+  fs.mkdirSync(fallbackDir, { mode: 0o777 });
+  fs.chmodSync(fallbackDir, 0o775);
+  const previous = { home: process.env.HOME, pluginData: process.env.CLAUDE_PLUGIN_DATA, umask: process.umask(0o002) };
+  process.env.HOME = home;
+  delete process.env.CLAUDE_PLUGIN_DATA;
+
+  try {
+    updateState(makeTempDir(), (state) => {
+      state.config.stopReviewGate = true;
+    });
+
+    assert.equal(fs.statSync(fallbackDir).mode & 0o777, 0o700);
+  } finally {
+    process.umask(previous.umask);
+    process.env.HOME = previous.home;
+    process.env.CLAUDE_PLUGIN_DATA = previous.pluginData;
+  }
+});
+
 test("resolveStateDir uses CLAUDE_PLUGIN_DATA when it is provided", () => {
   const workspace = makeTempDir();
   const pluginDataDir = makeTempDir();

@@ -201,7 +201,8 @@ data model, the contracts, the plan and the tasks link here.
     - Anything else: the command counts as not found, with a message that it cannot start without a
       shell.
     - A name that is already a path (it contains `\` or `/`) and is not a `.cmd` or `.bat` file is
-      used as given (added 2026-10-08, PR review).
+      used as given, and an `.exe` or `.cmd` suffix on a bare name is dropped before the search
+      (both added 2026-10-08, PR review).
   - Never pass `shell: true`.
 - **Rationale**: Principle IV ("If Windows needs a `.cmd` shim, it MUST live in one helper").
   Upstream uses a shell on Windows. Node refuses to spawn a `.cmd` file without a shell, and with a
@@ -495,7 +496,9 @@ Later tickets apply these rules. The call-site map uses them.
   Rejected alternative: keep upstream's unlocked update for parity; upstream has the same race, but
   this port relies on the job records to stop processes.
   Without `CLAUDE_PLUGIN_DATA`, the state lives in `~/.copilot-companion/state`, owned by the user,
-  as the plugin's Copilot home does (§3). Decided 2026-10-08, after Copilot PR review. Reason:
+  as the plugin's Copilot home does (§3). On macOS and Linux, `~/.copilot-companion` is set to
+  owner-only (`0700`) before each state write, also when it already exists, so other users cannot
+  read the logs or change the recorded pids (added 2026-10-08, PR review). Decided 2026-10-08, after Copilot PR review. Reason:
   security. Upstream uses `<tmp>/codex-companion`, which another local user can create first and
   fill with job records; cancel and `SessionEnd` would then signal PIDs that user chose. Rejected
   alternative: upstream's shared temp folder.
