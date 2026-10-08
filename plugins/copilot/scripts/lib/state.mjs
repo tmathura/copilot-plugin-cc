@@ -213,6 +213,20 @@ function reclaimDeadLock(lockFile, options) {
   }
 }
 
+function describeLockBlocker(lockFile, options) {
+  const isAlive = options.isPidAliveImpl ?? isPidAlive;
+  const holder = readLockOwner(lockFile);
+  const reclaimFile = `${lockFile}.reclaim`;
+  if (!holder) {
+    return "The lock has no readable owner; if no Copilot companion is running, delete it and retry.";
+  }
+  // A reclaimer that died before it wrote its owner leaves a reclaim file that no one can free.
+  if (!isAlive(holder.pid) && fs.existsSync(reclaimFile)) {
+    return `Process ${holder.pid} has ended, but ${reclaimFile} blocks freeing its lock; if no Copilot companion is running, delete ${reclaimFile} and retry.`;
+  }
+  return `Process ${holder.pid} holds the lock; retry when it finishes.`;
+}
+
 function acquireStateLock(cwd, options) {
   const lockFile = `${resolveStateFile(cwd)}.lock`;
   const timeoutMs = options.lockTimeoutMs ?? DEFAULT_LOCK_TIMEOUT_MS;
@@ -225,12 +239,9 @@ function acquireStateLock(cwd, options) {
     }
     reclaimDeadLock(lockFile, options);
     if (Date.now() >= deadline) {
-      const holder = readLockOwner(lockFile);
       throw new Error(
         `Timed out after ${timeoutMs} ms waiting for the state lock ${lockFile}. The state was not changed. ` +
-          (holder
-            ? `Process ${holder.pid} holds the lock; retry when it finishes.`
-            : "The lock has no readable owner; if no Copilot companion is running, delete it and retry.")
+          describeLockBlocker(lockFile, options)
       );
     }
     sleepSync(LOCK_RETRY_MS);

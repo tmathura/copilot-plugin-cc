@@ -430,6 +430,24 @@ test("a reclaim lock whose owner is dead gives a clear error that names it", () 
   assert.equal(fs.existsSync(lockFile), true);
 });
 
+test("an unreadable reclaim lock beside a dead lock gives an error that names it", () => {
+  const workspace = makeTempDir();
+  const lockFile = `${resolveStateFile(workspace)}.lock`;
+  const reclaimFile = `${lockFile}.reclaim`;
+  const pid = deadPid();
+  writeLock(lockFile, { pid, token: "dead-owner" });
+
+  for (const content of ["", '{"pid":']) {
+    fs.writeFileSync(reclaimFile, content, "utf8");
+
+    assert.throws(
+      () => updateState(workspace, () => {}, { lockTimeoutMs: 200 }),
+      new RegExp(`Process ${pid} has ended, but ${escapeRegExp(reclaimFile)} blocks freeing its lock; .*delete`)
+    );
+    assert.equal(fs.existsSync(lockFile), true);
+  }
+});
+
 test("upsertJob refuses a new job for a Claude session that closed after this process started", () => {
   const workspace = makeTempDir();
   updateState(workspace, (state) => {

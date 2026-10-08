@@ -472,7 +472,9 @@ Later tickets apply these rules. The call-site map uses them.
   caller read earlier, is not ported (decided 2026-10-08, ticket 3 code review; rejected alternative:
   a locked `saveState`, which still drops a job added after the caller's read). When the lock file
   has no readable owner (no positive integer pid and token), the timeout error says to delete it if
-  no companion is running. A process
+  no companion is running. When the main lock's owner has ended and an unreadable reclaim lock
+  blocks freeing it, the error names the reclaim lock to delete instead (added 2026-10-08, PR
+  review). A process
   that creates a lock but cannot write its owner removes that lock again, so it never leaves an
   unreadable one (added 2026-10-08, PR review). A session counts as closed for a companion if any
   `closedSessions` entry with its id is newer than the companion's start, so a resumed session that
