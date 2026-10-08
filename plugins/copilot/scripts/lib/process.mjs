@@ -60,7 +60,8 @@ function readNpmShimScript(shimPath) {
 // Node cannot start a .cmd file without a shell, so npm shims run their script with node directly.
 export function resolveLauncher(name, options = {}) {
   const platform = options.platform ?? process.platform;
-  if (platform !== "win32") {
+  // A path names one program, so only a bare name is looked up on the PATH.
+  if (platform !== "win32" || (/[\\/]/.test(name) && !/\.(cmd|bat)$/i.test(name))) {
     return { command: name, args: [], detail: null };
   }
 

@@ -200,6 +200,8 @@ data model, the contracts, the plan and the tasks link here.
       (seen on this machine).
     - Anything else: the command counts as not found, with a message that it cannot start without a
       shell.
+    - A name that is already a path (it contains `\` or `/`) and is not a `.cmd` or `.bat` file is
+      used as given (added 2026-10-08, PR review).
   - Never pass `shell: true`.
 - **Rationale**: Principle IV ("If Windows needs a `.cmd` shim, it MUST live in one helper").
   Upstream uses a shell on Windows. Node refuses to spawn a `.cmd` file without a shell, and with a

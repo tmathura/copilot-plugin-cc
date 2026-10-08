@@ -374,6 +374,23 @@ test("binaryAvailable starts a resolved npm shim without a shell", () => {
   assert.deepEqual(result, { available: true, detail: "GitHub Copilot CLI --version a&b" });
 });
 
+test("resolveLauncher keeps a Windows program path as given", () => {
+  const programPath = "C:\\Program Files\\nodejs\\node.exe";
+
+  assert.deepEqual(resolveLauncher(programPath, { platform: "win32", env: { PATH: "" } }), {
+    command: programPath,
+    args: [],
+    detail: null
+  });
+});
+
+test("binaryAvailable accepts the path of the running node", () => {
+  const result = binaryAvailable(process.execPath);
+
+  assert.equal(result.available, true, result.detail);
+  assert.equal(result.detail, process.version);
+});
+
 test("binaryAvailable finds npm with no shell", () => {
   const result = binaryAvailable("npm");
 
