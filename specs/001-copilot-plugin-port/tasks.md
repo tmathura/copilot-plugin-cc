@@ -113,7 +113,9 @@ setup.
   `<tmp>/copilot-companion`); keep `MAX_JOBS = 50` for finished jobs and never prune a queued or
   running job; keep `STATE_VERSION = 1`; lock `updateState` (with an optional shorter wait) with
   `state.json.lock` and write through a temp file and a rename (research.md §7, locked state
-  updates)
+  updates); add `closedSessions` (entries kept 30 days, no count cap) to the state, and refuse to
+  create a job for a closed
+  session (data-model.md)
 - [ ] T026 [P] Port `U/scripts/lib/tracked-jobs.mjs` to `P/scripts/lib/tracked-jobs.mjs`
   (`COPILOT_COMPANION_SESSION_ID`, `[copilot]` prefix); `runTrackedJob` writes its start and final
   status through `updateState` and never revives a `cancelled` or missing job (research.md §7,
@@ -387,7 +389,9 @@ and to `BLOCK`.
   hook; with a pause between a companion's claim and its Copilot start, and a fake Copilot that
   ignores `SIGTERM`, `SessionEnd` either kills that Copilot through the snapshot's `copilotPid` or the
   companion never starts it; with a pause between a worker's claim and `runTrackedJob`, a
-  `SessionEnd` in that gap leaves the job `cancelled` and no Copilot process is started
+  `SessionEnd` in that gap leaves the job `cancelled` and no Copilot process is started; a
+  foreground or background job that a companion creates after the `SessionEnd` snapshot is refused
+  with a clear error and never starts Copilot
 
 ### Implementation for User Story 5
 
@@ -403,8 +407,9 @@ and to `BLOCK`.
   its process tree with `terminateProcessTree`, then stop the `copilotPid` of the companion's job
   record (found by the companion's `pid`; research.md §7, stopping a job)
 - [ ] T077 [US5] Port `U/scripts/session-lifecycle-hook.mjs` to `P/scripts/session-lifecycle-hook.mjs`
-  (no broker, no transcript path). `SessionEnd` first, inside one `updateState`, marks the session's
-  queued and running jobs `cancelled` and reads the running jobs' `pid` and `copilotPid`; then
+  (no broker, no transcript path). `SessionEnd` first, inside one `updateState`, adds the session to
+  `closedSessions`, marks the session's queued and running jobs `cancelled` and reads the running
+  jobs' `pid` and `copilotPid` (job creation, claim and Copilot start refuse a closed session); then
   signals them,
   waits once (up to 2 s), sends `SIGKILL` to survivors, then removes the session's jobs
   through `updateState` on fresh state with the lock wait limited to the time left (research.md §7,

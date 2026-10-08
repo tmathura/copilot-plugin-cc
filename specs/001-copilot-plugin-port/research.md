@@ -341,8 +341,13 @@ Later tickets apply these rules. The call-site map uses them.
   smaller budget.
   - `Stop`: the gate's run limit is 840 s (upstream: 900 s). The other 60 s cover collecting the
     context, the kill wait, removing the patch folder and printing the decision.
-  - `SessionEnd`: first, inside one `updateState`, it marks all the session's queued and running
-    jobs `cancelled` and reads the `pid` and `copilotPid` of the running ones. The worker claim and
+  - `SessionEnd`: first, inside one `updateState`, it adds the session id to `closedSessions`,
+    marks all the session's queued and running jobs `cancelled`, and reads the `pid` and
+    `copilotPid` of the running ones. Creating a job, claiming one and starting Copilot all happen
+    inside `updateState` and are refused for a session in `closedSessions`, so a job that a
+    companion was still preparing can never start after the snapshot. Entries stay for 30 days, with
+    no count cap, so newer sessions cannot push an entry out early. Not covered: a companion paused
+    for longer than 30 days. The worker claim and
     the Copilot start use the same lock: a companion starts Copilot only inside `updateState`,
     after it checks that its job is still `running`, and it writes `copilotPid` in that same step
     (Node returns the child's `pid` from `spawn` at once). The check, the spawn and the save run as
