@@ -1,0 +1,348 @@
+// Changed from upstream codex-plugin-cc (Apache-2.0): the fallback state root is in the home folder;
+// updateState holds a lock file and writes through a rename; saveState is removed, so no writer saves
+// an earlier snapshot; pruning keeps every active job; state records closed Claude sessions.
+import { createHash, randomUUID } from "node:crypto";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+import { resolveWorkspaceRoot } from "./workspace.mjs";
+
+const STATE_VERSION = 1;
+const PLUGIN_DATA_ENV = "CLAUDE_PLUGIN_DATA";
+// Not the shared temp folder: another local user could create it first and plant job records.
+const FALLBACK_STATE_ROOT_DIR = path.join(os.homedir(), ".copilot-companion", "state");
+const STATE_FILE_NAME = "state.json";
+const JOBS_DIR_NAME = "jobs";
+const MAX_JOBS = 50;
+const DEFAULT_LOCK_TIMEOUT_MS = 5000;
+const LOCK_RETRY_MS = 25;
+const CLOSED_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function defaultState() {
+  return {
+    version: STATE_VERSION,
+    config: {
+      stopReviewGate: false
+    },
+    jobs: [],
+    closedSessions: []
+  };
+}
+
+// Each lookup starts git, and a locked update makes several. The root of a folder does not change
+// while a companion runs.
+const workspaceRoots = new Map();
+
+function resolveWorkspaceRoots(cwd) {
+  if (!workspaceRoots.has(cwd)) {
+    const workspaceRoot = resolveWorkspaceRoot(cwd);
+    let canonicalWorkspaceRoot = workspaceRoot;
+    try {
+      canonicalWorkspaceRoot = fs.realpathSync.native(workspaceRoot);
+    } catch {
+      canonicalWorkspaceRoot = workspaceRoot;
+    }
+    workspaceRoots.set(cwd, { workspaceRoot, canonicalWorkspaceRoot });
+  }
+  return workspaceRoots.get(cwd);
+}
+
+export function resolveStateDir(cwd) {
+  const { workspaceRoot, canonicalWorkspaceRoot } = resolveWorkspaceRoots(cwd);
+  const slugSource = path.basename(workspaceRoot) || "workspace";
+  const slug = slugSource.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "workspace";
+  const hash = createHash("sha256").update(canonicalWorkspaceRoot).digest("hex").slice(0, 16);
+  const pluginDataDir = process.env[PLUGIN_DATA_ENV];
+  const stateRoot = pluginDataDir ? path.join(pluginDataDir, "state") : FALLBACK_STATE_ROOT_DIR;
+  return path.join(stateRoot, `${slug}-${hash}`);
+}
+
+export function resolveStateFile(cwd) {
+  return path.join(resolveStateDir(cwd), STATE_FILE_NAME);
+}
+
+export function resolveJobsDir(cwd) {
+  return path.join(resolveStateDir(cwd), JOBS_DIR_NAME);
+}
+
+export function ensureStateDir(cwd) {
+  fs.mkdirSync(resolveJobsDir(cwd), { recursive: true });
+}
+
+export function loadState(cwd) {
+  const stateFile = resolveStateFile(cwd);
+  if (!fs.existsSync(stateFile)) {
+    return defaultState();
+  }
+
+  try {
+    const parsed = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+    return {
+      ...defaultState(),
+      ...parsed,
+      config: {
+        ...defaultState().config,
+        ...(parsed.config ?? {})
+      },
+      jobs: Array.isArray(parsed.jobs) ? parsed.jobs : [],
+      closedSessions: Array.isArray(parsed.closedSessions) ? parsed.closedSessions : []
+    };
+  } catch {
+    return defaultState();
+  }
+}
+
+function isActiveJob(job) {
+  return job.status === "queued" || job.status === "running";
+}
+
+// The cap counts finished jobs only: pruning a running job would lose the pids that cancel needs.
+function pruneJobs(jobs) {
+  let finishedJobs = 0;
+  return [...jobs]
+    .sort((left, right) => String(right.updatedAt ?? "").localeCompare(String(left.updatedAt ?? "")))
+    .filter((job) => isActiveJob(job) || ++finishedJobs <= MAX_JOBS);
+}
+
+function pruneClosedSessions(closedSessions) {
+  const cutoff = Date.now() - CLOSED_SESSION_TTL_MS;
+  return closedSessions.filter((entry) => Date.parse(entry?.closedAt ?? "") >= cutoff);
+}
+
+function removeFileIfExists(filePath) {
+  if (filePath && fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+  }
+}
+
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function isPidAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error?.code !== "ESRCH";
+  }
+}
+
+function readLockOwner(lockFile) {
+  try {
+    const owner = JSON.parse(fs.readFileSync(lockFile, "utf8"));
+    return Number.isInteger(owner?.pid) ? owner : null;
+  } catch {
+    return null;
+  }
+}
+
+function tryCreateLock(lockFile, owner) {
+  try {
+    fs.writeFileSync(lockFile, JSON.stringify(owner), { encoding: "utf8", flag: "wx" });
+    return true;
+  } catch (error) {
+    // Windows reports EPERM while another process is still deleting the old lock file.
+    if (error?.code === "EEXIST" || (error?.code === "EPERM" && process.platform === "win32")) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+function releaseLock(lockFile, token) {
+  if (readLockOwner(lockFile)?.token === token) {
+    fs.rmSync(lockFile, { force: true });
+  }
+}
+
+// Age alone never frees a lock: a long update by a live process must keep it.
+function reclaimDeadLock(lockFile, options) {
+  const isAlive = options.isPidAliveImpl ?? isPidAlive;
+  const holder = readLockOwner(lockFile);
+  if (!holder || isAlive(holder.pid)) {
+    return;
+  }
+
+  const reclaimFile = `${lockFile}.reclaim`;
+  const reclaimer = { pid: process.pid, token: randomUUID() };
+  if (!tryCreateLock(reclaimFile, reclaimer)) {
+    const other = readLockOwner(reclaimFile);
+    if (other && !isAlive(other.pid)) {
+      throw new Error(
+        `The state lock ${reclaimFile} belongs to process ${other.pid}, which is no longer running. Delete ${reclaimFile} and retry.`
+      );
+    }
+    return;
+  }
+
+  try {
+    // Another reclaimer may have freed the dead lock and a live process taken it since the check above.
+    const current = readLockOwner(lockFile);
+    if (current && !isAlive(current.pid)) {
+      fs.rmSync(lockFile, { force: true });
+    }
+  } finally {
+    releaseLock(reclaimFile, reclaimer.token);
+  }
+}
+
+function acquireStateLock(cwd, options) {
+  const lockFile = `${resolveStateFile(cwd)}.lock`;
+  const timeoutMs = options.lockTimeoutMs ?? DEFAULT_LOCK_TIMEOUT_MS;
+  const owner = { pid: process.pid, token: randomUUID() };
+  const deadline = Date.now() + timeoutMs;
+  ensureStateDir(cwd);
+  for (;;) {
+    if (tryCreateLock(lockFile, owner)) {
+      return { lockFile, token: owner.token };
+    }
+    reclaimDeadLock(lockFile, options);
+    if (Date.now() >= deadline) {
+      const holder = readLockOwner(lockFile);
+      throw new Error(
+        `Timed out after ${timeoutMs} ms waiting for the state lock ${lockFile}. The state was not changed. ` +
+          (holder
+            ? `Process ${holder.pid} holds the lock; retry when it finishes.`
+            : "The lock has no readable owner; if no Copilot companion is running, delete it and retry.")
+      );
+    }
+    sleepSync(LOCK_RETRY_MS);
+  }
+}
+
+function writeStateFile(cwd, state) {
+  const stateFile = resolveStateFile(cwd);
+  // A reader must never see half a file.
+  const tempFile = `${stateFile}.${process.pid}.${randomUUID()}.tmp`;
+  fs.writeFileSync(tempFile, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+  fs.renameSync(tempFile, stateFile);
+}
+
+export function updateState(cwd, mutate, options = {}) {
+  const lock = acquireStateLock(cwd, options);
+  try {
+    const state = loadState(cwd);
+    const previousJobs = state.jobs.map((job) => ({ id: job.id, logFile: job.logFile }));
+    mutate(state);
+
+    const nextJobs = pruneJobs(state.jobs ?? []);
+    const nextState = {
+      version: STATE_VERSION,
+      config: {
+        ...defaultState().config,
+        ...(state.config ?? {})
+      },
+      jobs: nextJobs,
+      closedSessions: pruneClosedSessions(state.closedSessions ?? [])
+    };
+
+    const retainedIds = new Set(nextJobs.map((job) => job.id));
+    for (const job of previousJobs) {
+      if (retainedIds.has(job.id)) {
+        continue;
+      }
+      removeJobFile(resolveJobFile(cwd, job.id));
+      removeFileIfExists(job.logFile);
+    }
+
+    writeStateFile(cwd, nextState);
+    return nextState;
+  } finally {
+    releaseLock(lock.lockFile, lock.token);
+  }
+}
+
+function processStartedAtMs() {
+  return Date.now() - process.uptime() * 1000;
+}
+
+// A resumed Claude session keeps its id, so only companions from before the close are refused.
+export function assertSessionOpen(state, sessionId, startedAtMs = processStartedAtMs()) {
+  if (!sessionId) {
+    return;
+  }
+  const closed = (state.closedSessions ?? []).find((entry) => entry?.id === sessionId);
+  if (closed && Date.parse(closed.closedAt) > startedAtMs) {
+    throw new Error(`Claude session ${sessionId} has ended. Start a new Copilot job from the current session.`);
+  }
+}
+
+export function generateJobId(prefix = "job") {
+  const random = Math.random().toString(36).slice(2, 8);
+  return `${prefix}-${Date.now().toString(36)}-${random}`;
+}
+
+export function upsertJob(cwd, jobPatch, options = {}) {
+  return updateState(
+    cwd,
+    (state) => {
+      const timestamp = nowIso();
+      const existingIndex = state.jobs.findIndex((job) => job.id === jobPatch.id);
+      if (existingIndex === -1) {
+        assertSessionOpen(state, jobPatch.sessionId);
+        state.jobs.unshift({
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          ...jobPatch
+        });
+        return;
+      }
+      state.jobs[existingIndex] = {
+        ...state.jobs[existingIndex],
+        ...jobPatch,
+        updatedAt: timestamp
+      };
+    },
+    options
+  );
+}
+
+export function listJobs(cwd) {
+  return loadState(cwd).jobs;
+}
+
+export function setConfig(cwd, key, value) {
+  return updateState(cwd, (state) => {
+    state.config = {
+      ...state.config,
+      [key]: value
+    };
+  });
+}
+
+export function getConfig(cwd) {
+  return loadState(cwd).config;
+}
+
+export function writeJobFile(cwd, jobId, payload) {
+  ensureStateDir(cwd);
+  const jobFile = resolveJobFile(cwd, jobId);
+  fs.writeFileSync(jobFile, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  return jobFile;
+}
+
+export function readJobFile(jobFile) {
+  return JSON.parse(fs.readFileSync(jobFile, "utf8"));
+}
+
+function removeJobFile(jobFile) {
+  if (fs.existsSync(jobFile)) {
+    fs.unlinkSync(jobFile);
+  }
+}
+
+export function resolveJobLogFile(cwd, jobId) {
+  ensureStateDir(cwd);
+  return path.join(resolveJobsDir(cwd), `${jobId}.log`);
+}
+
+export function resolveJobFile(cwd, jobId) {
+  ensureStateDir(cwd);
+  return path.join(resolveJobsDir(cwd), `${jobId}.json`);
+}
