@@ -124,6 +124,12 @@ data model, the contracts, the plan and the tasks link here.
     shared temp folder, where another user could prepare it. It has no trusted folders, so
     repository hooks and workspace MCP servers stay off. It also has no user hooks, no saved
     approvals, no user MCP servers and no user plugins.
+  - Login: the plugin home has no stored login file. The login still works when it is in the OS
+    credential store (tested) or in a token variable (`COPILOT_GITHUB_TOKEN`, `GH_TOKEN`,
+    `GITHUB_TOKEN`), which the child environment keeps. Without a credential store, `copilot login`
+    saves the token in a file under the user's `COPILOT_HOME` (command reference), which the plugin
+    home cannot see. For that case, setup tells the user to set `COPILOT_GITHUB_TOKEN` to a
+    fine-grained token with the "Copilot Requests" permission. The plugin never copies a login file.
   - A review above the inline limit also gets `--add-dir=<patch folder>` (§2).
 - **Decision (when a read-only run refuses to run)**: spec FR-018 applies in two cases.
   - Before the prompt: the Copilot version is below the floor, or Copilot exits with an error
@@ -238,8 +244,8 @@ Later tickets apply these rules. The call-site map uses them.
   (`outputSchema`). The adversarial-review prompt puts the schema text in the prompt.
   `parseStructuredOutput` also accepts JSON inside one surrounding code fence. Then
   `validateReviewOutput` checks the parsed value against `schemas/review-output.schema.json` (the
-  keywords it uses: `type`, `enum`, `required`, `additionalProperties`, `minLength`, `minimum`,
-  `maximum`, `items`). A value that fails sets `parseError` and fails the job. This does what
+  keywords it uses, applied at every level: `type`, `properties`, `enum`, `required`,
+  `additionalProperties`, `minLength`, `minimum`, `maximum`, `items`). A value that fails sets `parseError` and fails the job. This does what
   Codex's `outputSchema` did. Upstream's looser shape check in `render.mjs` stays as it is.
 - **Native review**: `/copilot:review` sends Copilot's `/review` slash command, followed by the context
   from `collectReviewContext`. The text lives in a new file, `prompts/review.md`. The output stays
@@ -254,8 +260,8 @@ Later tickets apply these rules. The call-site map uses them.
   user's own session list. `docs/operations.md` says how to clean them up.
 - **The plugin home stays untrusted**: a folder becomes trusted only when someone runs Copilot
   interactively and accepts the trust prompt. The plugin runs Copilot only in prompt mode, so its
-  home never gets a trusted folder. Read-only job reports therefore show the session id but no
-  interactive `copilot --resume` command, and `docs/operations.md` warns not to start Copilot by hand
+  home never gets a trusted folder. Read-only job reports therefore show only the session id, with
+  no resume command, and `docs/operations.md` warns not to start Copilot by hand
   with the plugin home. Where Copilot stores trust is not documented, so the plugin cannot check it.
 - **Resume stays in one mode**: a session lives in the home of the mode that made it. `--resume-last`
   only picks a task with the same `write` value as the new run. If there is none, the error says to

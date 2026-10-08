@@ -101,7 +101,7 @@ repo root.
 | same → `handleSessionEnd` | Shuts down the broker, kills the session's running jobs, clears broker state | Kills the session's running jobs and prunes them. No broker | 7 |
 | same → `shellEscape`, `appendEnvVar` | Writes `export` lines to `CLAUDE_ENV_FILE` | Rename only | 7 |
 | `scripts/stop-review-gate-hook.mjs` → `buildSetupNote` | `getCodexAvailability`, "Run /codex:setup" | `getCopilotAvailability`, "Run /copilot:setup" | 7 |
-| same → `runStopReview` | Runs `codex-companion.mjs task --json <prompt>` (read-only), 15-minute limit | Runs `copilot-companion.mjs task --json <prompt>`. Read-only profile, same limit | 7 |
+| same → `runStopReview` | Runs `codex-companion.mjs task --json <prompt>` (read-only) with `spawnSync` and a 15-minute limit; the limit kills only the companion | Runs `copilot-companion.mjs task --json <prompt>` with the read-only profile and the same limit. On the limit it kills the companion's whole process tree with `terminateProcessTree`, so no Copilot process is left (correctness) | 7 |
 | same → `parseStopReviewOutput`, messages | `ALLOW:` or `BLOCK:` first line; "Codex" in reasons | Rename only | 7 |
 
 ## Shared modules
@@ -120,7 +120,7 @@ repo root.
 | `scripts/lib/job-control.mjs` → import of `getSessionRuntimeStatus` | From `codex.mjs` | From `copilot.mjs`. Without a broker this function always reports "direct startup", so ticket 3 creates `copilot.mjs` with only this function. Ticket 4 adds the rest of the adapter | 3 |
 | same → `inferLegacyJobPhase` | Matches "starting codex", "codex error:" | Matches "starting copilot", "copilot error:" | 3 |
 | same → error text | `/codex:status`, `/codex:cancel`, "Codex jobs" | Rename only | 3 |
-| `scripts/lib/render.mjs` → `formatCodexResumeCommand` and the result renderers | `codex resume <threadId>`, "Codex session ID" | `copilot --resume=<sessionId>` and "Copilot session ID" for write tasks. Read-only jobs show the session id and `/copilot:rescue --resume`, never an interactive command, so the plugin home stays untrusted (§7) | 3 |
+| `scripts/lib/render.mjs` → `formatCodexResumeCommand` and the result renderers | `codex resume <threadId>`, "Codex session ID" | `copilot --resume=<sessionId>` and "Copilot session ID" for write tasks. Read-only jobs show only the session id, with no command: an interactive command would put trust in the plugin home (§7), and the companion's `--resume` means "the newest task", not this session | 3 |
 | same → titles and hints | "# Codex Setup", `- codex:`, `/codex:*` | Rename only | 3 |
 | `scripts/lib/args.mjs`, `scripts/lib/prompts.mjs`, `scripts/lib/workspace.mjs` | No Codex calls | Copied unchanged | 3 |
 | `scripts/lib/claude-session-transfer.mjs` | Finds the Claude transcript for `transfer` | Dropped | 3 |

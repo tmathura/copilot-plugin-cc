@@ -117,8 +117,7 @@ setup.
 - [ ] T028 Port `U/scripts/lib/job-control.mjs` to `P/scripts/lib/job-control.mjs` (import from
   `copilot.mjs`, Copilot text in `inferLegacyJobPhase` and errors)
 - [ ] T029 Port `U/scripts/lib/render.mjs` to `P/scripts/lib/render.mjs` (`copilot --resume=<id>` for
-  write tasks only; read-only jobs show the session id and `/copilot:rescue --resume`; "Copilot session
-  ID", `/copilot:*` hints, `- copilot:` in the setup report)
+  write tasks only; read-only jobs show only the session id, with no command; "Copilot session ID", `/copilot:*` hints, `- copilot:` in the setup report)
 - [ ] T030 [P] Port `tests/process.test.mjs`; add tests: `runCommand` never uses a shell; arguments
   with spaces, quotes, `&`, `|`, `;`, `$` and `%` reach the child unchanged; a non-zero exit gives
   `formatCommandFailure` text; `terminateProcessTree` kills a child and its grandchild;
@@ -168,7 +167,9 @@ logged in, and ready.
 - [ ] T039 [P] [US1] Add setup tests to `tests/runtime.test.mjs`: missing CLI, old version, not
   logged in (with `!copilot login` next step), BYOK counts as ready, review gate on and off; with
   Copilot missing and npm found through `resolveLauncher`, the report says npm is available, so
-  `/copilot:setup` can offer the install
+  `/copilot:setup` can offer the install; when the login check fails, the next steps name both
+  `!copilot login` and `COPILOT_GITHUB_TOKEN` for systems without a credential store; a token
+  variable in the environment reaches the read-only run
 
 ### Implementation for User Story 1
 
@@ -193,7 +194,7 @@ logged in, and ready.
 - [ ] T045 [P] [US1] Port `U/skills/codex-cli-runtime/SKILL.md` to
   `P/skills/copilot-cli-runtime/SKILL.md` (no `spark`)
 - [ ] T046 [P] [US1] Write `docs/configuration.md`: supported Copilot versions, install, login and
-  token variables (names only), BYOK, the permission profiles, the state folder, `--model` and
+  token variables (names only), why systems without a credential store need `COPILOT_GITHUB_TOKEN`, BYOK, the permission profiles, the state folder, `--model` and
   `--effort`
 - [ ] T047 [US1] Add the Phase 4 differences (version floor, login check, one process per run, no
   broker, no `transfer`) to the README section
@@ -224,8 +225,8 @@ after; a write attempt is rejected.
   branch review with unrelated local edits (which must not appear), and is deleted after the run;
   focus text with shell characters and a repo path with spaces; broken review JSON gives
   `parseError`; JSON inside a code fence parses; valid JSON with the wrong shape (`null`, `{}`, an
-  unknown `verdict`, a finding without `file`) gives upstream's "unexpected review shape" output and
-  a failed job
+  unknown `verdict`, a finding without `file`) is rejected by `validateReviewOutput`: `parseError` is
+  set, the job is `failed`, and the raw output is kept
 - [ ] T050 [P] [US2] Port `tests/commands.test.mjs` for `review.md` and `adversarial-review.md`
 
 ### Implementation for User Story 2
@@ -322,15 +323,17 @@ and to `BLOCK`.
 - [ ] T073 [P] [US5] Add hook tests to `tests/runtime.test.mjs`: gate off does nothing; gate blocks on
   `BLOCK:`; gate lets Claude stop on `ALLOW:`; an unexpected answer blocks with upstream's message; a
   missing Copilot gives a setup note and does not block; the gate run uses the read-only profile; a
-  gate run past its time limit blocks with upstream's timeout message (the 15-minute limit is passed
-  in through an option, so the test can use a short one); `SessionStart` writes `COPILOT_COMPANION_SESSION_ID` to `CLAUDE_ENV_FILE`; `SessionEnd` kills and
+  gate run past its time limit blocks with upstream's timeout message, and the companion, the fake
+  Copilot and their child processes are gone afterwards (the 15-minute limit is passed in through an
+  option, so the test can use a short one); `SessionStart` writes `COPILOT_COMPANION_SESSION_ID` to `CLAUDE_ENV_FILE`; `SessionEnd` kills and
   removes the session's running jobs
 
 ### Implementation for User Story 5
 
 - [ ] T074 [P] [US5] Port `U/hooks/hooks.json` to `P/hooks/hooks.json`
 - [ ] T075 [P] [US5] Port `U/prompts/stop-review-gate.md` to `P/prompts/stop-review-gate.md`
-- [ ] T076 [US5] Port `U/scripts/stop-review-gate-hook.mjs` to `P/scripts/stop-review-gate-hook.mjs`
+- [ ] T076 [US5] Port `U/scripts/stop-review-gate-hook.mjs` to `P/scripts/stop-review-gate-hook.mjs`;
+  on the time limit, kill the companion's process tree with `terminateProcessTree`
 - [ ] T077 [US5] Port `U/scripts/session-lifecycle-hook.mjs` to `P/scripts/session-lifecycle-hook.mjs`
   (no broker, no transcript path)
 - [ ] T078 [US5] Add the Phase 7 differences to the README section

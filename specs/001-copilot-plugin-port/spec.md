@@ -238,7 +238,8 @@ the matching function names in it.
 - **FR-017**: Reviews and the review gate MUST NOT change the target repository or any remote. The
   Copilot CLI's own permission controls MUST enforce this, not words in the prompt.
 - **FR-018**: A review MUST refuse to run if it cannot run read-only.
-- **FR-019**: Review results MUST follow the upstream review output schema, and Claude MUST show them
+- **FR-019**: Adversarial review results MUST follow the upstream review output schema. The native
+  review returns free text, as upstream does. For both review commands, Claude MUST show the result
   without changes and MUST NOT fix anything without the user's choice.
 
 **Tasks and jobs**
