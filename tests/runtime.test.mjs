@@ -1,14 +1,14 @@
-// Changed from upstream codex-plugin-cc (Apache-2.0): the setup tests run the Copilot companion
-// against the fake copilot CLI. Reviews, tasks, jobs and hooks come in later tickets.
+// Changed from upstream codex-plugin-cc (Apache-2.0): the setup and review tests run the Copilot
+// companion against the fake copilot CLI. Tasks, jobs and hooks come in later tickets.
 import fs from "node:fs";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 
 import { buildEnv, installFakeCopilot, readFakeCopilotRuns, readFakeVersionPids } from "./fake-copilot-fixture.mjs";
-import { makeTempDir, run } from "./helpers.mjs";
+import { initGitRepo, makeTempDir, run } from "./helpers.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PLUGIN_ROOT = path.join(ROOT, "plugins", "copilot");
@@ -210,4 +210,428 @@ test("the setup command file runs the companion and offers the Copilot npm packa
   assert.match(command, /Copilot is missing \(`copilot\.missing` is `true`\) and npm is available/);
   assert.match(command, /npm install -g @github\/copilot/);
   assert.match(command, /!copilot login/);
+});
+
+const READ_ONLY_ARGS = ["--available-tools=view,glob,grep", "--deny-tool=write,shell,memory"];
+const DIFF_ARGS = ["--binary", "--no-ext-diff", "--submodule=diff"];
+const FINDING = {
+  severity: "high",
+  title: "Missing empty-state guard",
+  body: "items can be empty.",
+  file: "src/app.js",
+  line_start: 1,
+  line_end: 1,
+  confidence: 0.8,
+  recommendation: "Guard the empty list."
+};
+const REVIEW_JSON = JSON.stringify({
+  verdict: "needs-attention",
+  summary: "Do not ship yet.",
+  findings: [FINDING],
+  next_steps: ["Add the guard."]
+});
+
+function git(repo, ...args) {
+  const result = run("git", args, { cwd: repo });
+  assert.equal(result.status, 0, result.stderr);
+  return result.stdout;
+}
+
+function writeFile(repo, name, text) {
+  fs.mkdirSync(path.dirname(path.join(repo, name)), { recursive: true });
+  fs.writeFileSync(path.join(repo, name), text);
+}
+
+// A committed file with one unstaged change: a small working-tree review.
+function makeRepo(repo = makeTempDir()) {
+  initGitRepo(repo);
+  writeFile(repo, "src/app.js", "export const value = items[0];\n");
+  git(repo, "add", "src/app.js");
+  git(repo, "commit", "-m", "init");
+  writeFile(repo, "src/app.js", "export const value = items[0].id;\n");
+  return repo;
+}
+
+// Every file under the folder, .git included, so a review that writes anything is caught.
+function snapshot(dir) {
+  const files = {};
+  const walk = (current) => {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else {
+        files[path.relative(dir, full)] = fs.readFileSync(full).toString("base64");
+      }
+    }
+  };
+  walk(dir);
+  return files;
+}
+
+function runReview(subcommand, repo, options = {}) {
+  const binDir = makeTempDir();
+  const { recordPath } = installFakeCopilot(binDir, options.behavior ?? "ok");
+  const dataDir = makeTempDir();
+  const result = run(process.execPath, [SCRIPT, subcommand, ...(options.args ?? [])], {
+    cwd: repo,
+    env: buildEnv(binDir, { CLAUDE_PLUGIN_DATA: dataDir, ...options.env })
+  });
+  return { result, runs: readFakeCopilotRuns(recordPath), dataDir };
+}
+
+function readJobs(dataDir) {
+  const stateRoot = path.join(dataDir, "state");
+  const [workspaceDir] = fs.readdirSync(stateRoot);
+  return JSON.parse(fs.readFileSync(path.join(stateRoot, workspaceDir, "state.json"), "utf8")).jobs;
+}
+
+function assertReadOnlyRun(copilotRun, dataDir) {
+  for (const arg of READ_ONLY_ARGS) {
+    assert.ok(copilotRun.args.includes(arg), arg);
+  }
+  assert.ok(!copilotRun.args.some((arg) => /allow-all|--allow-tool|--sandbox/.test(arg)), copilotRun.args.join(" "));
+  assert.equal(copilotRun.env.COPILOT_HOME, path.join(dataDir, "copilot-home"));
+}
+
+function addDirsOf(copilotRun) {
+  return copilotRun.args.filter((arg) => arg.startsWith("--add-dir=")).map((arg) => arg.slice("--add-dir=".length));
+}
+
+function patchesOf(copilotRun) {
+  return Object.fromEntries(Object.entries(copilotRun.addDirFiles).map(([name, data]) => [name, Buffer.from(data, "base64")]));
+}
+
+// Raw bytes with no buffer limit, to compare with the patch files.
+function gitBytes(repo, ...args) {
+  const result = spawnSync("git", args, { cwd: repo, maxBuffer: 64 * 1024 * 1024, windowsHide: true });
+  assert.equal(result.status, 0, String(result.stderr));
+  return result.stdout;
+}
+
+test("review sends /review with the working-tree diff on the read-only profile", () => {
+  const repo = makeRepo();
+  const { result, runs, dataDir } = runReview("review", repo);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /^# Copilot Review\n\nTarget: working tree diff\n/);
+  assert.match(result.stdout, /Fake Copilot answer\./);
+  assert.equal(runs.length, 1);
+  assert.match(runs[0].prompt, /^\/review the working tree diff\./);
+  assert.match(runs[0].prompt, /export const value = items\[0\]\.id;/);
+  assertReadOnlyRun(runs[0], dataDir);
+  assert.deepEqual(addDirsOf(runs[0]), []);
+  assert.equal(readJobs(dataDir)[0].status, "completed");
+});
+
+test("review --json gives upstream's payload, with the session as both thread ids", () => {
+  const { result, runs } = runReview("review", makeRepo(), { args: ["--json"] });
+  const payload = JSON.parse(result.stdout);
+  const sessionId = runs[0].args.find((arg) => arg.startsWith("--session-id=")).slice("--session-id=".length);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(payload.review, "Review");
+  assert.equal(payload.target.mode, "working-tree");
+  assert.equal(payload.threadId, sessionId);
+  assert.equal(payload.sourceThreadId, sessionId);
+  assert.equal(payload.copilot.status, 0);
+  assert.equal(payload.copilot.stdout, "Fake Copilot answer.");
+  assert.deepEqual(payload.copilot.reasoning, ["Looked at the request."]);
+});
+
+test("review accepts the quoted raw argument style for base-branch review", () => {
+  const repo = makeRepo();
+  git(repo, "checkout", "-q", "-b", "feature");
+  git(repo, "commit", "-qam", "change");
+
+  const { result, runs } = runReview("review", repo, { args: ["--base main"] });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Target: branch diff against main/);
+  assert.match(runs[0].prompt, /^\/review the branch diff against main\./);
+  assert.match(runs[0].prompt, /export const value = items\[0\]\.id;/);
+});
+
+test("review rejects focus text because it is native-review only", () => {
+  const { result, runs } = runReview("review", makeRepo(), { args: ["--scope working-tree focus on auth"] });
+
+  assert.equal(result.status > 0, true);
+  assert.match(result.stderr, /does not support custom focus text/i);
+  assert.match(result.stderr, /\/copilot:adversarial-review focus on auth/i);
+  assert.deepEqual(runs, []);
+});
+
+test("review and adversarial review reject staged-only scope", () => {
+  for (const subcommand of ["review", "adversarial-review"]) {
+    const repo = makeRepo();
+    git(repo, "add", "src/app.js");
+    const { result } = runReview(subcommand, repo, { args: ["--scope", "staged"] });
+
+    assert.equal(result.status > 0, true, subcommand);
+    assert.match(result.stderr, /Unsupported review scope "staged"/i);
+    assert.match(result.stderr, /Use one of: auto, working-tree, branch, or pass --base <ref>/i);
+  }
+});
+
+test("adversarial review renders structured findings and puts the schema in the prompt", () => {
+  const { result, runs, dataDir } = runReview("adversarial-review", makeRepo(), {
+    env: { FAKE_COPILOT_ANSWER: REVIEW_JSON }
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Verdict: needs-attention/);
+  assert.match(result.stdout, /\[high\] Missing empty-state guard \(src\/app\.js:1\)/);
+  assert.match(runs[0].prompt, /You are Copilot performing an adversarial software review/);
+  assert.match(runs[0].prompt, /<output_schema>\n\{\n {2}"\$schema"/);
+  assert.match(runs[0].prompt, /"needs-attention"/);
+  assertReadOnlyRun(runs[0], dataDir);
+});
+
+test("adversarial review accepts the same base-branch targeting as review", () => {
+  const repo = makeRepo();
+  git(repo, "checkout", "-q", "-b", "feature");
+  git(repo, "commit", "-qam", "change");
+
+  const { result } = runReview("adversarial-review", repo, {
+    args: ["--base", "main"],
+    env: { FAKE_COPILOT_ANSWER: REVIEW_JSON }
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Target: branch diff against main/);
+  assert.match(result.stdout, /Missing empty-state guard/);
+});
+
+test("adversarial review accepts JSON inside one code fence", () => {
+  const { result } = runReview("adversarial-review", makeRepo(), {
+    env: { FAKE_COPILOT_ANSWER: `\`\`\`json\n${REVIEW_JSON}\n\`\`\`` }
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Missing empty-state guard/);
+});
+
+test("broken review JSON fails the job and keeps the raw output", () => {
+  const answer = "The change looks fine to me.";
+  const { result, dataDir } = runReview("adversarial-review", makeRepo(), {
+    args: ["--json"],
+    env: { FAKE_COPILOT_ANSWER: answer }
+  });
+  const payload = JSON.parse(result.stdout);
+
+  assert.equal(result.status, 1);
+  assert.match(payload.parseError, /JSON/);
+  assert.equal(payload.result, null);
+  assert.equal(payload.rawOutput, answer);
+  assert.equal(readJobs(dataDir)[0].status, "failed");
+});
+
+test("valid review JSON with the wrong shape fails the job and keeps the raw output", () => {
+  const review = JSON.parse(REVIEW_JSON);
+  const { file, ...findingWithoutFile } = FINDING;
+  assert.equal(file, "src/app.js");
+  const cases = [
+    [null, "The review output must be of type object."],
+    [{}, "The review output is missing `verdict`."],
+    [{ ...review, verdict: "maybe" }, "`verdict` must be one of: approve, needs-attention."],
+    [{ ...review, findings: [findingWithoutFile] }, "`findings[0]` is missing `file`."]
+  ].map(([value, error]) => [value, `The JSON does not match the review schema: ${error}`]);
+
+  for (const [value, expectedError] of cases) {
+    const answer = JSON.stringify(value);
+    const { result, dataDir } = runReview("adversarial-review", makeRepo(), {
+      args: ["--json"],
+      env: { FAKE_COPILOT_ANSWER: answer }
+    });
+    const payload = JSON.parse(result.stdout);
+
+    assert.equal(result.status, 1, answer);
+    assert.equal(payload.parseError, expectedError);
+    assert.equal(payload.result, null);
+    assert.equal(payload.rawOutput, answer);
+    assert.equal(readJobs(dataDir)[0].status, "failed", answer);
+  }
+});
+
+test("a review changes no file, even with --write and a Copilot that writes when it can", () => {
+  for (const [subcommand, args] of [["review", []], ["adversarial-review", ["--write"]]]) {
+    const repo = makeRepo();
+    const before = snapshot(repo);
+    const { result, runs, dataDir } = runReview(subcommand, repo, {
+      behavior: "write-attempt",
+      args,
+      env: { FAKE_COPILOT_ANSWER: REVIEW_JSON }
+    });
+
+    assert.equal(result.status, 0, `${subcommand}: ${result.stderr}`);
+    assertReadOnlyRun(runs[0], dataDir);
+    assert.deepEqual(snapshot(repo), before, subcommand);
+  }
+});
+
+test("a review refuses to run when Copilot is too old or rejects the read-only arguments", () => {
+  const old = runReview("review", makeRepo(), { behavior: "old-version" });
+  assert.equal(old.result.status, 1);
+  assert.match(old.result.stderr, /Copilot CLI 1\.0\.92 is not supported/);
+  assert.deepEqual(old.runs, []);
+
+  const rejected = runReview("review", makeRepo(), { behavior: "reject-flags" });
+  assert.equal(rejected.result.status, 1);
+  assert.match(rejected.result.stdout, /Copilot stopped before it sent a result \(exit 1\)/);
+  assert.match(rejected.result.stdout, /unknown option '--available-tools=view,glob,grep'/);
+  assert.deepEqual(rejected.runs, []);
+});
+
+test("a review whose Copilot starts a write tool is stopped and its process is killed", async () => {
+  for (const subcommand of ["review", "adversarial-review"]) {
+    const repo = makeRepo();
+    const before = snapshot(repo);
+    const { result, runs, dataDir } = runReview(subcommand, repo, { behavior: "forbidden-tool" });
+
+    assert.equal(result.status, 1, subcommand);
+    assert.match(result.stdout, /Copilot started the tool "create", which a read-only run does not allow/);
+    assert.equal(readJobs(dataDir)[0].status, "failed");
+    assert.deepEqual(snapshot(repo), before);
+    await waitFor(() => !isAlive(runs[0].pid));
+  }
+});
+
+test("an adversarial review that is stopped after it sent valid JSON still fails and says why", () => {
+  const { result } = runReview("adversarial-review", makeRepo(), {
+    behavior: "forbidden-tool",
+    args: ["--json"],
+    env: { FAKE_COPILOT_ANSWER: REVIEW_JSON }
+  });
+  const payload = JSON.parse(result.stdout);
+
+  assert.equal(result.status, 1);
+  assert.equal(payload.result, null);
+  assert.equal(payload.rawOutput, REVIEW_JSON);
+  assert.match(payload.parseError, /Copilot started the tool "create"/);
+});
+
+test("above the inline limit, a working-tree review reads the exact patches from a folder that is then removed", () => {
+  const repo = makeTempDir();
+  initGitRepo(repo);
+  for (const name of ["a.txt", "b.txt", "c.txt", "deleted.txt", "latin1.txt"]) {
+    writeFile(repo, name, `${name} v1\n`);
+  }
+  git(repo, "add", ".");
+  git(repo, "commit", "-q", "-m", "init");
+  git(repo, "rm", "-q", "deleted.txt");
+  writeFile(repo, "a.txt", "a.txt STAGED_MARKER\n");
+  git(repo, "add", "a.txt");
+  writeFile(repo, "a.txt", "a.txt UNSTAGED_MARKER\n");
+  writeFile(repo, "b.txt", "b.txt UNSTAGED_MARKER\n");
+  // More than spawnSync's default 1 MiB buffer.
+  writeFile(repo, "c.txt", `${Array.from({ length: 15000 }, (_, index) => `line ${index} ${"x".repeat(90)}`).join("\n")}\nBIG_END\n`);
+  git(repo, "add", "c.txt");
+  // "café" in Latin-1: bytes that are not UTF-8 must reach the patch unchanged.
+  fs.writeFileSync(path.join(repo, "latin1.txt"), Buffer.from([0x63, 0x61, 0x66, 0xe9, 0x0a]));
+  writeFile(repo, "new.txt", "untracked file\n");
+  const before = snapshot(repo);
+
+  const { result, runs } = runReview("adversarial-review", repo, { env: { FAKE_COPILOT_ANSWER: REVIEW_JSON } });
+
+  assert.equal(result.status, 0, result.stderr);
+  const [patchDir] = addDirsOf(runs[0]);
+  assert.ok(patchDir);
+  assert.equal(fs.existsSync(patchDir), false);
+  const patches = patchesOf(runs[0]);
+  assert.deepEqual(Object.keys(patches).sort(), ["staged.patch", "unstaged.patch", "untracked.md"]);
+  assert.ok(patches["staged.patch"].equals(gitBytes(repo, "diff", "--cached", ...DIFF_ARGS)));
+  assert.ok(patches["unstaged.patch"].equals(gitBytes(repo, "diff", ...DIFF_ARGS)));
+  assert.ok(patches["staged.patch"].length > 1024 * 1024);
+  assert.ok(patches["unstaged.patch"].includes(Buffer.from([0x2b, 0x63, 0x61, 0x66, 0xe9, 0x0a])));
+  const staged = patches["staged.patch"].toString("utf8");
+  assert.match(staged, /deleted file mode 100644\n[^\n]*\n--- a\/deleted\.txt/);
+  assert.match(staged, /\+a\.txt STAGED_MARKER/);
+  assert.match(staged, /\+BIG_END\n/);
+  assert.match(patches["unstaged.patch"].toString("utf8"), /-a\.txt STAGED_MARKER\n\+a\.txt UNSTAGED_MARKER/);
+  assert.match(patches["untracked.md"].toString("utf8"), /### new\.txt\n```\nuntracked file\n```/);
+  assert.match(runs[0].prompt, /lightweight summary/i);
+  assert.match(runs[0].prompt, /with the view tool/);
+  assert.ok(runs[0].prompt.includes(`## Patch Files\n\n- ${path.join(patchDir, "staged.patch")}\n`));
+  assert.doesNotMatch(runs[0].prompt, /STAGED_MARKER|UNSTAGED_MARKER|BIG_END/);
+  assert.deepEqual(snapshot(repo), before);
+});
+
+test(
+  "a review stopped with SIGTERM or SIGINT removes its patch folder",
+  { skip: process.platform === "win32" && "Windows stops the tree with taskkill /T" },
+  async () => {
+    for (const signal of ["SIGTERM", "SIGINT"]) {
+      const repo = makeTempDir();
+      initGitRepo(repo);
+      for (const name of ["a.txt", "b.txt", "c.txt"]) {
+        writeFile(repo, name, `${name} v1\n`);
+      }
+      git(repo, "add", ".");
+      git(repo, "commit", "-q", "-m", "init");
+      for (const name of ["a.txt", "b.txt", "c.txt"]) {
+        writeFile(repo, name, `${name} v2\n`);
+      }
+      const binDir = makeTempDir();
+      const { recordPath } = installFakeCopilot(binDir, "hang");
+      const companion = spawn(process.execPath, [SCRIPT, "adversarial-review"], {
+        cwd: repo,
+        env: buildEnv(binDir, { CLAUDE_PLUGIN_DATA: makeTempDir() }),
+        stdio: "ignore"
+      });
+      const exited = new Promise((resolve) => companion.on("exit", resolve));
+      await waitFor(() => readFakeCopilotRuns(recordPath).length > 0);
+      const [patchDir] = addDirsOf(readFakeCopilotRuns(recordPath)[0]);
+      assert.ok(fs.existsSync(patchDir), signal);
+
+      companion.kill(signal);
+      await exited;
+
+      assert.equal(fs.existsSync(patchDir), false, signal);
+    }
+  }
+);
+
+test("above the inline limit, a branch review gets only the branch patch, without local edits", () => {
+  const repo = makeTempDir();
+  initGitRepo(repo);
+  for (const name of ["a.txt", "b.txt", "c.txt"]) {
+    writeFile(repo, name, `${name} v1\n`);
+  }
+  git(repo, "add", ".");
+  git(repo, "commit", "-q", "-m", "init");
+  git(repo, "checkout", "-q", "-b", "feature");
+  for (const name of ["a.txt", "b.txt", "c.txt"]) {
+    writeFile(repo, name, `${name} BRANCH_MARKER\n`);
+  }
+  git(repo, "commit", "-qam", "change");
+  writeFile(repo, "a.txt", "a.txt LOCAL_MARKER\n");
+
+  const { result, runs } = runReview("review", repo, { args: ["--base", "main"] });
+
+  assert.equal(result.status, 0, result.stderr);
+  const [patchDir] = addDirsOf(runs[0]);
+  assert.equal(fs.existsSync(patchDir), false);
+  const patches = patchesOf(runs[0]);
+  assert.deepEqual(Object.keys(patches), ["branch.patch"]);
+  const mergeBase = git(repo, "merge-base", "HEAD", "main").trim();
+  assert.ok(patches["branch.patch"].equals(gitBytes(repo, "diff", ...DIFF_ARGS, `${mergeBase}..HEAD`)));
+  assert.match(patches["branch.patch"].toString("utf8"), /BRANCH_MARKER/);
+  assert.doesNotMatch(patches["branch.patch"].toString("utf8"), /LOCAL_MARKER/);
+  assert.doesNotMatch(runs[0].prompt, /LOCAL_MARKER/);
+});
+
+test("focus text with shell characters reaches the prompt unchanged, in a repo path with spaces", () => {
+  const repo = path.join(makeTempDir(), "repo with spaces & more");
+  fs.mkdirSync(repo);
+  makeRepo(repo);
+  const focus = `$(touch pwned) & echo "hi" | more; 'quoted' %PATH% \`id\``;
+
+  const { result, runs } = runReview("adversarial-review", repo, {
+    args: ["--scope", "working-tree", focus],
+    env: { FAKE_COPILOT_ANSWER: REVIEW_JSON }
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(runs[0].prompt.includes(`User focus: ${focus}\n`));
+  assert.equal(fs.existsSync(path.join(repo, "pwned")), false);
 });

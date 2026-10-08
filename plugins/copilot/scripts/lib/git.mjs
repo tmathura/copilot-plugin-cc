@@ -1,6 +1,6 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): every git call writes no index and starts no
 // fsmonitor hook or textconv program; untracked symlinks are not read; the self-collect guidance
-// points Copilot at patch files.
+// points Copilot at patch files, which writeReviewPatches writes.
 import fs from "node:fs";
 import path from "node:path";
 
@@ -324,6 +324,39 @@ function buildAdversarialCollectionGuidance(options = {}) {
   }
 
   return "The repository context below is a lightweight summary. Read the patch files listed below with the view tool before finalizing findings.";
+}
+
+// Git writes straight to the file: a large patch has no buffer limit, and its bytes stay exact.
+function writeGitOutput(cwd, args, file) {
+  const fd = fs.openSync(file, "wx", 0o600);
+  try {
+    gitChecked(cwd, args, { stdio: ["ignore", fd, "pipe"] });
+  } finally {
+    fs.closeSync(fd);
+  }
+  return file;
+}
+
+// Above the inline limit Copilot cannot run git itself, so it reads the same patches from files.
+export function writeReviewPatches(context, dir) {
+  const { repoRoot } = context;
+  const diffArgs = ["diff", "--binary", "--no-ext-diff", "--submodule=diff"];
+  if (context.mode === "branch") {
+    return [writeGitOutput(repoRoot, [...diffArgs, context.comparison.commitRange], path.join(dir, "branch.patch"))];
+  }
+
+  const { untracked } = getWorkingTreeState(repoRoot);
+  const untrackedFile = path.join(dir, "untracked.md");
+  fs.writeFileSync(untrackedFile, untracked.map((file) => formatUntrackedFile(repoRoot, file)).join("\n\n"), {
+    encoding: "utf8",
+    flag: "wx",
+    mode: 0o600
+  });
+  return [
+    writeGitOutput(repoRoot, [...diffArgs, "--cached"], path.join(dir, "staged.patch")),
+    writeGitOutput(repoRoot, diffArgs, path.join(dir, "unstaged.patch")),
+    untrackedFile
+  ];
 }
 
 export function collectReviewContext(cwd, target, options = {}) {

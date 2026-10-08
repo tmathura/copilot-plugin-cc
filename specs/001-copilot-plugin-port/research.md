@@ -115,7 +115,12 @@ Evidence, run on 2026-10-08:
   and above it the companion writes the exact patches (the same `git diff` commands upstream inlines:
   staged, unstaged, untracked files, or the branch range) to a new folder for the run. It passes that
   folder with `--add-dir`, which lets the `view` tool read it, names the files in the prompt, and
-  deletes the folder after the run.
+  deletes the folder after the run. Git writes each patch straight to its file, so a patch has no
+  size limit and its bytes are exact. A companion stopped with `SIGTERM` or `SIGINT` also deletes the
+  folder as it exits. Limit (2026-10-09, ticket 5 code review): a companion killed outright
+  (`SIGKILL`, or `taskkill /F` on Windows) leaves the folder in the user's temp folder. Rejected
+  alternative: a sweep of old patch folders at the next review, which could delete the folder of a
+  review that is still running.
 - **A shared runtime.** Upstream's broker shares one `codex app-server` per Claude session. Prompt
   mode has no server to share. The broker files are not ported.
 - **Policy hooks.** An administrator can install machine-wide policy hooks. They run in every mode

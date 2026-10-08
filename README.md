@@ -7,8 +7,8 @@ keeps the same commands and layout, and calls the Copilot CLI instead of Codex.
 
 ## Status
 
-Work in progress. The plugin has `/copilot:setup`. The other commands below describe what the first
-release will do.
+Work in progress. The plugin has `/copilot:setup`, `/copilot:review` and
+`/copilot:adversarial-review`. The other commands below describe what the first release will do.
 
 ## What you get
 
@@ -62,11 +62,23 @@ claude plugin install copilot@tmathura-copilot
   a `core.fsmonitor` hook or a `textconv` program from the repo's git config. A review must leave
   the repo as it was, and nothing controls these programs once git starts them. Clean filters, such
   as Git LFS, still run, as in any `git diff`. So does a `textconv` program that your own git config
-  sets for a changed submodule, because git starts the submodule's diff itself.
+  sets for a changed submodule, because git starts the submodule's diff itself. The review commands
+  tell Claude to use the same git options when it estimates the size of a review.
 - A review does not read the target of an untracked symlink. The link can point outside the repo,
   for example at a key file. Codex puts the target's text in the prompt.
 - For a large diff, Codex runs read-only `git` commands itself. Copilot's reviews have no shell, so
-  the plugin will write the patches to files that Copilot reads.
+  the plugin writes the exact patches to a new folder, lets Copilot read that folder
+  (`--add-dir`), and deletes the folder after the review. If the review is killed outright
+  (`SIGKILL`, or `taskkill /F` on Windows), the folder stays in your own temp folder.
+- `/copilot:review` sends Copilot's `/review` command with the diff in the prompt. Codex uses its
+  built-in reviewer, which collects the diff itself. Copilot's `/review` collects the diff with
+  `git` in a shell, and reviews have no shell.
+- Copilot has no setting for an output schema. So `/copilot:adversarial-review` puts the schema in
+  the prompt, also accepts the JSON inside one code fence, and checks the answer against the schema.
+  An answer that does not match fails the job and keeps Copilot's text. Codex makes its answer match
+  the schema itself.
+- Copilot keeps every review session. Codex can run a review in a thread that it does not keep. The
+  sessions stay in the plugin's own Copilot folder, so they are not in your own session list.
 - Job state lives in `~/.copilot-companion/state` when Claude Code does not give a plugin data
   folder. Codex uses the shared temp folder, where another user on the same computer could create
   the folder first and plant job records.

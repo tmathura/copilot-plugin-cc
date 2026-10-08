@@ -256,7 +256,7 @@ after; a write attempt is rejected.
 
 ### Tests for User Story 2
 
-- [ ] T049 [P] [US2] Add review tests to `tests/runtime.test.mjs`: working tree and branch targets;
+- [X] T049 [P] [US2] Add review tests to `tests/runtime.test.mjs`: working tree and branch targets;
   the fake's write attempt is rejected and no file changes; the Copilot arguments contain the read-only
   profile; the two refusal cases in research.md §3 (Copilot fails to start with the read-only flags:
   no prompt is sent; Copilot starts a tool other than `view`, `glob` or `grep`: the run
@@ -268,35 +268,36 @@ after; a write attempt is rejected.
   `parseError`; JSON inside a code fence parses; valid JSON with the wrong shape (`null`, `{}`, an
   unknown `verdict`, a finding without `file`) is rejected by `validateReviewOutput`: `parseError` is
   set, the job is `failed`, and the raw output is kept
-- [ ] T050 [P] [US2] Port `tests/commands.test.mjs` for `review.md` and `adversarial-review.md`;
+- [X] T050 [P] [US2] Port `tests/commands.test.mjs` for `review.md` and `adversarial-review.md`;
   check that every `git` command in them has `--no-optional-locks -c core.fsmonitor=false -c diff.autoRefreshIndex=false`, and every `git diff` also
   `--no-textconv`
 
 ### Implementation for User Story 2
 
-- [ ] T051 [P] [US2] Copy `U/schemas/review-output.schema.json` to `P/schemas/` unchanged
-- [ ] T052 [P] [US2] Port `U/prompts/adversarial-review.md` to `P/prompts/adversarial-review.md`
+- [X] T051 [P] [US2] Copy `U/schemas/review-output.schema.json` to `P/schemas/` unchanged
+- [X] T052 [P] [US2] Port `U/prompts/adversarial-review.md` to `P/prompts/adversarial-review.md`
   ("You are Copilot", `{{OUTPUT_SCHEMA}}` block)
-- [ ] T053 [P] [US2] Add `P/prompts/review.md`: the `/review` slash command, the target label and
+- [X] T053 [P] [US2] Add `P/prompts/review.md`: the `/review` slash command, the target label and
   `{{REVIEW_INPUT}}`
-- [ ] T053b [US2] In `P/scripts/copilot-companion.mjs`, when `collectReviewContext` returns
+- [X] T053b [US2] In `P/scripts/copilot-companion.mjs`, when `collectReviewContext` returns
   `inputMode: "self-collect"`, write the exact patches (staged, unstaged and untracked for a working
   tree; the merge-base range for a branch) to a new folder for the run, pass it with `--add-dir`
-  through the adapter, name the files in the prompt, and delete the folder after the run
-- [ ] T054 [US2] Add `runPromptModeReview`, `parseStructuredOutput` (code fence), `readOutputSchema`
+  through the adapter, name the files in the prompt, and delete the folder after the run (and when
+  the companion is stopped with `SIGTERM` or `SIGINT`; added 2026-10-09, research §2)
+- [X] T054 [US2] Add `runPromptModeReview`, `parseStructuredOutput` (code fence), `readOutputSchema`
   and `validateReviewOutput` (the schema keywords in research.md §7; a failure sets `parseError` and
   fails the job) to `P/scripts/lib/copilot.mjs`
-- [ ] T055 [US2] Add `review` and `adversarial-review` to `P/scripts/copilot-companion.mjs`
+- [X] T055 [US2] Add `review` and `adversarial-review` to `P/scripts/copilot-companion.mjs`
   (`executeReviewRun`, `handleReviewCommand`, `validateNativeReviewRequest`,
   `buildAdversarialReviewPrompt`, `buildReviewJobMetadata`)
-- [ ] T056 [P] [US2] Port `U/commands/review.md` and `U/commands/adversarial-review.md` to
+- [X] T056 [P] [US2] Port `U/commands/review.md` and `U/commands/adversarial-review.md` to
   `P/commands/`; the size-estimate git commands get `--no-optional-locks -c core.fsmonitor=false -c diff.autoRefreshIndex=false`, and the diffs also
   `--no-textconv` (research.md §4b)
-- [ ] T057 [P] [US2] Port `U/skills/codex-result-handling/SKILL.md` to
+- [X] T057 [P] [US2] Port `U/skills/codex-result-handling/SKILL.md` to
   `P/skills/copilot-result-handling/SKILL.md`
-- [ ] T058 [US2] Add the Phase 5 differences (`/review` with inline context instead of the native
+- [X] T058 [US2] Add the Phase 5 differences (`/review` with inline context instead of the native
   reviewer, schema in the prompt, sessions kept) to the README section
-- [ ] T059 [US2] Run `claude plugin validate .`, `npm run build` and `node --test tests/*.test.mjs`;
+- [X] T059 [US2] Run `claude plugin validate .`, `npm run build` and `node --test tests/*.test.mjs`;
   all pass
 
 **Checkpoint**: both reviews work, read-only, against a real Copilot.

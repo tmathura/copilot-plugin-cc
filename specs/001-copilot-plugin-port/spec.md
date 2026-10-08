@@ -86,6 +86,14 @@ and the optional Stop-hook review gate. Drop transfer. The first ticket chooses 
   not answer (decided 2026-10-08, ticket 4 Codex review; research.md §5). Rejected alternative: no
   limit, as upstream.
 
+### Session 2026-10-09
+
+- Q: Is the review patch folder always deleted? → A: After every run, and when the companion is
+  stopped with `SIGTERM` or `SIGINT`. A companion killed outright (`SIGKILL`, `taskkill /F`) leaves it
+  in the user's temp folder (decided 2026-10-09, ticket 5 code review; research.md §2). Rejected
+  alternative: a sweep of old patch folders at the next review, which could delete a running
+  review's folder.
+
 ## User Scenarios & Testing *(mandatory)*
 
 The user is a developer who works in Claude Code and has the GitHub Copilot CLI. The owner is the
