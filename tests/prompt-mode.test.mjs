@@ -138,22 +138,39 @@ test("a run that passes its time limit is stopped with an error", async () => {
   assert.equal(isAlive(client.proc.pid), false);
 });
 
-test("a run whose process cannot be stopped still ends, with the kill error", async () => {
+test("a run whose process cannot be stopped still ends, and the companion can exit", async () => {
   const binDir = makeTempDir();
   const { scriptPath } = installFakeCopilot(binDir, "hang");
-  const client = CopilotPromptModeClient.start(binDir, {
-    command: process.execPath,
-    args: [scriptPath, "--output-format", "json"],
-    prompt: "hello",
-    timeoutMs: 200,
-    terminateImpl: () => Promise.reject(new Error("kill EPERM"))
+  const source = `
+    import { CopilotPromptModeClient } from ${JSON.stringify(PROMPT_MODE_URL)};
+    const client = CopilotPromptModeClient.start(process.cwd(), {
+      command: process.execPath,
+      args: [${JSON.stringify(scriptPath)}, "--output-format", "json"],
+      prompt: "hello",
+      timeoutMs: 200,
+      terminateImpl: () => Promise.reject(new Error("kill EPERM"))
+    });
+    const exit = await client.exitPromise;
+    console.log(JSON.stringify({ copilotPid: client.proc.pid, error: exit.error.message }));
+  `;
+  const companion = spawn(process.execPath, ["--input-type=module", "-e", source], {
+    cwd: binDir,
+    stdio: ["ignore", "pipe", "inherit"]
   });
+  let stdout = "";
+  companion.stdout.on("data", (chunk) => {
+    stdout += chunk;
+  });
+  const exited = new Promise((resolve) => companion.on("exit", (code) => resolve(code)));
+  const timeout = setTimeout(() => companion.kill(), 10000);
 
-  const exit = await client.exitPromise;
+  const code = await exited;
+  clearTimeout(timeout);
 
-  assert.equal(exit.error.message, "Copilot could not be stopped: kill EPERM");
-  assert.match(client.protocolError.message, /did not finish within 0\.2 seconds/);
-  await terminateProcessTree(client.proc.pid);
+  assert.equal(code, 0);
+  const { copilotPid, error } = JSON.parse(stdout);
+  assert.equal(error, "Copilot could not be stopped: kill EPERM");
+  await terminateProcessTree(copilotPid);
 });
 
 test("a missing program ends the run with the spawn error", async () => {

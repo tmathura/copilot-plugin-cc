@@ -30,6 +30,14 @@ function stopLiveClientsAndExit(signal) {
   Promise.all(stops).finally(() => process.exit(SIGNAL_EXIT_CODES[signal] ?? 1));
 }
 
+// A child that survived its kill must not keep the companion alive through its open pipes.
+function releaseChild(child) {
+  child.stdin?.destroy();
+  child.stdout?.destroy();
+  child.stderr?.destroy();
+  child.unref();
+}
+
 function trackClient(client) {
   if (liveClients.size === 0) {
     process.on("SIGTERM", stopLiveClientsAndExit);
@@ -99,7 +107,10 @@ export function runShortCommand(cwd, options) {
       handle
         .close()
         .catch(() => {})
-        .finally(() => finish({}));
+        .finally(() => {
+          finish({});
+          releaseChild(child);
+        });
     }, options.timeoutMs);
 
     child.stdout.setEncoding("utf8").on("data", (chunk) => {
@@ -266,6 +277,7 @@ export class CopilotPromptModeClient {
                 signal: null,
                 error: new Error(`Copilot could not be stopped: ${error.message}`)
               });
+              releaseChild(this.proc);
               throw error;
             }
           );
