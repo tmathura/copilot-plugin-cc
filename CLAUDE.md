@@ -17,7 +17,8 @@ This file only gives directions. The rules live in the files below.
 
 ```
 .claude-plugin/marketplace.json   marketplace entry
-plugins/copilot/                  the plugin; commands, agents, hooks, skills and scripts are planned
+plugins/copilot/                  the plugin; scripts/lib has the shared modules; commands, agents,
+                                  hooks, skills and the companion are planned
 scripts/bump-version.mjs          sets and checks the version in every manifest
 tests/                            node --test suites, helpers and the fake copilot CLI
 UPSTREAM.md                       last upstream commit checked, and the status of later changes

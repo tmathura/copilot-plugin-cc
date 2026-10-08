@@ -36,6 +36,37 @@ and the optional Stop-hook review gate. Drop transfer. The first ticket chooses 
   so paths with spaces or shell characters reach the child unchanged (decided 2026-10-08, after the
   ticket 2 code review). Rejected alternative: upstream's shell, kept for parity (research.md §4,
   test helper).
+- Q: Do the review git calls keep `.git/index` unchanged with `--no-optional-locks`? → A: No.
+  `git diff` still refreshes stale stat data in the index, so every call also passes
+  `-c diff.autoRefreshIndex=false`, and the unstaged file list uses `git diff --numstat` so that a
+  file with only stale stat data does not count as changed (decided 2026-10-08, ticket 3, after the
+  T031 test failed). Rejected alternative: `--no-optional-locks` alone (research.md §4b).
+- Q: Can a progress write bring back a removed job? → A: No. Progress writes change only a job that
+  is still running, and a progress write that cannot take the state lock is skipped (decided
+  2026-10-08, ticket 3). Rejected alternative: upstream's `upsertJob` (research.md §7, background
+  start order).
+- Q: Does the wait in `terminateProcessTree` block? → A: No. It returns a promise, so the caller's
+  own child is reaped during the wait and several processes can be stopped with one shared wait
+  (decided 2026-10-08, ticket 3 code review). Rejected alternative: a blocking wait (research.md §7,
+  stopping a job).
+- Q: Is upstream's `saveState` ported? → A: No. It saves a snapshot read earlier, so it can drop a
+  job another process added; every writer uses `updateState` (decided 2026-10-08, ticket 3 code
+  review; research.md §7, locked state updates).
+- Q: What does an update do with a state file it cannot read, or a save that fails? → A: It stops
+  and changes nothing, and it deletes pruned job files only after a successful save (decided
+  2026-10-08, ticket 3 Codex review). Rejected alternative: upstream, which saves the empty state
+  over the file and deletes first (research.md §7, locked state updates). Job files are written
+  through a temp file and a rename too, so a failed write keeps the old record (Codex review round
+  2).
+- Q: Does `runCommand` report a child killed by a signal as exit 0? → A: No. It keeps
+  `status: null`, so a killed git call is not taken as a success (decided 2026-10-08, PR review).
+  Rejected alternative: upstream's `status ?? 0`.
+- Q: Does the review context read the target of an untracked symlink? → A: No. It shows
+  `(skipped: symlink)`, because the target can be outside the repository (decided 2026-10-08,
+  ticket 3 Codex review). Rejected alternative: upstream, which follows the link (research.md §4b).
+- Q: Does a review start a textconv program for a changed submodule? → A: It can, if the user's own
+  git config sets one: git starts the submodule diff itself and does not pass `--no-textconv`.
+  Kept as a documented limit (decided 2026-10-08, ticket 3 code review; research.md §4b).
 
 ## User Scenarios & Testing *(mandatory)*
 

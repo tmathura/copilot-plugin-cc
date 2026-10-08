@@ -200,6 +200,10 @@ data model, the contracts, the plan and the tasks link here.
       (seen on this machine).
     - Anything else: the command counts as not found, with a message that it cannot start without a
       shell.
+    - A name that is already a path (it contains `\` or `/`) is not searched for. A `.cmd` or
+      `.bat` path goes through the same shim rules in its own folder; any other path is used as
+      given. An `.exe` or `.cmd` suffix on a bare name is dropped before the search (added
+      2026-10-08, PR review).
   - Never pass `shell: true`.
 - **Rationale**: Principle IV ("If Windows needs a `.cmd` shim, it MUST live in one helper").
   Upstream uses a shell on Windows. Node refuses to spawn a `.cmd` file without a shell, and with a
@@ -218,12 +222,22 @@ data model, the contracts, the plan and the tasks link here.
 ## 4b. Git calls that write nothing and start no hooks
 
 - **Decision**: every `git` call in `scripts/lib/git.mjs` passes the global options
-  `--no-optional-locks -c core.fsmonitor=false`, and every `git diff` call also passes
-  `--no-textconv` next to upstream's `--no-ext-diff`. The git commands that `commands/review.md` and
-  `commands/adversarial-review.md` give Claude for the size estimate get the same options.
+  `--no-optional-locks -c core.fsmonitor=false -c diff.autoRefreshIndex=false`, and every `git diff`
+  call also passes `--no-textconv` next to upstream's `--no-ext-diff`. The git commands that
+  `commands/review.md` and `commands/adversarial-review.md` give Claude for the size estimate get the
+  same options. The unstaged file list comes from `git diff --numstat --no-renames`, not
+  `git diff --name-only`.
 - **Rationale (index)**: correctness. `git status` can refresh cached file data in `.git/index`
   while it reads; `--no-optional-locks` stops that (git-status manual). A review must leave the
   repository byte for byte the same (spec User Story 2).
+- **Changed 2026-10-08** (ticket 3, found by the T031 index test with git 2.56): `git diff` of the
+  working tree still rewrote `.git/index` when a file's cached stat data was stale, even with
+  `--no-optional-locks`. Its refresh is controlled by `diff.autoRefreshIndex`, so that option is now
+  off on every call. Without the refresh, `git diff --name-only` also lists files whose content
+  matches the index (only their stat data changed), which would make a clean tree look dirty and
+  pick a working-tree review. `--numstat` compares the content and drops them, and quotes paths as
+  `--name-only` does. Rejected alternative: the earlier decision, `--no-optional-locks -c
+  core.fsmonitor=false` only, which does not keep the index unchanged.
 - **Rationale**: security. `shell: false` stops a shell, but git itself can start a configured
   `core.fsmonitor` hook (on `git status`) or a `textconv` program (on `git diff`). Reviews and the
   gate run these calls before Copilot starts, so no Copilot control covers them. Neither is needed
@@ -232,6 +246,17 @@ data model, the contracts, the plan and the tasks link here.
   still run, as they do in every `git status` or `git diff` the user runs. They are needed for a
   correct diff. Their commands come from the user's own git config; a cloned repository can only name
   a driver in `.gitattributes`, not define its command.
+- **Untracked symlinks** (decided 2026-10-08, ticket 3 Codex review round 4): the review context
+  shows an untracked symlink as `(skipped: symlink)` and never reads its target. Reason: security.
+  A link can point outside the repository, for example at a key file, and upstream would put that
+  file's text in the prompt before any Copilot control applies. A broken link keeps upstream's
+  text. Rejected alternative: upstream, which follows the link.
+- **Limit (submodules)**, found in the ticket 3 code review (2026-10-08): `--submodule=diff` makes git
+  start a second `git diff` inside each changed submodule. Command-line flags such as `--no-textconv`
+  and `--no-ext-diff` do not reach it (the `-c` options do), so a textconv program set in the user's
+  own config for that submodule still runs. As with filters, a cloned repository cannot define the
+  command. Kept as upstream, because the inline submodule diff is review input. Rejected
+  alternative: `--submodule=short`, which drops that input.
 
 ## 5. Supported Copilot CLI versions
 
@@ -342,9 +367,19 @@ Later tickets apply these rules. The call-site map uses them.
 - **Stopping a job**: `terminateProcessTree` changes in two ways (correctness, spec SC-007).
   - If the group signal finds no group (`ESRCH`), it signals the process itself. A companion that
     Claude's Bash tool started (a foreground or Bash-background review) is not a group leader, and
-    upstream returns without signalling it.
+    upstream returns without signalling it. Any other group signal error (such as `EPERM`, which
+    means no process in the group could be signalled) is thrown, not hidden (added 2026-10-08, PR
+    review; upstream then tries the process and can report "not delivered" instead).
   - It waits up to 5 seconds (an option, so tests can use less). If the process or its group is
     still alive, it sends `SIGKILL` to it. Windows already uses `taskkill /T /F`.
+  - A pid that is not a positive integer is never signalled: `kill(0)` would signal the caller's own
+    group (added 2026-10-08, PR review; upstream accepts any finite number).
+  - The wait does not block the event loop, so `terminateProcessTree` returns a promise (decided
+    2026-10-08, ticket 3 code review). Reason: correctness. Node reaps the caller's own exited child
+    only from the event loop; until then it still answers a signal check, so a blocking wait always
+    ran the full 5 seconds and then sent `SIGKILL`. A caller that stops several processes (such as
+    `SessionEnd`) can also wait for all of them at once. Rejected alternative: a blocking wait, as
+    upstream's synchronous function would need.
   - The job record also keeps `copilotPid`, the Copilot child's process id, set when the run starts.
     Cancel stops the job's `pid` and then the `copilotPid` group, so a Copilot run whose companion
     was killed with `SIGKILL` is still stopped.
@@ -379,6 +414,17 @@ Later tickets apply these rules. The call-site map uses them.
   without running. Its final write (`completed` or `failed`) also happens only if the job is still
   `running`, so a finished run never overwrites a cancel. Upstream writes `running` and the final
   status unconditionally (rejected: it can revive a job that `SessionEnd` or cancel stopped).
+  The progress writes of `createJobProgressUpdater` (phase, session id, turn id) follow the same
+  rule: they change only a job that is still `running` (added 2026-10-08, ticket 3). Reason:
+  correctness. Upstream writes them with `upsertJob`, which creates the job again if `SessionEnd`
+  has removed it. Rejected alternative: upstream's `upsertJob`. A progress write that cannot take the
+  state lock is skipped and does not fail the run; the job log still gets the line. The final status
+  write runs outside the runner's error handling, so a failed write never turns a finished run into a
+  failed one (both added 2026-10-08, ticket 3 code review). If that write fails, the error goes to
+  the job log and `runTrackedJob` still returns the run's result (added 2026-10-08, PR review).
+  Likewise, if the runner fails and its `failed` status cannot be saved, the caller still gets the
+  runner's own error (added 2026-10-08, PR review). A progress value counts as written only
+  after its write succeeds, so the next event retries it (added 2026-10-08, PR review).
 - **Hook time budgets**: Claude Code stops a hook at its `hooks.json` timeout (`Stop` 900 s,
   `SessionEnd` 5 s, as upstream), and then no cleanup runs. So each hook does its work inside a
   smaller budget.
@@ -426,11 +472,34 @@ Later tickets apply these rules. The call-site map uses them.
   Pruning keeps every queued or running job and applies the 50-job cap to finished jobs only,
   because upstream's cap counts running jobs too and can delete a long task's record. Every writer,
   `SessionEnd` included, changes state only through `updateState` on the state it read under the
-  lock, never by saving an earlier snapshot.
+  lock, never by saving an earlier snapshot. So upstream's `saveState`, which saves a snapshot the
+  caller read earlier, is not ported (decided 2026-10-08, ticket 3 code review; rejected alternative:
+  a locked `saveState`, which still drops a job added after the caller's read). When the lock file
+  has no readable owner (no positive integer pid and token), the timeout error says to delete it if
+  no companion is running. When the main lock's owner has ended and an unreadable reclaim lock
+  blocks freeing it, the error names the reclaim lock to delete instead (added 2026-10-08, PR
+  review). A process
+  that creates a lock but cannot write its owner removes that lock again, so it never leaves an
+  unreadable one (added 2026-10-08, PR review). A session counts as closed for a companion if any
+  `closedSessions` entry with its id is newer than the companion's start, so a resumed session that
+  closes again is caught (added 2026-10-08, PR review).
+  An update that cannot read or parse an existing `state.json` stops with an error that names the
+  file and changes nothing; plain readers still fall back to the empty state, as upstream. Pruned
+  jobs' files and logs are deleted only after the new `state.json` is saved, and a failed delete
+  does not fail the saved update. A job that the same update adds and prunes loses its files too
+  (upstream checks only the jobs read before the change; added 2026-10-08, PR review). Reason: correctness (decided 2026-10-08, ticket 3 Codex review).
+  Upstream saves the empty default over a file it could not read, and deletes before it saves
+  (rejected: a read error or a failed save loses job records, pids and logs). Job files
+  (`jobs/<id>.json`) are also written through a temp file and a rename, and the final status write
+  rebuilds a job file it cannot read (decided 2026-10-08, ticket 3 Codex review round 2; rejected:
+  upstream's direct overwrite, where a failed progress write leaves a broken file that then stops
+  the final write).
   Rejected alternative: keep upstream's unlocked update for parity; upstream has the same race, but
   this port relies on the job records to stop processes.
   Without `CLAUDE_PLUGIN_DATA`, the state lives in `~/.copilot-companion/state`, owned by the user,
-  as the plugin's Copilot home does (§3). Decided 2026-10-08, after Copilot PR review. Reason:
+  as the plugin's Copilot home does (§3). On macOS and Linux, `~/.copilot-companion` is set to
+  owner-only (`0700`) before each state write, also when it already exists, so other users cannot
+  read the logs or change the recorded pids (added 2026-10-08, PR review). Decided 2026-10-08, after Copilot PR review. Reason:
   security. Upstream uses `<tmp>/codex-companion`, which another local user can create first and
   fill with job records; cancel and `SessionEnd` would then signal PIDs that user chose. Rejected
   alternative: upstream's shared temp folder.

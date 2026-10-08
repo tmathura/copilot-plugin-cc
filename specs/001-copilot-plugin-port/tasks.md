@@ -103,34 +103,40 @@ setup.
 
 **Purpose**: The modules that every command needs, ported with their tests. No Copilot calls yet.
 
-- [ ] T021 [P] Copy `U/scripts/lib/args.mjs`, `U/scripts/lib/prompts.mjs` and
+- [X] T021 [P] Copy `U/scripts/lib/args.mjs`, `U/scripts/lib/prompts.mjs` and
   `U/scripts/lib/workspace.mjs` to `P/scripts/lib/` unchanged
-- [ ] T022 [P] Port `U/scripts/lib/fs.mjs` to `P/scripts/lib/fs.mjs` (temp prefix `copilot-plugin-`)
-- [ ] T023 Port `U/scripts/lib/process.mjs` to `P/scripts/lib/process.mjs` with `shell: false` always;
-  add `resolveLauncher(name)` (research.md §4) and use it in `binaryAvailable`
-- [ ] T024 Port `U/scripts/lib/git.mjs` to `P/scripts/lib/git.mjs`; change the self-collect guidance
+- [X] T022 [P] Port `U/scripts/lib/fs.mjs` to `P/scripts/lib/fs.mjs` (temp prefix `copilot-plugin-`)
+- [X] T023 Port `U/scripts/lib/process.mjs` to `P/scripts/lib/process.mjs` with `shell: false` always;
+  add `resolveLauncher(name)` (research.md §4) and use it in `binaryAvailable`; `terminateProcessTree`
+  returns a promise, so its wait does not block the event loop (research.md §7, changed 2026-10-08)
+- [X] T024 Port `U/scripts/lib/git.mjs` to `P/scripts/lib/git.mjs`; change the self-collect guidance
   in `buildAdversarialCollectionGuidance` to "Read the patch files listed below with the view tool"
-  (research.md §2, self-collect); pass `--no-optional-locks -c core.fsmonitor=false` to every git call and `--no-textconv`
-  to every `git diff` (research.md §4b)
-- [ ] T025 [P] Port `U/scripts/lib/state.mjs` to `P/scripts/lib/state.mjs` (fallback root
+  (research.md §2, self-collect); pass `--no-optional-locks -c core.fsmonitor=false -c diff.autoRefreshIndex=false` to every git call and `--no-textconv`
+  to every `git diff`, and list unstaged files with `git diff --numstat --no-renames`; never read the
+  target of an untracked symlink (research.md §4b; changed 2026-10-08)
+- [X] T025 [P] Port `U/scripts/lib/state.mjs` to `P/scripts/lib/state.mjs` (fallback root
   `~/.copilot-companion/state`, never the shared temp folder; test that the fallback is under the
   home folder); keep `MAX_JOBS = 50` for finished jobs and never prune a queued or
   running job; keep `STATE_VERSION = 1`; lock `updateState` (with an optional shorter wait) with
   `state.json.lock` and write through a temp file and a rename (research.md §7, locked state
-  updates); add `closedSessions` (entries kept 30 days, no count cap) to the state; a companion that
+  updates); do not port `saveState`; an update refuses a state file it cannot read and deletes
+  pruned files only after the save, with tests for both; job files are written through a temp file
+  and a rename, and `runTrackedJob` completes even after a failed progress write (added 2026-10-08); add `closedSessions` (entries kept 30 days, no count cap) to the state; a companion that
   started before a session's `closedAt` cannot create a job for that session (data-model.md)
-- [ ] T026 [P] Port `U/scripts/lib/tracked-jobs.mjs` to `P/scripts/lib/tracked-jobs.mjs`
+- [X] T026 [P] Port `U/scripts/lib/tracked-jobs.mjs` to `P/scripts/lib/tracked-jobs.mjs`
   (`COPILOT_COMPANION_SESSION_ID`, `[copilot]` prefix); `runTrackedJob` writes its start and final
   status through `updateState` and never revives a `cancelled` or missing job (research.md §7,
-  background start order); test that a job cancelled before `runTrackedJob` starts never runs, and
-  that a cancel during a run is not overwritten by the final write
-- [ ] T027 Create `P/scripts/lib/copilot.mjs` with only `getSessionRuntimeStatus`, which always
+  background start order); `createJobProgressUpdater` changes only a job that is still `running`
+  (added 2026-10-08); test in `tests/tracked-jobs.test.mjs` that a job cancelled before
+  `runTrackedJob` starts never runs, and that a cancel during a run is not overwritten by the final
+  write or by a progress write
+- [X] T027 Create `P/scripts/lib/copilot.mjs` with only `getSessionRuntimeStatus`, which always
   returns `mode: "direct"`, `label: "direct startup"`
-- [ ] T028 Port `U/scripts/lib/job-control.mjs` to `P/scripts/lib/job-control.mjs` (import from
+- [X] T028 Port `U/scripts/lib/job-control.mjs` to `P/scripts/lib/job-control.mjs` (import from
   `copilot.mjs`, Copilot text in `inferLegacyJobPhase` and errors)
-- [ ] T029 Port `U/scripts/lib/render.mjs` to `P/scripts/lib/render.mjs` (`copilot --resume=<id>` for
+- [X] T029 Port `U/scripts/lib/render.mjs` to `P/scripts/lib/render.mjs` (`copilot --resume=<id>` for
   write tasks only; read-only jobs show only the session id, with no command; "Copilot session ID", `/copilot:*` hints, `- copilot:` in the setup report)
-- [ ] T030 [P] Port `tests/process.test.mjs`; add tests: `runCommand` never uses a shell; arguments
+- [X] T030 [P] Port `tests/process.test.mjs`; add tests: `runCommand` never uses a shell; arguments
   with spaces, quotes, `&`, `|`, `;`, `$` and `%` reach the child unchanged; a non-zero exit gives
   `formatCommandFailure` text; `terminateProcessTree` kills a child started with `detached: true`
   and its grandchild on macOS and Linux, and a child tree on Windows, including a child spawned with
@@ -139,11 +145,13 @@ setup.
   `resolveLauncher` on Windows (simulated with a temp PATH): an `.exe`, an npm global-package `.cmd`
   shim, `npm.cmd` with `node_modules/npm/bin/npm-cli.js`, an unknown `.cmd` (not found), and paths
   with spaces; `binaryAvailable("npm")` finds npm on Windows with no shell
-- [ ] T031 [P] Port `tests/git.test.mjs`, including a repository path with spaces, and a repository
+- [X] T031 [P] Port `tests/git.test.mjs`, including a repository path with spaces, and a repository
   with a configured `core.fsmonitor` hook and a `textconv` driver: context collection runs neither
   (each would write a marker file); with stale cached file data (a tracked file touched after
-  `git add`), context collection leaves the SHA-256 of `.git/index` unchanged
-- [ ] T032 [P] Port `tests/state.test.mjs` and `tests/render.test.mjs`; add state tests: several
+  `git add`), context collection leaves the SHA-256 of `.git/index` unchanged and does not count
+  that file as unstaged; an untracked symlink to a file outside the repository never puts that
+  file's text in the context, inline or lightweight (added 2026-10-08)
+- [X] T032 [P] Port `tests/state.test.mjs` and `tests/render.test.mjs`; add state tests: several
   processes that add jobs at the same time all keep their job records and logs, and each job can
   still be found for cancel; a lock whose owner `pid` is dead is reclaimed; a lock held by a live
   process stays, however old it is, and the waiting update fails with a clear error after 5 seconds
@@ -152,11 +160,11 @@ setup.
   one live holder in (the reclaim lock serializes them); a reclaim lock with a dead owner gives the
   clear error that names it; with 55 newer finished jobs, an older running job keeps its record and
   log and can still be cancelled
-- [ ] T033 [P] Add `tests/job-control.test.mjs` for job lookup by id and prefix, ambiguous prefixes,
+- [X] T033 [P] Add `tests/job-control.test.mjs` for job lookup by id and prefix, ambiguous prefixes,
   and the "still running" errors
-- [ ] T034 Add the Phase 3 differences (no shell in `runCommand`, the self-collect text) to the
+- [X] T034 Add the Phase 3 differences (no shell in `runCommand`, the self-collect text) to the
   README section
-- [ ] T035 Run `claude plugin validate .` and `node --test tests/*.test.mjs`; both pass
+- [X] T035 Run `claude plugin validate .` and `node --test tests/*.test.mjs`; both pass
 
 **Checkpoint**: shared modules are ported and tested.
 
@@ -258,7 +266,7 @@ after; a write attempt is rejected.
   unknown `verdict`, a finding without `file`) is rejected by `validateReviewOutput`: `parseError` is
   set, the job is `failed`, and the raw output is kept
 - [ ] T050 [P] [US2] Port `tests/commands.test.mjs` for `review.md` and `adversarial-review.md`;
-  check that every `git` command in them has `--no-optional-locks -c core.fsmonitor=false`, and every `git diff` also
+  check that every `git` command in them has `--no-optional-locks -c core.fsmonitor=false -c diff.autoRefreshIndex=false`, and every `git diff` also
   `--no-textconv`
 
 ### Implementation for User Story 2
@@ -279,7 +287,7 @@ after; a write attempt is rejected.
   (`executeReviewRun`, `handleReviewCommand`, `validateNativeReviewRequest`,
   `buildAdversarialReviewPrompt`, `buildReviewJobMetadata`)
 - [ ] T056 [P] [US2] Port `U/commands/review.md` and `U/commands/adversarial-review.md` to
-  `P/commands/`; the size-estimate git commands get `--no-optional-locks -c core.fsmonitor=false`, and the diffs also
+  `P/commands/`; the size-estimate git commands get `--no-optional-locks -c core.fsmonitor=false -c diff.autoRefreshIndex=false`, and the diffs also
   `--no-textconv` (research.md §4b)
 - [ ] T057 [P] [US2] Port `U/skills/codex-result-handling/SKILL.md` to
   `P/skills/copilot-result-handling/SKILL.md`
