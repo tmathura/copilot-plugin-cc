@@ -93,6 +93,9 @@ and the optional Stop-hook review gate. Drop transfer. The first ticket chooses 
   in the user's temp folder (decided 2026-10-09, ticket 5 code review; research.md §2). Rejected
   alternative: a sweep of old patch folders at the next review, which could delete a running
   review's folder.
+- Q: Does a review read an untracked file whose name git quotes, such as one with non-ASCII letters?
+  → A: Yes. The list comes from `git ls-files -z` (decided 2026-10-09, ticket 5 Codex review;
+  research.md §4b). Rejected alternative: upstream's list without `-z`, which skips the file.
 
 ## User Scenarios & Testing *(mandatory)*
 

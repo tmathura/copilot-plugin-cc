@@ -264,6 +264,10 @@ data model, the contracts, the plan and the tasks link here.
   still run, as they do in every `git status` or `git diff` the user runs. They are needed for a
   correct diff. Their commands come from the user's own git config; a cloned repository can only name
   a driver in `.gitattributes`, not define its command.
+- **Untracked file names** (decided 2026-10-09, ticket 5 Codex review round 3): the untracked
+  list comes from `git ls-files -z`. Without `-z`, git quotes a name with non-ASCII letters, tabs or
+  quotes, and the review skips that file as unreadable. Rejected alternative: upstream's list
+  without `-z`.
 - **Untracked symlinks** (decided 2026-10-08, ticket 3 Codex review round 4): the review context
   shows an untracked symlink as `(skipped: symlink)` and never reads its target. Reason: security.
   A link can point outside the repository, for example at a key file, and upstream would put that

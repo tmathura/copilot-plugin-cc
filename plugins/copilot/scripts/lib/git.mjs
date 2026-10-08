@@ -145,7 +145,8 @@ function listUnstagedFiles(cwd) {
 export function getWorkingTreeState(cwd) {
   const staged = gitChecked(cwd, ["diff", "--cached", "--name-only"]).stdout.trim().split("\n").filter(Boolean);
   const unstaged = listUnstagedFiles(cwd);
-  const untracked = gitChecked(cwd, ["ls-files", "--others", "--exclude-standard"]).stdout.trim().split("\n").filter(Boolean);
+  // -z gives the real names: without it git quotes a non-ASCII name, and the file cannot be read.
+  const untracked = gitChecked(cwd, ["ls-files", "-z", "--others", "--exclude-standard"]).stdout.split("\0").filter(Boolean);
 
   return {
     staged,
