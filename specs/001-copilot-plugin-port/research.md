@@ -318,6 +318,12 @@ Later tickets apply these rules. The call-site map uses them.
 - **Gate context folder**: the gate hook writes the patch folder (§2) and passes it to the companion
   with the internal `task` option `--context-dir <path>`. The adapter turns it into `--add-dir`. The
   hook removes the folder in a `finally` step, after success, failure or a timeout kill.
+- **Background start order** (decided 2026-10-08, after Copilot PR review): `enqueueBackgroundTask`
+  writes the `queued` job record, with its stored request, before it starts the worker. Then it
+  stores the worker's `pid` through `updateState`, only if the job is still `queued`, so it never
+  overwrites a worker that has already moved the job on. Reason: correctness. Upstream starts the
+  worker first; a worker that reads the job record before it exists exits at once, and the job stays
+  `queued` forever. Rejected alternative: upstream's order, kept for parity.
 - **Hook time budgets**: Claude Code stops a hook at its `hooks.json` timeout (`Stop` 900 s,
   `SessionEnd` 5 s, as upstream), and then no cleanup runs. So each hook does its work inside a
   smaller budget.

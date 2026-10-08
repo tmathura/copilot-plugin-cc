@@ -309,7 +309,9 @@ cancel a second task; its process tree is gone.
   `copilotPid`); a Copilot child that ignores `SIGTERM` is gone within 10 seconds;
   `status --wait --timeout-ms` returns `waitTimedOut` for a job that
   keeps running; jobs are filtered by `COPILOT_COMPANION_SESSION_ID`; with `GH_TOKEN` set to a
-  marker value, no state, job or log file contains the marker
+  marker value, no state, job or log file contains the marker; with a spawn stub that runs the worker
+  to completion before `enqueueBackgroundTask` continues, the job ends `completed`, not `queued`, and
+  the late `pid` write does not overwrite that status
 - [ ] T062 [P] [US3] Port the `rescue.md` checks in `tests/commands.test.mjs`
 
 ### Implementation for User Stories 3 and 4
@@ -318,7 +320,9 @@ cancel a second task; its process tree is gone.
   in the plugin state with the same `write` value), `buildPersistentTaskThreadName`, `DEFAULT_CONTINUE_PROMPT` and
   `interruptPromptModeTurn` (not attempted) to `P/scripts/lib/copilot.mjs`
 - [ ] T064 [US3] Add `task`, `task-worker` and `task-resume-candidate` to
-  `P/scripts/copilot-companion.mjs` (`MODEL_ALIASES` empty, `VALID_REASONING_EFFORTS` as upstream)
+  `P/scripts/copilot-companion.mjs` (`MODEL_ALIASES` empty, `VALID_REASONING_EFFORTS` as upstream);
+  `enqueueBackgroundTask` writes the `queued` record before it starts the worker, and stores the
+  worker's `pid` only if the job is still `queued` (research.md §7, background start order)
 - [ ] T065 [US4] Add `status`, `result` and `cancel` to `P/scripts/copilot-companion.mjs`; record
   `copilotPid` when a run starts, and stop it on cancel (research.md §7, stopping a job)
 - [ ] T066 [P] [US3] Port `U/commands/rescue.md` to `P/commands/rescue.md` (no `spark`)
