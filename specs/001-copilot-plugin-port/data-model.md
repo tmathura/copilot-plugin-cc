@@ -27,7 +27,10 @@ added 2026-10-08).
 ## Job
 
 A summary lives in `state.json`. The full record lives in `jobs/<id>.json`, and the log in
-`jobs/<id>.log`.
+`jobs/<id>.log`. A review above the inline limit also has `jobs/<id>.patches/` while it runs:
+`staged.patch`, `unstaged.patch` and `untracked.md` for a working tree, or `branch.patch` for a
+branch. The review deletes it at the end, and removing the job record deletes it too (research §2;
+added 2026-10-09, PR review).
 
 | Field | Type | Notes |
 | --- | --- | --- |

@@ -14,6 +14,7 @@ import {
   listJobs,
   loadState,
   resolveJobFile,
+  resolveJobPatchDir,
   resolveJobLogFile,
   resolveStateDir,
   resolveStateFile,
@@ -122,6 +123,12 @@ test("updateState prunes dropped job artifacts when indexed jobs exceed the cap"
     };
   });
 
+  // A review patch folder left by a killed review goes with its job.
+  for (const jobId of ["job-0", "job-50"]) {
+    fs.mkdirSync(resolveJobPatchDir(workspace, jobId));
+    fs.writeFileSync(path.join(resolveJobPatchDir(workspace, jobId), "staged.patch"), "patch\n", "utf8");
+  }
+
   fs.writeFileSync(
     stateFile,
     `${JSON.stringify(
@@ -156,9 +163,10 @@ test("updateState prunes dropped job artifacts when indexed jobs exceed the cap"
   );
   assert.deepEqual(
     fs.readdirSync(jobsDir).sort(),
-    Array.from({ length: 50 }, (_, index) => `job-${index + 1}`)
-      .flatMap((jobId) => [`${jobId}.json`, `${jobId}.log`])
-      .sort()
+    [
+      ...Array.from({ length: 50 }, (_, index) => `job-${index + 1}`).flatMap((jobId) => [`${jobId}.json`, `${jobId}.log`]),
+      "job-50.patches"
+    ].sort()
   );
 });
 

@@ -69,9 +69,9 @@ claude plugin install copilot@tmathura-copilot
 - A review reads an untracked file whose name has non-ASCII letters. Codex skips it, because git
   quotes the name.
 - For a large diff, Codex runs read-only `git` commands itself. Copilot's reviews have no shell, so
-  the plugin writes the exact patches to a new folder, lets Copilot read that folder
-  (`--add-dir`), and deletes the folder after the review. If the review is killed outright
-  (`SIGKILL`, or `taskkill /F` on Windows), the folder stays in your own temp folder.
+  the plugin writes the exact patches to a folder in its own job storage, lets Copilot read that
+  folder (`--add-dir`), and deletes the folder after the review. If the review is killed outright
+  (`SIGKILL`, or `taskkill /F` on Windows), the folder stays until its job record is removed.
 - `/copilot:review` sends Copilot's `/review` command with the diff in the prompt. Codex uses its
   built-in reviewer, which collects the diff itself. Copilot's `/review` collects the diff with
   `git` in a shell, and reviews have no shell.

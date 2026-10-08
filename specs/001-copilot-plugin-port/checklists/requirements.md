@@ -34,3 +34,5 @@
 - The product is a CLI plugin, so command names, flags, Node 22 and the marketplace commands are the
   user-facing contract, not implementation details. They come from the constitution.
 - FR-031 was resolved: port `gpt-5-4-prompting` with the same name.
+- FR-017 holds for reviews above the inline limit: their patch folder is a job file in the plugin's
+  job storage, outside the repository (research.md §2, 2026-10-09).

@@ -22,11 +22,10 @@ import {
   UPDATE_HINT,
   validateReviewOutput
 } from "./lib/copilot.mjs";
-import { createTempDir } from "./lib/fs.mjs";
 import { collectReviewContext, ensureGitRepository, resolveReviewTarget, writeReviewPatches } from "./lib/git.mjs";
 import { binaryAvailable } from "./lib/process.mjs";
 import { loadPromptTemplate, interpolateTemplate } from "./lib/prompts.mjs";
-import { generateJobId, getConfig, setConfig } from "./lib/state.mjs";
+import { generateJobId, getConfig, resolveJobPatchDir, setConfig } from "./lib/state.mjs";
 import {
   createJobLogFile,
   createJobProgressUpdater,
@@ -39,6 +38,7 @@ import { renderNativeReviewResult, renderReviewResult, renderSetupReport } from 
 
 const ROOT_DIR = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const REVIEW_SCHEMA = path.join(ROOT_DIR, "schemas", "review-output.schema.json");
+const SIGNAL_EXIT_CODES = { SIGINT: 130, SIGTERM: 143 };
 
 function printUsage() {
   console.log(
@@ -196,22 +196,32 @@ function validateNativeReviewRequest(target, focusText) {
 }
 
 // Copilot has no shell in a review, so above the inline limit it reads the exact patches from a folder
-// that only this run can see. The folder is removed after the run, whatever the outcome.
-async function withReviewPatches(context, run) {
+// in the job's own storage. The folder is removed after the run, whatever the outcome.
+async function withReviewPatches(context, request, run) {
   if (context.inputMode !== "self-collect") {
     return run({ reviewInput: context.content, addDirs: [] });
   }
 
-  const patchDir = createTempDir("copilot-review-");
+  const patchDir = resolveJobPatchDir(request.workspaceRoot, request.jobId);
+  fs.mkdirSync(patchDir, { mode: 0o700 });
   const removePatchDir = () => fs.rmSync(patchDir, { recursive: true, force: true });
-  // A companion stopped with SIGTERM or SIGINT exits from its signal handler, where finally does not run.
-  process.once("exit", removePatchDir);
+  // A stopped companion exits from a signal handler, where finally does not run. While Copilot or its
+  // version check runs, prompt-mode's handler stops it and exits; before that, nothing else would.
+  const onSignal = (signal) => {
+    removePatchDir();
+    if (process.listenerCount(signal) === 1) {
+      process.exit(SIGNAL_EXIT_CODES[signal]);
+    }
+  };
+  process.on("SIGTERM", onSignal);
+  process.on("SIGINT", onSignal);
   try {
     const files = writeReviewPatches(context, patchDir);
     const reviewInput = [context.content.trimEnd(), "", "## Patch Files", "", ...files.map((file) => `- ${file}`), ""].join("\n");
     return await run({ reviewInput, addDirs: [patchDir] });
   } finally {
-    process.off("exit", removePatchDir);
+    process.off("SIGTERM", onSignal);
+    process.off("SIGINT", onSignal);
     removePatchDir();
   }
 }
@@ -234,7 +244,7 @@ async function executeReviewRun(request) {
   if (reviewName === "Review") {
     validateNativeReviewRequest(target, focusText);
     const context = collectReviewContext(request.cwd, target);
-    const result = await withReviewPatches(context, ({ reviewInput, addDirs }) =>
+    const result = await withReviewPatches(context, request, ({ reviewInput, addDirs }) =>
       runPromptModeReview(context.repoRoot, {
         prompt: buildNativeReviewPrompt(context, reviewInput),
         addDirs,
@@ -279,7 +289,7 @@ async function executeReviewRun(request) {
 
   const context = collectReviewContext(request.cwd, target);
   const schema = readOutputSchema(REVIEW_SCHEMA);
-  const result = await withReviewPatches(context, ({ reviewInput, addDirs }) =>
+  const result = await withReviewPatches(context, request, ({ reviewInput, addDirs }) =>
     runPromptModeTurn(context.repoRoot, {
       prompt: buildAdversarialReviewPrompt(context, focusText, reviewInput, schema),
       addDirs,
@@ -432,6 +442,8 @@ async function handleReviewCommand(argv, config) {
         model: options.model,
         focusText,
         reviewName: config.reviewName,
+        workspaceRoot,
+        jobId: job.id,
         onProgress: progress
       }),
     { json: options.json }

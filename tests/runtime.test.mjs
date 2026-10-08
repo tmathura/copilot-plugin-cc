@@ -569,11 +569,30 @@ test("above the inline limit, a working-tree review reads the exact patches from
   assert.deepEqual(snapshot(repo), before);
 });
 
+// The patch folders under the plugin data folder: jobs/<job id>.patches.
+function findPatchDirs(dataDir) {
+  const stateRoot = path.join(dataDir, "state");
+  if (!fs.existsSync(stateRoot)) {
+    return [];
+  }
+  return fs.readdirSync(stateRoot).flatMap((workspace) => {
+    const jobsDir = path.join(stateRoot, workspace, "jobs");
+    return fs.existsSync(jobsDir)
+      ? fs.readdirSync(jobsDir).filter((name) => name.endsWith(".patches")).map((name) => path.join(jobsDir, name))
+      : [];
+  });
+}
+
 test(
-  "a review stopped with SIGTERM or SIGINT removes its patch folder",
+  "a review stopped with SIGTERM or SIGINT removes its patch folder, before or while Copilot runs",
   { skip: process.platform === "win32" && "Windows stops the tree with taskkill /T" },
   async () => {
-    for (const signal of ["SIGTERM", "SIGINT"]) {
+    for (const [behavior, signal, exitCode] of [
+      ["hang", "SIGTERM", 143],
+      ["hang", "SIGINT", 130],
+      ["hang-version", "SIGTERM", 143],
+      ["hang-version", "SIGINT", 130]
+    ]) {
       const repo = makeTempDir();
       initGitRepo(repo);
       for (const name of ["a.txt", "b.txt", "c.txt"]) {
@@ -585,21 +604,28 @@ test(
         writeFile(repo, name, `${name} v2\n`);
       }
       const binDir = makeTempDir();
-      const { recordPath } = installFakeCopilot(binDir, "hang");
+      const dataDir = makeTempDir();
+      const { recordPath } = installFakeCopilot(binDir, behavior);
       const companion = spawn(process.execPath, [SCRIPT, "adversarial-review"], {
         cwd: repo,
-        env: buildEnv(binDir, { CLAUDE_PLUGIN_DATA: makeTempDir() }),
+        env: buildEnv(binDir, { CLAUDE_PLUGIN_DATA: dataDir }),
         stdio: "ignore"
       });
-      const exited = new Promise((resolve) => companion.on("exit", resolve));
-      await waitFor(() => readFakeCopilotRuns(recordPath).length > 0);
-      const [patchDir] = addDirsOf(readFakeCopilotRuns(recordPath)[0]);
-      assert.ok(fs.existsSync(patchDir), signal);
+      const exited = new Promise((resolve) => companion.on("exit", (code) => resolve(code)));
+      // A stop that does not work must fail the test, not hang it.
+      const fallback = setTimeout(() => companion.kill("SIGKILL"), 15000);
+      await waitFor(() =>
+        behavior === "hang" ? readFakeCopilotRuns(recordPath).length > 0 : readFakeVersionPids(binDir).length > 0
+      );
+      const label = `${behavior} ${signal}`;
+      assert.equal(findPatchDirs(dataDir).length, 1, label);
 
       companion.kill(signal);
-      await exited;
+      const code = await exited;
+      clearTimeout(fallback);
 
-      assert.equal(fs.existsSync(patchDir), false, signal);
+      assert.equal(code, exitCode, label);
+      assert.deepEqual(findPatchDirs(dataDir), [], label);
     }
   }
 );

@@ -283,7 +283,8 @@ after; a write attempt is rejected.
   `inputMode: "self-collect"`, write the exact patches (staged, unstaged and untracked for a working
   tree; the merge-base range for a branch) to a new folder for the run, pass it with `--add-dir`
   through the adapter, name the files in the prompt, and delete the folder after the run (and when
-  the companion is stopped with `SIGTERM` or `SIGINT`; added 2026-10-09, research §2)
+  the companion is stopped with `SIGTERM` or `SIGINT`; the folder is the job's `jobs/<id>.patches`,
+  and removing the job record removes it; added 2026-10-09, research §2)
 - [X] T054 [US2] Add `runPromptModeReview`, `parseStructuredOutput` (code fence), `readOutputSchema`
   and `validateReviewOutput` (the schema keywords in research.md §7; a failure sets `parseError` and
   fails the job) to `P/scripts/lib/copilot.mjs`

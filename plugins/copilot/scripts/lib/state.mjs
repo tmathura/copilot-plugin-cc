@@ -1,6 +1,7 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): the fallback state root is in the home folder;
 // updateState holds a lock file and writes through a rename; saveState is removed, so no writer saves
-// an earlier snapshot; pruning keeps every active job; state records closed Claude sessions.
+// an earlier snapshot; pruning keeps every active job and also removes a job's review patch folder;
+// state records closed Claude sessions.
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -312,6 +313,7 @@ export function updateState(cwd, mutate, options = {}) {
       try {
         removeJobFile(resolveJobFile(cwd, job.id));
         removeFileIfExists(job.logFile);
+        fs.rmSync(resolveJobPatchDir(cwd, job.id), { recursive: true, force: true });
       } catch {
         // The update is saved; a file that cannot be removed now is only left behind.
       }
@@ -411,4 +413,10 @@ export function resolveJobLogFile(cwd, jobId) {
 export function resolveJobFile(cwd, jobId) {
   ensureStateDir(cwd);
   return path.join(resolveJobsDir(cwd), `${jobId}.json`);
+}
+
+// A review above the inline limit keeps its patches here while it runs.
+export function resolveJobPatchDir(cwd, jobId) {
+  ensureStateDir(cwd);
+  return path.join(resolveJobsDir(cwd), `${jobId}.patches`);
 }
