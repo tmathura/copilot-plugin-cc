@@ -239,7 +239,7 @@ Later tickets apply these rules. The call-site map uses them.
 - **Exit after `result`**: the `result` event ends the run. If the process has not exited 5 seconds
   later, the helper kills the process tree and keeps the result. The `result` event decides success;
   the forced exit does not. There is no other run deadline,
-  as upstream has none; cancel and the review gate's 15-minute limit stop long runs.
+  as upstream has none; cancel and the review gate's 840 s limit stop long runs.
 - **Structured output**: prompt mode has no output schema setting, unlike Codex `turn/start`
   (`outputSchema`). The adversarial-review prompt puts the schema text in the prompt.
   `parseStructuredOutput` also accepts JSON inside one surrounding code fence. Then
@@ -293,6 +293,14 @@ Later tickets apply these rules. The call-site map uses them.
 - **Gate context folder**: the gate hook writes the patch folder (§2) and passes it to the companion
   with the internal `task` option `--context-dir <path>`. The adapter turns it into `--add-dir`. The
   hook removes the folder in a `finally` step, after success, failure or a timeout kill.
+- **Hook time budgets**: Claude Code stops a hook at its `hooks.json` timeout (`Stop` 900 s,
+  `SessionEnd` 5 s, as upstream), and then no cleanup runs. So each hook does its work inside a
+  smaller budget.
+  - `Stop`: the gate's run limit is 840 s (upstream: 900 s). The other 60 s cover collecting the
+    context, the kill wait, removing the patch folder and printing the decision.
+  - `SessionEnd`: it sends `SIGTERM` to the `pid` and `copilotPid` of every running job of the
+    session first, then waits once, up to 2 s in total, then sends `SIGKILL` to what is still alive,
+    then prunes the jobs. It never waits per job.
 
 ## 8. Effect on the ticket split
 

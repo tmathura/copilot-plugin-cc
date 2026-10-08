@@ -334,12 +334,16 @@ and to `BLOCK`.
   `BLOCK:`; gate lets Claude stop on `ALLOW:`; an unexpected answer blocks with upstream's message; a
   missing Copilot gives a setup note and does not block; the gate run uses the read-only profile; a
   gate run past its time limit blocks with upstream's timeout message, and the companion, the fake
-  Copilot and their child processes are gone afterwards (the 15-minute limit is passed in through an
+  Copilot and their child processes are gone afterwards (the 840 s limit is passed in through an
   option, so the test can use a short one); a 100 KB last Claude message reaches the companion on
   stdin and the gate runs; the gate prompt holds the working-tree context, and above the inline
   limit the patch folder reaches Copilot as `--add-dir` through `--context-dir`, and is removed after
-  success, failure and a timeout; `SessionStart` writes `COPILOT_COMPANION_SESSION_ID` to `CLAUDE_ENV_FILE`; `SessionEnd` kills and
-  removes the session's running jobs
+  success, failure and a timeout; with the run limit and the hook timeout both shortened in the
+  test, a run past the limit still prints the `BLOCK` decision and removes the folder before the hook
+  timeout; `SessionStart` writes `COPILOT_COMPANION_SESSION_ID` to `CLAUDE_ENV_FILE`; `SessionEnd`
+  stops and removes the session's running jobs, finishing within its 5 s timeout with three running
+  jobs, and also stops a job's Copilot process and its child when the job's companion is already
+  dead
 
 ### Implementation for User Story 5
 
@@ -350,10 +354,13 @@ and to `BLOCK`.
   collect the working-tree context with `collectReviewContext` (and the patch folder above the
   inline limit, as T053b) and put it in the prompt; pass the patch folder with the internal
   `task --context-dir <path>` option and remove it in a `finally` step; send the prompt to
-  `task --json` on stdin, not as an argument; start the companion with `detached: true` on macOS and Linux, and on the time limit
-  kill its process tree with `terminateProcessTree`
+  `task --json` on stdin, not as an argument; use an 840 s run limit (research.md §7, hook time
+  budgets); start the companion with `detached: true` on macOS and Linux, and on the time limit kill
+  its process tree with `terminateProcessTree`
 - [ ] T077 [US5] Port `U/scripts/session-lifecycle-hook.mjs` to `P/scripts/session-lifecycle-hook.mjs`
-  (no broker, no transcript path)
+  (no broker, no transcript path). `SessionEnd` signals the `pid` and `copilotPid` of every running
+  job first, waits once (up to 2 s), sends `SIGKILL` to survivors, then prunes (research.md §7, hook
+  time budgets)
 - [ ] T078 [US5] Add the Phase 7 differences to the README section
 - [ ] T079 [US5] Run `claude plugin validate .`, `npm run build` and `node --test tests/*.test.mjs`;
   all pass

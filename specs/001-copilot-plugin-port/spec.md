@@ -174,7 +174,7 @@ the matching function names in it.
   error lines, and does not guess.
 - Copilot exits with a non-zero code. The plugin reports the failure and stops.
 - A run keeps going for a long time. Like upstream, there is no general deadline: the user cancels
-  it, and the review gate stops after 15 minutes. A process that sends its final event but does not
+  it, and the review gate stops after 14 minutes (840 s). A process that sends its final event but does not
   exit is killed after a short grace period.
 - The user cancels a job whose process has already ended. Cancel reports the true state.
 - There is nothing to review. The command says so only when the chosen scope is really empty,
