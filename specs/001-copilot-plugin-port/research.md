@@ -242,6 +242,11 @@ data model, the contracts, the plan and the tasks link here.
   still run, as they do in every `git status` or `git diff` the user runs. They are needed for a
   correct diff. Their commands come from the user's own git config; a cloned repository can only name
   a driver in `.gitattributes`, not define its command.
+- **Untracked symlinks** (decided 2026-10-08, ticket 3 Codex review round 4): the review context
+  shows an untracked symlink as `(skipped: symlink)` and never reads its target. Reason: security.
+  A link can point outside the repository, for example at a key file, and upstream would put that
+  file's text in the prompt before any Copilot control applies. A broken link keeps upstream's
+  text. Rejected alternative: upstream, which follows the link.
 - **Limit (submodules)**, found in the ticket 3 code review (2026-10-08): `--submodule=diff` makes git
   start a second `git diff` inside each changed submodule. Command-line flags such as `--no-textconv`
   and `--no-ext-diff` do not reach it (the `-c` options do), so a textconv program set in the user's

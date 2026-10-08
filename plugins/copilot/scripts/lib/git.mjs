@@ -1,5 +1,6 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): every git call writes no index and starts no
-// fsmonitor hook or textconv program; the self-collect guidance points Copilot at patch files.
+// fsmonitor hook or textconv program; untracked symlinks are not read; the self-collect guidance
+// points Copilot at patch files.
 import fs from "node:fs";
 import path from "node:path";
 
@@ -223,6 +224,10 @@ function formatUntrackedFile(cwd, relativePath) {
     stat = fs.statSync(absolutePath);
   } catch {
     return `### ${relativePath}\n(skipped: broken symlink or unreadable file)`;
+  }
+  // A link can point outside the repository, for example at a key file.
+  if (fs.lstatSync(absolutePath).isSymbolicLink()) {
+    return `### ${relativePath}\n(skipped: symlink)`;
   }
   if (stat.isDirectory()) {
     return `### ${relativePath}\n(skipped: directory)`;

@@ -62,6 +62,8 @@ claude plugin install copilot@tmathura-copilot
   the repo as it was, and nothing controls these programs once git starts them. Clean filters, such
   as Git LFS, still run, as in any `git diff`. So does a `textconv` program that your own git config
   sets for a changed submodule, because git starts the submodule's diff itself.
+- A review does not read the target of an untracked symlink. The link can point outside the repo,
+  for example at a key file. Codex puts the target's text in the prompt.
 - For a large diff, Codex runs read-only `git` commands itself. Copilot's reviews have no shell, so
   the plugin will write the patches to files that Copilot reads.
 - Job state lives in `~/.copilot-companion/state` when Claude Code does not give a plugin data

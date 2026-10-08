@@ -58,6 +58,9 @@ and the optional Stop-hook review gate. Drop transfer. The first ticket chooses 
   over the file and deletes first (research.md §7, locked state updates). Job files are written
   through a temp file and a rename too, so a failed write keeps the old record (Codex review round
   2).
+- Q: Does the review context read the target of an untracked symlink? → A: No. It shows
+  `(skipped: symlink)`, because the target can be outside the repository (decided 2026-10-08,
+  ticket 3 Codex review). Rejected alternative: upstream, which follows the link (research.md §4b).
 - Q: Does a review start a textconv program for a changed submodule? → A: It can, if the user's own
   git config sets one: git starts the submodule diff itself and does not pass `--no-textconv`.
   Kept as a documented limit (decided 2026-10-08, ticket 3 code review; research.md §4b).

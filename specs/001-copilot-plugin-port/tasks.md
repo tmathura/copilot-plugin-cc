@@ -112,8 +112,8 @@ setup.
 - [X] T024 Port `U/scripts/lib/git.mjs` to `P/scripts/lib/git.mjs`; change the self-collect guidance
   in `buildAdversarialCollectionGuidance` to "Read the patch files listed below with the view tool"
   (research.md §2, self-collect); pass `--no-optional-locks -c core.fsmonitor=false -c diff.autoRefreshIndex=false` to every git call and `--no-textconv`
-  to every `git diff`, and list unstaged files with `git diff --numstat --no-renames` (research.md §4b; changed
-  2026-10-08)
+  to every `git diff`, and list unstaged files with `git diff --numstat --no-renames`; never read the
+  target of an untracked symlink (research.md §4b; changed 2026-10-08)
 - [X] T025 [P] Port `U/scripts/lib/state.mjs` to `P/scripts/lib/state.mjs` (fallback root
   `~/.copilot-companion/state`, never the shared temp folder; test that the fallback is under the
   home folder); keep `MAX_JOBS = 50` for finished jobs and never prune a queued or
@@ -149,7 +149,8 @@ setup.
   with a configured `core.fsmonitor` hook and a `textconv` driver: context collection runs neither
   (each would write a marker file); with stale cached file data (a tracked file touched after
   `git add`), context collection leaves the SHA-256 of `.git/index` unchanged and does not count
-  that file as unstaged (added 2026-10-08)
+  that file as unstaged; an untracked symlink to a file outside the repository never puts that
+  file's text in the context, inline or lightweight (added 2026-10-08)
 - [X] T032 [P] Port `tests/state.test.mjs` and `tests/render.test.mjs`; add state tests: several
   processes that add jobs at the same time all keep their job records and logs, and each job can
   still be found for cancel; a lock whose owner `pid` is dead is reclaimed; a lock held by a live
