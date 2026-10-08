@@ -1,0 +1,29 @@
+Copyright 2026 OpenAI
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+copilot-plugin-cc, by tmathura, is a port of codex-plugin-cc
+(https://github.com/openai/codex-plugin-cc).
+
+Changes
+
+Changed .mjs files say so in a comment at the top. The other changed files
+are listed below. Each was changed from upstream codex-plugin-cc to use
+GitHub Copilot instead of Codex:
+
+- .claude-plugin/marketplace.json
+- .github/workflows/pull-request-ci.yml
+- package.json
+- package-lock.json
+
+The plugin folder has its own NOTICE for the files in it.

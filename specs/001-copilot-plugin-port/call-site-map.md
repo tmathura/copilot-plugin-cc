@@ -171,7 +171,7 @@ repo root.
 | Upstream place | What it does with Codex | Copilot match | Ticket |
 | --- | --- | --- | --- |
 | `tests/fake-codex-fixture.mjs` | Fake `codex` binary that speaks the app-server protocol | `tests/fake-copilot-fixture.mjs`. Ticket 2: `--version` and `--help` only. Ticket 4: prompt mode, which reads the prompt on stdin, records its arguments and environment, and prints JSON events, with the failure modes of Principle VI | 2, 4 |
-| `tests/helpers.mjs` | Temp folders and git repos | Rename only | 2 |
+| `tests/helpers.mjs` | Temp folders and git repos; `run()` uses a shell on Windows | Renamed, and `run()` never uses a shell (§4, test helper; decided 2026-10-08) | 2 |
 | `tests/bump-version.test.mjs` | Version script | Rename only | 2 |
 | `tests/process.test.mjs`, `tests/git.test.mjs`, `tests/state.test.mjs`, `tests/render.test.mjs` | Shared modules | Rename only, plus tests for no shell, and for spaces and shell characters in arguments | 3 |
 | `tests/runtime.test.mjs` | End-to-end companion runs against the fake | Split by ticket: setup (4), reviews (5), tasks and jobs (6), hooks (7) | 4 to 7 |
