@@ -10,7 +10,7 @@ import {
   getCopilotAvailability,
   runPromptModeTurn
 } from "../plugins/copilot/scripts/lib/copilot.mjs";
-import { buildEnv, installFakeCopilot, readFakeCopilotRuns } from "./fake-copilot-fixture.mjs";
+import { buildEnv, installFakeCopilot, readFakeCopilotRuns, readFakeVersionPids } from "./fake-copilot-fixture.mjs";
 import { makeTempDir } from "./helpers.mjs";
 
 const ALLOW_ALL_FLAGS = ["--allow-all-tools", "--allow-all", "--yolo", "--allow-all-paths"];
@@ -148,7 +148,7 @@ test("a version check that does not answer is stopped at its time limit, with th
     detail: "copilot --version did not answer within 0.5 seconds",
     version: null
   });
-  const pids = JSON.parse(fs.readFileSync(path.join(binDir, "fake-copilot-pids.json"), "utf8"));
+  const pids = readFakeVersionPids(binDir).flat();
   await waitFor(() => pids.every((pid) => !isAlive(pid)));
 });
 

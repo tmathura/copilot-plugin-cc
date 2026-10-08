@@ -7,7 +7,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 
-import { buildEnv, installFakeCopilot, readFakeCopilotRuns } from "./fake-copilot-fixture.mjs";
+import { buildEnv, installFakeCopilot, readFakeCopilotRuns, readFakeVersionPids } from "./fake-copilot-fixture.mjs";
 import { makeTempDir, run } from "./helpers.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -113,26 +113,27 @@ test(
 );
 
 test(
-  "a companion stopped during a stalled version check stops the whole check",
+  "a companion stopped during a stalled version check stops it and starts no other check",
   { skip: process.platform === "win32" && "Windows stops the tree with taskkill /T" },
   async () => {
     for (const [signal, exitCode] of [["SIGTERM", 143], ["SIGINT", 130]]) {
       const binDir = makeTempDir();
       installFakeCopilot(binDir, "hang-version");
-      const pidsPath = path.join(binDir, "fake-copilot-pids.json");
       const companion = spawn(process.execPath, [SCRIPT, "setup", "--json"], {
         cwd: makeTempDir(),
         env: buildEnv(binDir, { CLAUDE_PLUGIN_DATA: makeTempDir() }),
         stdio: "ignore"
       });
       const exited = new Promise((resolve) => companion.on("exit", (code) => resolve(code)));
-      await waitFor(() => fs.existsSync(pidsPath) && fs.readFileSync(pidsPath, "utf8"));
-      const pids = JSON.parse(fs.readFileSync(pidsPath, "utf8"));
+      await waitFor(() => readFakeVersionPids(binDir).length > 0);
 
       companion.kill(signal);
 
       assert.equal(await exited, exitCode, signal);
-      await waitFor(() => pids.every((pid) => !isAlive(pid)));
+      // Setup runs a second check after the first; a check that starts during the stop would leak.
+      const checks = readFakeVersionPids(binDir);
+      assert.equal(checks.length, 1, signal);
+      await waitFor(() => checks.flat().every((pid) => !isAlive(pid)));
     }
   }
 );

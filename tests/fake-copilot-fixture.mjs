@@ -41,14 +41,14 @@ const { spawn } = require("node:child_process");
 
 const BEHAVIOR = process.env.FAKE_COPILOT_BEHAVIOR || ${JSON.stringify(behavior)};
 const RECORD_PATH = ${JSON.stringify(recordPath)};
-const PIDS_PATH = ${JSON.stringify(path.join(binDir, "fake-copilot-pids.json"))};
+const PIDS_PATH = ${JSON.stringify(path.join(binDir, "fake-copilot-pids.jsonl"))};
 const NOT_LOGGED_IN_STDERR = ${JSON.stringify(NOT_LOGGED_IN_STDERR)};
 
 const args = process.argv.slice(2);
 if (args.includes("--version") && BEHAVIOR === "hang-version") {
   // Like the npm loader: a native child that inherits the pipes, and both stall.
   const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "inherit" });
-  fs.writeFileSync(PIDS_PATH, JSON.stringify([process.pid, child.pid]));
+  fs.appendFileSync(PIDS_PATH, JSON.stringify([process.pid, child.pid]) + "\\n");
   setInterval(() => {}, 1000);
   return;
 }
@@ -166,6 +166,19 @@ process.stdin.on("end", () => {
   }
 
   return { scriptPath, recordPath };
+}
+
+// One [probe pid, child pid] pair for each hang-version check that started.
+export function readFakeVersionPids(binDir) {
+  const pidsPath = path.join(binDir, "fake-copilot-pids.jsonl");
+  if (!fs.existsSync(pidsPath)) {
+    return [];
+  }
+  return fs
+    .readFileSync(pidsPath, "utf8")
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
 }
 
 export function readFakeCopilotRuns(recordPath) {

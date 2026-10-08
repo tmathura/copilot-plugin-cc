@@ -17,10 +17,15 @@ import { terminateProcessTree } from "./process.mjs";
 const DEFAULT_RESULT_GRACE_MS = 5000;
 const SIGNAL_EXIT_CODES = { SIGINT: 130, SIGTERM: 143 };
 
-const liveClients = new Set();
+const STOPPING_ERROR = "The companion is stopping, so Copilot was not started.";
 
-// A companion that is stopped must not leave its Copilot process group running.
+const liveClients = new Set();
+let shuttingDown = false;
+
+// A companion that is stopped must not leave its Copilot process group running. The caller may go on
+// to start another process while the stop waits, so nothing new starts after the first signal.
 function stopLiveClientsAndExit(signal) {
+  shuttingDown = true;
   const stops = [...liveClients].map((client) => client.close().catch(() => {}));
   Promise.all(stops).finally(() => process.exit(SIGNAL_EXIT_CODES[signal] ?? 1));
 }
@@ -34,7 +39,9 @@ function trackClient(client) {
 }
 
 function untrackClient(client) {
-  liveClients.delete(client);
+  if (!liveClients.delete(client)) {
+    return;
+  }
   if (liveClients.size === 0) {
     process.off("SIGTERM", stopLiveClientsAndExit);
     process.off("SIGINT", stopLiveClientsAndExit);
@@ -45,6 +52,17 @@ function untrackClient(client) {
 // SIGINT as a run. The npm loader runs the native binary with inherited pipes, so the limit stops the
 // whole tree; killing the loader alone would leave the pipes open.
 export function runShortCommand(cwd, options) {
+  if (shuttingDown) {
+    return Promise.resolve({
+      exitCode: null,
+      signal: null,
+      error: new Error(STOPPING_ERROR),
+      stdout: "",
+      stderr: "",
+      timedOut: false
+    });
+  }
+
   return new Promise((resolve) => {
     const child = spawn(options.command, options.args, {
       cwd,
@@ -138,6 +156,10 @@ export class CopilotPromptModeClient {
   }
 
   spawn() {
+    if (shuttingDown) {
+      this.finish({ exitCode: null, signal: null, error: new Error(STOPPING_ERROR) });
+      return;
+    }
     this.proc = spawn(this.options.command, this.options.args, {
       cwd: this.cwd,
       env: this.options.env ?? process.env,
