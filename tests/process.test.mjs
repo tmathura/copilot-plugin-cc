@@ -214,6 +214,22 @@ test("terminateProcessTree signals the process itself when it leads no group", a
   assert.equal(outcome.method, "process");
 });
 
+test("terminateProcessTree reports a group it is not allowed to signal", async () => {
+  const calls = [];
+
+  await assert.rejects(
+    terminateProcessTree(1234, {
+      platform: "linux",
+      killImpl(target, signal) {
+        calls.push([target, signal]);
+        throw Object.assign(new Error("operation not permitted"), { code: "EPERM" });
+      }
+    }),
+    /operation not permitted/
+  );
+  assert.deepEqual(calls, [[-1234, "SIGTERM"]]);
+});
+
 test("terminateProcessTree reports a process that is already gone", async () => {
   const outcome = await terminateProcessTree(1234, {
     platform: "linux",

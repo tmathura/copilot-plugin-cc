@@ -365,7 +365,9 @@ Later tickets apply these rules. The call-site map uses them.
 - **Stopping a job**: `terminateProcessTree` changes in two ways (correctness, spec SC-007).
   - If the group signal finds no group (`ESRCH`), it signals the process itself. A companion that
     Claude's Bash tool started (a foreground or Bash-background review) is not a group leader, and
-    upstream returns without signalling it.
+    upstream returns without signalling it. Any other group signal error (such as `EPERM`, which
+    means no process in the group could be signalled) is thrown, not hidden (added 2026-10-08, PR
+    review; upstream then tries the process and can report "not delivered" instead).
   - It waits up to 5 seconds (an option, so tests can use less). If the process or its group is
     still alive, it sends `SIGKILL` to it. Windows already uses `taskkill /T /F`.
   - A pid that is not a positive integer is never signalled: `kill(0)` would signal the caller's own

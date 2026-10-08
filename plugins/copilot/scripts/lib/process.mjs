@@ -198,8 +198,12 @@ export async function terminateProcessTree(pid, options = {}) {
   let method = "process-group";
   try {
     killImpl(-pid, "SIGTERM");
-  } catch {
-    // A process that Claude's Bash tool started leads no group (ESRCH), but it must still stop.
+  } catch (error) {
+    // A process that Claude's Bash tool started leads no group (ESRCH), but it must still stop. Any
+    // other error means the group could not be signalled, and the caller must know.
+    if (error?.code !== "ESRCH") {
+      throw error;
+    }
     target = pid;
     method = "process";
     try {
