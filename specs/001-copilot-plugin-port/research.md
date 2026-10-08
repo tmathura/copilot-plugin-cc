@@ -278,7 +278,10 @@ data model, the contracts, the plan and the tasks link here.
   environment` says `--no-auto-update` "makes launches ignore any newer version already in the
   package cache", so a bare `--version` can report a different build from the one that runs. Setup
   refuses older versions and says how to update. Raise the floor only after a test run on the newer
-  version.
+  version. The check has a 30-second limit, and a check that passes it reports that `--version` did
+  not answer (decided 2026-10-08, ticket 4 Codex review). Reason: the check is a blocking
+  `spawnSync`, so no later time limit or signal handler can run while it waits. Rejected
+  alternative: no limit, as upstream's `binaryAvailable`.
 - **Rationale**: The prompt-mode event format has no published schema, so the plugin claims only what
   was tested. Most users run the newest version, because Copilot updates itself by default.
 

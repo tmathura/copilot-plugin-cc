@@ -8,6 +8,7 @@ was seen on Copilot CLI 1.0.93 (research §1, §2 and §7).
 
 - Command: the resolved launcher (research §4) with `--no-auto-update --version` (research §5).
 - Output: `GitHub Copilot CLI <x.y.z>.` on stdout. Setup refuses versions below 1.0.93.
+- Limit: 30 seconds; after that the check reports that `--version` did not answer (research §5).
 
 ## One run
 

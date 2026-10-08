@@ -24,6 +24,7 @@ export const NOT_LOGGED_IN_STDERR = [
 //                       line that is not an event
 //   old-version         --version reports 1.0.92
 //   pinned-old-version  1.0.99 without --no-auto-update, 1.0.92 with it
+//   hang-version        --version never answers
 //   not-logged-in       the real "no authentication" output
 //   bad-json            a line that is not JSON, then exits
 //   truncated           exits 1 before the result event
@@ -43,6 +44,10 @@ const RECORD_PATH = ${JSON.stringify(recordPath)};
 const NOT_LOGGED_IN_STDERR = ${JSON.stringify(NOT_LOGGED_IN_STDERR)};
 
 const args = process.argv.slice(2);
+if (args.includes("--version") && BEHAVIOR === "hang-version") {
+  setInterval(() => {}, 1000);
+  return;
+}
 if (args.includes("--version")) {
   let version = BEHAVIOR === "old-version" ? "1.0.92" : "1.0.93";
   if (BEHAVIOR === "pinned-old-version") {

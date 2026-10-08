@@ -9,7 +9,8 @@ Copilot. Run `/copilot:setup` to check your setup.
 - Setup reads the version with `copilot --no-auto-update --version`. Every run also passes
   `--no-auto-update`, so the version that setup checked is the version that runs. A bare
   `copilot --version` can report a newer build from Copilot's update cache.
-- Setup refuses an older version and tells you to update.
+- Setup refuses an older version and tells you to update. It stops the version check after 30
+  seconds.
 
 ## Install
 

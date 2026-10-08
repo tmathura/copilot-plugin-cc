@@ -82,6 +82,9 @@ and the optional Stop-hook review gate. Drop transfer. The first ticket chooses 
   stops after 60 seconds, and only Copilot's "No authentication information found" output gives
   the login steps (decided 2026-10-08, ticket 4 code review; research.md §7, login check). Rejected
   alternatives: no limit; the login steps for every failed check.
+- Q: Can the version check hang setup? → A: No. It stops after 30 seconds and says `--version` did
+  not answer (decided 2026-10-08, ticket 4 Codex review; research.md §5). Rejected alternative: no
+  limit, as upstream.
 
 ## User Scenarios & Testing *(mandatory)*
 

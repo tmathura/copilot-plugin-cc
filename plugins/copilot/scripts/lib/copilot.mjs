@@ -46,6 +46,7 @@ const TOKEN_ENV_VARS = ["COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"];
 const LOGIN_CHECK_PROMPT = "Reply with the single word OK.";
 // A stalled model request must not hang setup; the check answers in a few seconds when it works.
 const LOGIN_CHECK_TIMEOUT_MS = 60 * 1000;
+const VERSION_CHECK_TIMEOUT_MS = 30 * 1000;
 const NOT_LOGGED_IN_PATTERN = /No authentication information found/i;
 const BUILTIN_PROVIDER_LABELS = new Map([
   ["openai", "OpenAI"],
@@ -434,10 +435,15 @@ function buildAuthStatus(fields = {}) {
 
 // The version check runs the same launch as a real run: --no-auto-update makes Copilot ignore a newer
 // build in its package cache, which a bare --version could report.
+// The probe blocks the event loop, so it needs its own limit: no later timer or signal handler can run.
 export function getCopilotAvailability(cwd, options = {}) {
-  const status = binaryAvailable("copilot", ["--no-auto-update", "--version"], { cwd, env: options.env });
+  const timeout = options.timeoutMs ?? VERSION_CHECK_TIMEOUT_MS;
+  const status = binaryAvailable("copilot", ["--no-auto-update", "--version"], { cwd, env: options.env, timeout });
   if (!status.available) {
-    return { available: false, detail: status.detail, version: null };
+    const detail = /ETIMEDOUT/.test(status.detail)
+      ? `copilot --version did not answer within ${timeout / 1000} seconds`
+      : status.detail;
+    return { available: false, detail, version: null };
   }
 
   const firstLine = status.detail.split(/\r?\n/)[0].trim().replace(/\.$/, "");

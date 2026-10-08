@@ -119,6 +119,16 @@ test("the version check uses --no-auto-update and enforces the 1.0.93 floor", ()
   assert.equal(getCopilotAvailability(".", { env: setUp("pinned-old-version").env }).available, false);
 });
 
+test("a version check that does not answer is stopped at its time limit", () => {
+  const status = getCopilotAvailability(".", { env: setUp("hang-version").env, timeoutMs: 500 });
+
+  assert.deepEqual(status, {
+    available: false,
+    detail: "copilot --version did not answer within 0.5 seconds",
+    version: null
+  });
+});
+
 test("a read-only run starts the resolved launcher with the read-only arguments and environment", async () => {
   const { workDir, dataDir, env, runs } = setUp("ok");
 
