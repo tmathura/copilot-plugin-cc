@@ -145,7 +145,9 @@ function isPidAlive(pid) {
 function readLockOwner(lockFile) {
   try {
     const owner = JSON.parse(fs.readFileSync(lockFile, "utf8"));
-    return Number.isInteger(owner?.pid) ? owner : null;
+    // A pid of 0 or below names a process group, not an owner, so such a lock counts as unreadable.
+    const valid = Number.isInteger(owner?.pid) && owner.pid > 0 && typeof owner.token === "string" && owner.token;
+    return valid ? owner : null;
   } catch {
     return null;
   }

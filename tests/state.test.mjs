@@ -340,13 +340,15 @@ test("a lock with no readable owner stays, and the error says how to clear it", 
   const workspace = makeTempDir();
   const lockFile = `${resolveStateFile(workspace)}.lock`;
   fs.mkdirSync(path.dirname(lockFile), { recursive: true });
-  fs.writeFileSync(lockFile, "", "utf8");
+  for (const content of ["", JSON.stringify({ pid: 0, token: "x" }), JSON.stringify({ pid: -1, token: "x" })]) {
+    fs.writeFileSync(lockFile, content, "utf8");
 
-  assert.throws(
-    () => updateState(workspace, () => {}, { lockTimeoutMs: 200 }),
-    /The lock has no readable owner; if no Copilot companion is running, delete it and retry\./
-  );
-  assert.equal(fs.existsSync(lockFile), true);
+    assert.throws(
+      () => updateState(workspace, () => {}, { lockTimeoutMs: 200 }),
+      /The lock has no readable owner; if no Copilot companion is running, delete it and retry\./
+    );
+    assert.equal(fs.existsSync(lockFile), true);
+  }
 });
 
 test("a lock whose owner cannot be written is removed, so a later update succeeds", (t) => {
