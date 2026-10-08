@@ -442,7 +442,9 @@ test("valid review JSON with the wrong shape fails the job and keeps the raw out
     [null, "The review output must be of type object."],
     [{}, "The review output is missing `verdict`."],
     [{ ...review, verdict: "maybe" }, "`verdict` must be one of: approve, needs-attention."],
-    [{ ...review, findings: [findingWithoutFile] }, "`findings[0]` is missing `file`."]
+    [{ ...review, findings: [findingWithoutFile] }, "`findings[0]` is missing `file`."],
+    [{ ...review, constructor: "unexpected" }, "The review output has the unknown field `constructor`."],
+    [{ ...review, findings: [{ ...FINDING, toString: "unexpected" }] }, "`findings[0]` has the unknown field `toString`."]
   ].map(([value, error]) => [value, `The JSON does not match the review schema: ${error}`]);
 
   for (const [value, expectedError] of cases) {

@@ -679,7 +679,8 @@ export function validateReviewOutput(value, schema, at = "") {
       }
     }
     for (const [key, item] of Object.entries(value)) {
-      const property = schema.properties?.[key];
+      // An own-property check: a field named like an inherited name such as `constructor` is unknown too.
+      const property = schema.properties && Object.hasOwn(schema.properties, key) ? schema.properties[key] : null;
       if (!property) {
         if (schema.additionalProperties === false) {
           return `${where} has the unknown field \`${key}\`.`;
