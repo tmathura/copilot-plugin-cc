@@ -30,13 +30,15 @@ export const NOT_LOGGED_IN_STDERR = [
 //   bad-json            a line that is not JSON, then exits
 //   truncated           exits 1 before the result event
 //   fail                sends FAKE_COPILOT_ANSWER if set, a result with exitCode 1, then exits 1
-//   forbidden-tool      sends FAKE_COPILOT_ANSWER if set, starts the create tool, then runs until killed
+//   forbidden-tool      sends FAKE_COPILOT_ANSWER if set, starts a child and the create tool, then
+//                       runs until killed
 //   hang                starts a child, then runs until killed
-//   hang-after-result   a full successful turn, then runs until killed
+//   hang-ignore-sigterm like hang, but ignores SIGTERM
+//   hang-after-result   a full successful turn, starts a child, then runs until killed
 //   write-attempt       writes a file in its working folder if the create tool is available
 //   reject-flags        rejects its arguments and exits 1 before it reads the prompt
 // Every run records its arguments, environment, prompt, pid and the files of each --add-dir folder
-// (base64, so the bytes stay exact).
+// (base64, so the bytes stay exact). Each child that a run starts is recorded with the run's pid.
 // FAKE_COPILOT_ANSWER replaces the final answer text.
 export function installFakeCopilot(binDir, behavior = "ok") {
   const scriptPath = path.join(binDir, "copilot");
@@ -48,6 +50,7 @@ const { spawn } = require("node:child_process");
 const BEHAVIOR = process.env.FAKE_COPILOT_BEHAVIOR || ${JSON.stringify(behavior)};
 const RECORD_PATH = ${JSON.stringify(recordPath)};
 const PIDS_PATH = ${JSON.stringify(path.join(binDir, "fake-copilot-pids.jsonl"))};
+const CHILDREN_PATH = ${JSON.stringify(path.join(binDir, "fake-copilot-children.jsonl"))};
 const NOT_LOGGED_IN_STDERR = ${JSON.stringify(NOT_LOGGED_IN_STDERR)};
 
 const args = process.argv.slice(2);
@@ -98,6 +101,12 @@ function readAddDirFiles() {
 
 function emit(event) {
   process.stdout.write(JSON.stringify(event) + "\\n");
+}
+
+function startChild() {
+  const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+  fs.appendFileSync(CHILDREN_PATH, JSON.stringify([process.pid, child.pid]) + "\\n");
+  return child;
 }
 
 function runForever() {
@@ -168,11 +177,16 @@ process.stdin.on("end", () => {
       if (process.env.FAKE_COPILOT_ANSWER) {
         emit({ type: "assistant.message", data: { content: process.env.FAKE_COPILOT_ANSWER } });
       }
+      startChild();
       emit({ type: "tool.execution_start", data: { toolCallId: "call-1", toolName: "create", arguments: { path: "x.txt" } } });
       runForever();
       break;
+    case "hang-ignore-sigterm":
     case "hang": {
-      const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+      if (BEHAVIOR === "hang-ignore-sigterm") {
+        process.on("SIGTERM", () => {});
+      }
+      const child = startChild();
       emit({ type: "fake.child", data: { pid: child.pid } });
       emit({ type: "assistant.turn_start", data: { turnId: "0" } });
       runForever();
@@ -189,6 +203,7 @@ process.stdin.on("end", () => {
       break;
     }
     case "hang-after-result":
+      startChild();
       emitTurn();
       emitResult(0);
       runForever();
@@ -213,7 +228,15 @@ process.stdin.on("end", () => {
 
 // One [probe pid, child pid] pair for each hang-version check that started.
 export function readFakeVersionPids(binDir) {
-  const pidsPath = path.join(binDir, "fake-copilot-pids.jsonl");
+  return readPidPairs(path.join(binDir, "fake-copilot-pids.jsonl"));
+}
+
+// One [run pid, child pid] pair for each child that a run started.
+export function readFakeChildPids(binDir) {
+  return readPidPairs(path.join(binDir, "fake-copilot-children.jsonl"));
+}
+
+function readPidPairs(pidsPath) {
   if (!fs.existsSync(pidsPath)) {
     return [];
   }

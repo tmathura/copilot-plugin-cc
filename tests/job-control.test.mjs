@@ -75,7 +75,18 @@ test("cancel picks the only active job and refuses when there are none or severa
   assert.equal(resolveCancelableJob(single).job.id, "task-live");
   assert.throws(() => resolveCancelableJob(several), /Multiple Copilot jobs are active\. Pass a job id to \/copilot:cancel\./);
   assert.throws(() => resolveCancelableJob(none), /No active Copilot jobs to cancel\./);
-  assert.throws(() => resolveCancelableJob(none, "task-done"), /No job found for "task-done"\. Run \/copilot:status/);
+  assert.throws(() => resolveCancelableJob(none, "task-done"), /Job task-done is already completed, so there is nothing to cancel\./);
+  assert.throws(() => resolveCancelableJob(none, "task-gone"), /No job found for "task-gone"\. Run \/copilot:status/);
+});
+
+test("cancel with the exact id of a finished job refuses it instead of a running job with that prefix", () => {
+  const workspace = workspaceWithJobs([
+    { id: "task-abc", status: "completed" },
+    { id: "task-abcdef", status: "running" }
+  ]);
+
+  assert.throws(() => resolveCancelableJob(workspace, "task-abc"), /Job task-abc is already completed/);
+  assert.equal(resolveCancelableJob(workspace, "task-abcd").job.id, "task-abcdef");
 });
 
 test("status reports direct startup and filters jobs by the Claude session", () => {

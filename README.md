@@ -7,8 +7,8 @@ keeps the same commands and layout, and calls the Copilot CLI instead of Codex.
 
 ## Status
 
-Work in progress. The plugin has `/copilot:setup`, `/copilot:review` and
-`/copilot:adversarial-review`. The other commands below describe what the first release will do.
+Work in progress. The plugin has every command below and the `copilot-rescue` subagent. The review
+gate comes next. [docs/operations.md](docs/operations.md) says how to look after jobs.
 
 ## What you get
 
@@ -103,6 +103,36 @@ claude plugin install copilot@tmathura-copilot
   that starts any other tool is stopped.
 - When the companion is stopped with `SIGTERM` or `SIGINT`, it first stops its Copilot process and
   that process's children.
+- `/copilot:rescue` has no `spark` model name. Copilot has no such model.
+- `/copilot:rescue --resume` continues only a task of the same mode: a read-only task continues a
+  read-only task, and a `--write` task a `--write` task. Each mode keeps its sessions in a different
+  Copilot folder. If there is no such task, the error says to use `--fresh`. The rescue command tells
+  the subagent the mode of the task it continues, so the subagent adds `--write` only for a
+  `--write` task.
+- `/copilot:rescue --resume` finds the last task in the plugin's own job records. Codex asks its app
+  server for its list of threads. Copilot has no such list.
+- A `--write` task runs shell commands in Copilot's sandbox (`--sandbox`). The sandbox lets commands
+  write in the working folder, the temp folder and your user folder, so it is wider than Codex's
+  `workspace-write`. Where your system cannot run the sandbox, Copilot runs shell commands with your
+  full rights, and the plugin cannot detect this.
+- Cancel cannot ask a running Copilot to stop its turn, because Copilot has no interrupt that another
+  process can send. Cancel stops the process tree instead. `turnInterruptAttempted` is always
+  `false`.
+- Cancel first marks the job cancelled, then stops its processes. It stops the companion and then
+  the Copilot process itself, so a Copilot process whose companion was killed is still stopped.
+  Codex stops the process first and marks the job after, so a job that starts between the two steps
+  can keep running.
+- A background task's record is written before its worker starts. Codex starts the worker first, and
+  a worker that finds no record leaves the job queued forever. If the worker cannot start, the job
+  is marked failed.
+- `/copilot:cancel <job id>` with the full id of a finished job says that the job has finished. Codex
+  can pick a different, running job whose id starts with the same text.
+- The rescue skill rule that defaults to `--write` repeats the exceptions for review, diagnosis and
+  research without edits. The Codex skill lists them in one rule but not in the other.
+- The plugin replaces the job state and job files through a temp file and a rename, so a reader
+  never sees half a file. Codex writes over the file. On Windows a rename fails while another
+  process reads the file, and a reader can miss the file during a rename, so the plugin retries both
+  for up to 2 seconds.
 
 ## Development
 

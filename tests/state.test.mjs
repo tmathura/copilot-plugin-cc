@@ -369,6 +369,30 @@ test("a lock held by a live process stays, however old, and the waiting update c
   }
 });
 
+test(
+  "an update waits for a reader that holds the state file open, instead of failing to replace it",
+  { skip: process.platform !== "win32" && "only Windows refuses to replace an open file" },
+  async () => {
+    const workspace = makeTempDir();
+    updateState(workspace, (state) => {
+      state.config.stopReviewGate = false;
+    });
+    const stateFile = resolveStateFile(workspace);
+    const reader = spawn(
+      process.execPath,
+      ["-e", "const fd = require('fs').openSync(process.argv[1], 'r'); console.log('open'); setTimeout(() => require('fs').closeSync(fd), 300);", stateFile],
+      { stdio: ["ignore", "pipe", "ignore"] }
+    );
+    await new Promise((resolve) => reader.stdout.once("data", resolve));
+
+    updateState(workspace, (state) => {
+      state.config.stopReviewGate = true;
+    });
+
+    assert.equal(loadState(workspace).config.stopReviewGate, true);
+  }
+);
+
 test("a lock with no readable owner stays, and the error says how to clear it", () => {
   const workspace = makeTempDir();
   const lockFile = `${resolveStateFile(workspace)}.lock`;

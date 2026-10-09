@@ -402,7 +402,11 @@ Later tickets apply these rules. The call-site map uses them.
 - **Resume stays in one mode**: a session lives in the home of the mode that made it. `--resume-last`
   only picks a task with the same `write` value as the new run. If there is none, the error says to
   use `--fresh`. `task-resume-candidate` runs before the mode is known, so it reports the
-  candidate's `write` value and does not filter.
+  candidate's `write` value and does not filter. `/copilot:rescue` passes that value on: when the
+  request continues a task, also with an explicit `--resume`, it tells the subagent the mode of that
+  task, and the subagent adds `--write` only for a `--write` task (added 2026-10-09, ticket 6;
+  rejected alternatives: no hint, so the resume fails; the companion takes the mode from the resumed
+  job, which would ignore an explicit `--write`).
 - **Type check**: upstream type-checks its protocol client with generated types. Copilot has no
   generator. The port hand-writes the few event types in `scripts/lib/prompt-mode-protocol.d.ts` and
   keeps the `tsc` check with `typescript` and `@types/node` as devDependencies.
@@ -457,6 +461,10 @@ Later tickets apply these rules. The call-site map uses them.
     so a job either was claimed and started before this step (its PIDs are read) or finds itself
     cancelled and never starts. Upstream signals first and saves `cancelled` after (rejected: a job
     that starts between the two steps escapes the kill).
+  - Cancel matches an explicit job reference against all jobs first (exact id, then a unique
+    prefix), then refuses a matched job that is not queued or running (decided 2026-10-09, ticket 6,
+    from the Copilot review of PR #15; correctness). Rejected alternative: upstream, which matches
+    only active jobs, so the exact id of a finished `task-abc` cancels a running `task-abcdef`.
   - The rule for every stopper (cancel, `SessionEnd`, the review gate): stop the companion, then
     stop the `copilotPid` of its job record itself. Never rely only on the companion's `SIGTERM`
     handler, because the companion can be killed before the handler finishes. The gate finds the
@@ -508,7 +516,10 @@ Later tickets apply these rules. The call-site map uses them.
     cannot push an entry out early. Not covered: a companion paused for longer than 30 days. The worker claim and
     the Copilot start use the same lock: a companion starts Copilot only inside `updateState`,
     after it checks that its job is still `running`, and it writes `copilotPid` in that same step
-    (Node returns the child's `pid` from `spawn` at once). The check, the spawn and the save run as
+    (Node returns the child's `pid` from `spawn` at once). The adapter takes a `guardStart` option
+    for this: the companion passes `guardCopilotStart` from `tracked-jobs.mjs`, which calls the
+    adapter's start function inside its `updateState`, so only `copilot.mjs` imports
+    `prompt-mode.mjs` (added 2026-10-09, ticket 6). The check, the spawn and the save run as
     one synchronous block (synchronous file calls, as upstream `state.mjs` uses), so no signal
     handler runs inside it, and the plugin's own `SIGKILL` comes seconds after its `SIGTERM`. If the
     save fails after the spawn, the companion kills the new Copilot process tree before it reports
@@ -564,6 +575,16 @@ Later tickets apply these rules. The call-site map uses them.
   the final write).
   Rejected alternative: keep upstream's unlocked update for parity; upstream has the same race, but
   this port relies on the job records to stop processes.
+  On Windows a rename cannot replace a file that another process has open (`EPERM`), and a reader
+  can miss the file during a rename (`ENOENT`). Measured on Windows 11 (2026-10-09, ticket 6): with
+  one process reading `state.json` in a loop, most renames over it failed, and some reads found no
+  file. So the state module retries a rename that fails with `EPERM`, `EACCES` or `EBUSY`, and a
+  read that fails with one of these or with `ENOENT` while the state lock exists, for up to 2
+  seconds (decided 2026-10-09, ticket 6; correctness, platform support). Writers replace these
+  files only under the state lock, so a missing file is retried only while another process holds
+  that lock; with no lock, or with the reader's own lock, the file is missing for real. Rejected alternatives: no retry, where a job fails,
+  or a worker misses its job record, when `/copilot:status` reads at the same moment; readers that
+  take the state lock too, where every status read writes a lock file and waits for writers.
   Without `CLAUDE_PLUGIN_DATA`, the state lives in `~/.copilot-companion/state`, owned by the user,
   as the plugin's Copilot home does (§3). On macOS and Linux, `~/.copilot-companion` is set to
   owner-only (`0700`) before each state write, also when it already exists, so other users cannot

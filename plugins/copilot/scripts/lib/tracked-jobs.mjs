@@ -1,5 +1,6 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): renamed for the copilot plugin; job status and
-// progress writes go through one locked update and never revive a cancelled or missing job.
+// progress writes go through one locked update and never revive a cancelled or missing job; a job
+// starts Copilot inside a locked update and saves its pid there.
 import fs from "node:fs";
 import process from "node:process";
 
@@ -96,6 +97,26 @@ function updateRunningJob(workspaceRoot, jobId, buildRecord, statePatch) {
       updatedAt: nowIso()
     };
   });
+}
+
+// Cancel reads a job's pids under the same lock, so it either sees the Copilot pid or finds a job that
+// never starts Copilot. The check, the start and the save run as one synchronous step.
+export function guardCopilotStart(workspaceRoot, jobId) {
+  return (start) => {
+    updateState(workspaceRoot, (state) => {
+      const index = state.jobs.findIndex((job) => job.id === jobId);
+      if (index === -1 || state.jobs[index].status !== "running") {
+        return;
+      }
+      assertSessionOpen(state, state.jobs[index].sessionId);
+      const copilotPid = start();
+      const storedJob = readJobFileOrNull(resolveJobFile(workspaceRoot, jobId));
+      if (storedJob) {
+        writeJobFile(workspaceRoot, jobId, { ...storedJob, copilotPid });
+      }
+      state.jobs[index] = { ...state.jobs[index], copilotPid, updatedAt: nowIso() };
+    });
+  };
 }
 
 export function createJobProgressUpdater(workspaceRoot, jobId) {

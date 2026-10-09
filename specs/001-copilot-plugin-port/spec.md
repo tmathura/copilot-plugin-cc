@@ -99,6 +99,24 @@ and the optional Stop-hook review gate. Drop transfer. The first ticket chooses 
 - Q: Does a review read an untracked file whose name git quotes, such as one with non-ASCII letters?
   → A: Yes. The list comes from `git ls-files -z` (decided 2026-10-09, ticket 5 Codex review;
   research.md §4b). Rejected alternative: upstream's list without `-z`, which skips the file.
+- Q: Can a process that reads the job state on Windows make a save fail? → A: No. On Windows a
+  rename cannot replace a file that another process has open, and a reader can miss the file during
+  a rename. The state module retries both for up to 2 seconds (decided 2026-10-09, ticket 6, found by
+  the background job tests; research.md §7, locked state updates). Rejected alternatives: no retry,
+  where a job fails or a worker misses its job when `/copilot:status` reads at the same moment;
+  readers that also take the state lock, where every status read writes a lock file and waits.
+- Q: What does `/copilot:cancel <job id>` do with the full id of a finished job? → A: It says the
+  job has already finished. It matches the reference against all jobs first, then refuses a job that
+  is not queued or running (decided 2026-10-09, ticket 6, from the Copilot review of PR #15;
+  correctness; research.md §7, stopping a job). Rejected alternative: upstream, which matches only
+  active jobs, so the id can select a different running job by prefix.
+- Q: How does a continued task keep its mode, when the rescue subagent picks `--write` from the
+  request? → A: `/copilot:rescue` reads the candidate's `write` value, also for an explicit
+  `--resume`, and tells the subagent the mode of the continued task; the subagent adds `--write` only
+  for a `--write` task (decided 2026-10-09, ticket 6, code review; research.md §7, resume stays in one
+  mode). Rejected alternatives: no hint, so the resume fails and the user must start again with
+  `--fresh`; the companion takes the mode from the resumed job, which would ignore an explicit
+  `--write`.
 
 ## User Scenarios & Testing *(mandatory)*
 

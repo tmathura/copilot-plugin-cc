@@ -23,9 +23,20 @@ GitHub Copilot instead of Codex:
 
 - .claude-plugin/plugin.json
 - CHANGELOG.md
+- agents/copilot-rescue.md (from agents/codex-rescue.md)
 - commands/adversarial-review.md
+- commands/cancel.md
+- commands/rescue.md
+- commands/result.md
 - commands/review.md
 - commands/setup.md
+- commands/status.md
 - prompts/adversarial-review.md
 - skills/copilot-cli-runtime/SKILL.md (from skills/codex-cli-runtime/SKILL.md)
 - skills/copilot-result-handling/SKILL.md (from skills/codex-result-handling/SKILL.md)
+- skills/gpt-5-4-prompting/SKILL.md
+- skills/gpt-5-4-prompting/references/copilot-prompt-antipatterns.md (from
+  references/codex-prompt-antipatterns.md)
+- skills/gpt-5-4-prompting/references/copilot-prompt-recipes.md (from
+  references/codex-prompt-recipes.md)
+- skills/gpt-5-4-prompting/references/prompt-blocks.md

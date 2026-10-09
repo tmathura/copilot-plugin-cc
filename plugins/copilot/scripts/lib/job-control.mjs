@@ -1,4 +1,6 @@
-// Changed from upstream codex-plugin-cc (Apache-2.0): renamed for the copilot plugin.
+// Changed from upstream codex-plugin-cc (Apache-2.0): renamed for the copilot plugin; cancel matches an
+// explicit job reference against every job before it checks that the job is active; a stored job is
+// read through the state module, which retries a read that meets a file replace on Windows.
 import fs from "node:fs";
 
 import { getSessionRuntimeStatus } from "./copilot.mjs";
@@ -182,11 +184,14 @@ export function enrichJob(job, options = {}) {
 }
 
 export function readStoredJob(workspaceRoot, jobId) {
-  const jobFile = resolveJobFile(workspaceRoot, jobId);
-  if (!fs.existsSync(jobFile)) {
-    return null;
+  try {
+    return readJobFile(resolveJobFile(workspaceRoot, jobId));
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      return null;
+    }
+    throw error;
   }
-  return readJobFile(jobFile);
 }
 
 function matchJobReference(jobs, reference, predicate = () => true) {
@@ -284,10 +289,11 @@ export function resolveCancelableJob(cwd, reference, options = {}) {
   const jobs = sortJobsNewestFirst(listJobs(workspaceRoot));
   const activeJobs = jobs.filter((job) => job.status === "queued" || job.status === "running");
 
+  // The exact id of a finished job must not select a different, running job that it is a prefix of.
   if (reference) {
-    const selected = matchJobReference(activeJobs, reference);
-    if (!selected) {
-      throw new Error(`No active job found for "${reference}".`);
+    const selected = matchJobReference(jobs, reference);
+    if (selected.status !== "queued" && selected.status !== "running") {
+      throw new Error(`Job ${selected.id} is already ${selected.status}, so there is nothing to cancel.`);
     }
     return { workspaceRoot, job: selected };
   }

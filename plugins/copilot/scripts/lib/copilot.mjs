@@ -1,6 +1,7 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): ported from codex.mjs for the Copilot CLI in
 // prompt mode. This module alone builds Copilot arguments and decides permissions. It has no broker,
-// no session transfer and no thread list; the login check is one tiny read-only prompt.
+// no session transfer and no thread list, so the latest task comes from the plugin's job state; the
+// login check is one tiny read-only prompt, and a caller can start Copilot inside its own locked step.
 /**
  * @typedef {import("./prompt-mode-protocol").PromptModeEvent} PromptModeEvent
  * @typedef {import("./prompt-mode-protocol").ResultEvent} ResultEvent
@@ -27,8 +28,11 @@ import process from "node:process";
 import { readJsonFile } from "./fs.mjs";
 import { CopilotPromptModeClient, runShortCommand } from "./prompt-mode.mjs";
 import { resolveLauncher } from "./process.mjs";
-import { ensurePluginDataDir, resolvePluginDataDir } from "./state.mjs";
+import { ensurePluginDataDir, listJobs, resolvePluginDataDir } from "./state.mjs";
 
+const TASK_THREAD_PREFIX = "Copilot Companion Task";
+const DEFAULT_CONTINUE_PROMPT =
+  "Continue from the current thread state. Pick the next highest-value step and follow through until the task is resolved.";
 const MIN_COPILOT_VERSION = [1, 0, 93];
 const INSTALL_HINT = "Install it with `npm install -g @github/copilot`, then rerun `/copilot:setup`.";
 // An npm install cannot update a WinGet or Homebrew install, and `copilot update` only fills the
@@ -77,6 +81,11 @@ function shorten(text, limit = 72) {
     return normalized;
   }
   return `${normalized.slice(0, limit - 3)}...`;
+}
+
+function buildTaskThreadName(prompt) {
+  const excerpt = shorten(prompt, 56);
+  return excerpt ? `${TASK_THREAD_PREFIX}: ${excerpt}` : TASK_THREAD_PREFIX;
 }
 
 function looksLikeVerificationCommand(command) {
@@ -353,14 +362,35 @@ async function withPromptMode(cwd, options, fn) {
     throw new Error(`Copilot CLI is not installed (${launcher.detail}). ${INSTALL_HINT}`);
   }
 
-  const client = CopilotPromptModeClient.start(cwd, {
-    command: launcher.command,
-    args: [...launcher.args, ...options.args],
-    env: options.env,
-    prompt: options.prompt,
-    resultGraceMs: options.resultGraceMs,
-    timeoutMs: options.timeoutMs
-  });
+  /** @type {CopilotPromptModeClient | null} */
+  let client = null;
+  const start = () => {
+    client = CopilotPromptModeClient.start(cwd, {
+      command: launcher.command,
+      args: [...launcher.args, ...options.args],
+      env: options.env,
+      prompt: options.prompt,
+      resultGraceMs: options.resultGraceMs,
+      timeoutMs: options.timeoutMs
+    });
+    return client.proc?.pid ?? null;
+  };
+  // A job's guard starts Copilot inside its locked state update, so a cancel either sees the Copilot
+  // pid or finds a job that never starts Copilot. A guard that declines does not call start.
+  try {
+    if (options.guardStart) {
+      options.guardStart(start);
+    } else {
+      start();
+    }
+  } catch (error) {
+    // Copilot may have started before the guard failed, for example when its pid could not be saved.
+    await client?.close().catch(() => {});
+    throw error;
+  }
+  if (!client) {
+    throw new Error("The job was cancelled or removed before Copilot started, so Copilot was not started.");
+  }
   try {
     return await fn(client);
   } finally {
@@ -402,10 +432,18 @@ async function runCopilotTurn(cwd, options = {}) {
     options.resumeSessionId ? `Resuming session ${sessionId}.` : "Starting Copilot run.",
     "starting"
   );
-  emitProgress(options.onProgress, `Session ready (${sessionId}).`, "starting", { threadId: sessionId });
 
-  const launch = { args, env, prompt, resultGraceMs: options.resultGraceMs, timeoutMs: options.timeoutMs };
+  const launch = {
+    args,
+    env,
+    prompt,
+    resultGraceMs: options.resultGraceMs,
+    timeoutMs: options.timeoutMs,
+    guardStart: options.guardStart
+  };
   return withPromptMode(cwd, launch, async (client) => {
+    // Only now does the session exist, so a job that never started Copilot gets no session to resume.
+    emitProgress(options.onProgress, `Session ready (${sessionId}).`, "starting", { threadId: sessionId });
     const turnState = await captureTurn(client, sessionId, { write, onProgress: options.onProgress });
     return {
       status: buildResultStatus(turnState),
@@ -574,12 +612,42 @@ function oneLine(text) {
   return text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).join(" ");
 }
 
-export async function runPromptModeTurn(cwd, options = {}) {
+export async function ensureCopilotAvailable(cwd, options = {}) {
   const availability = await getCopilotAvailability(cwd, { env: options.env });
   if (!availability.available) {
     throw new Error(formatUnavailableError(availability));
   }
+}
+
+export async function runPromptModeTurn(cwd, options = {}) {
+  await ensureCopilotAvailable(cwd, options);
   return runCopilotTurn(cwd, options);
+}
+
+// Prompt mode has no turn interrupt that another process can send; cancel stops the process tree.
+export async function interruptPromptModeTurn() {
+  return { attempted: false, interrupted: false, transport: null, detail: "prompt mode has no turn interrupt" };
+}
+
+// Prompt mode has no session list, so the plugin's job state is the record of task sessions. A session
+// lives in the Copilot home of the mode that made it, so only a task of the same mode can be resumed.
+export function findLatestTaskThread(cwd, options = {}) {
+  const write = Boolean(options.write);
+  const job = [...listJobs(cwd)]
+    .sort((left, right) => String(right.updatedAt ?? "").localeCompare(String(left.updatedAt ?? "")))
+    .find(
+      (entry) =>
+        entry.jobClass === "task" &&
+        entry.threadId &&
+        Boolean(entry.write) === write &&
+        entry.status !== "queued" &&
+        entry.status !== "running"
+    );
+  return job ? { id: job.threadId } : null;
+}
+
+export function buildPersistentTaskThreadName(prompt) {
+  return buildTaskThreadName(prompt);
 }
 
 // Copilot's built-in reviewer gets the diff in the prompt: with only the read tools it cannot run git.
@@ -695,3 +763,5 @@ export function validateReviewOutput(value, schema, at = "") {
   }
   return null;
 }
+
+export { DEFAULT_CONTINUE_PROMPT, TASK_THREAD_PREFIX };

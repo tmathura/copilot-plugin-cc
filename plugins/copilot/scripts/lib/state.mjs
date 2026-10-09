@@ -1,7 +1,8 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): the fallback state root is in the home folder;
 // updateState holds a lock file and writes through a rename; saveState is removed, so no writer saves
 // an earlier snapshot; pruning keeps every active job and also removes a job's review patch folder;
-// state records closed Claude sessions.
+// state records closed Claude sessions; on Windows, a file replace or read that meets another process
+// is retried.
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -17,6 +18,8 @@ const JOBS_DIR_NAME = "jobs";
 const MAX_JOBS = 50;
 const DEFAULT_LOCK_TIMEOUT_MS = 5000;
 const LOCK_RETRY_MS = 25;
+const WINDOWS_RETRY_MS = 2000;
+const WINDOWS_RETRY_STEP_MS = 5;
 const CLOSED_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 function nowIso() {
@@ -96,12 +99,8 @@ export function ensureStateDir(cwd) {
 
 export function loadState(cwd, options = {}) {
   const stateFile = resolveStateFile(cwd);
-  if (!fs.existsSync(stateFile)) {
-    return defaultState();
-  }
-
   try {
-    const parsed = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+    const parsed = JSON.parse(readTextFile(stateFile, `${stateFile}.lock`));
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       throw new Error("not a JSON object");
     }
@@ -116,6 +115,9 @@ export function loadState(cwd, options = {}) {
       closedSessions: Array.isArray(parsed.closedSessions) ? parsed.closedSessions : []
     };
   } catch (error) {
+    if (error?.code === "ENOENT") {
+      return defaultState();
+    }
     // An update must not save the empty default over job records that cancel still needs.
     if (options.strict) {
       throw new Error(
@@ -268,12 +270,45 @@ function acquireStateLock(cwd, options) {
   }
 }
 
+// On Windows a rename cannot replace a file that another process has open, and a reader can miss the
+// file for the moment it is replaced. Each lasts about as long as one read or one rename.
+function retryOnWindows(action, isTransient) {
+  const deadline = Date.now() + WINDOWS_RETRY_MS;
+  for (;;) {
+    try {
+      return action();
+    } catch (error) {
+      if (process.platform !== "win32" || !isTransient(error) || Date.now() >= deadline) {
+        throw error;
+      }
+      sleepSync(WINDOWS_RETRY_STEP_MS);
+    }
+  }
+}
+
+function isBusyFileError(error) {
+  return ["EPERM", "EACCES", "EBUSY"].includes(error?.code);
+}
+
+// State and job files are replaced only under the state lock, so a missing file is only worth a retry
+// while another process holds that lock. A lock with no readable owner may be one still being made.
+function isLockHeldByOther(lockFile) {
+  return fs.existsSync(lockFile) && readLockOwner(lockFile)?.pid !== process.pid;
+}
+
+function readTextFile(filePath, lockFile) {
+  return retryOnWindows(
+    () => fs.readFileSync(filePath, "utf8"),
+    (error) => isBusyFileError(error) || (error?.code === "ENOENT" && isLockHeldByOther(lockFile))
+  );
+}
+
 // A reader must never see half a file, and a failed write must keep the old one.
 function writeJsonAtomic(filePath, value) {
   const tempFile = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
   try {
     fs.writeFileSync(tempFile, `${JSON.stringify(value, null, 2)}\n`, "utf8");
-    fs.renameSync(tempFile, filePath);
+    retryOnWindows(() => fs.renameSync(tempFile, filePath), isBusyFileError);
   } catch (error) {
     fs.rmSync(tempFile, { force: true });
     throw error;
@@ -402,7 +437,8 @@ export function writeJobFile(cwd, jobId, payload) {
 }
 
 export function readJobFile(jobFile) {
-  return JSON.parse(fs.readFileSync(jobFile, "utf8"));
+  const lockFile = path.join(path.dirname(path.dirname(jobFile)), `${STATE_FILE_NAME}.lock`);
+  return JSON.parse(readTextFile(jobFile, lockFile));
 }
 
 function removeJobFile(jobFile) {

@@ -35,7 +35,8 @@ Command selection:
 - `task --resume-last`: internal helper for "keep going", "resume", "apply the top fix", or "dig deeper" after a previous rescue run.
 
 Safety rules:
-- Default to write-capable Copilot work in `copilot:copilot-rescue` unless the user explicitly asks for read-only behavior.
+- Default to write-capable Copilot work in `copilot:copilot-rescue` unless the user explicitly asks for read-only behavior or only wants review, diagnosis, or research without edits.
+- If the forwarded request says that the continued task is read-only, do not add `--write`. If it says that the continued task is a `--write` task, add `--write`. A Copilot thread keeps the mode it started in.
 - Preserve the user's task text as-is apart from stripping routing flags.
 - Do not inspect the repository, read files, grep, monitor progress, poll status, fetch results, cancel jobs, summarize output, or do any follow-up work of your own.
 - Return the stdout of the `task` command exactly as-is.
