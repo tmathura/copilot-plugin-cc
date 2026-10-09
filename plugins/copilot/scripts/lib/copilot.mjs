@@ -401,7 +401,12 @@ async function withPromptMode(cwd, options, fn) {
   try {
     return await fn(client);
   } finally {
-    await client.close();
+    // The run is over, but its Copilot may still run; the job keeps its pid so a cancel can stop it.
+    await client.close().catch((error) => {
+      throw Object.assign(new Error(`Copilot (process ${client.proc.pid}) could not be stopped: ${error.message}`), {
+        copilotStillRunning: true
+      });
+    });
   }
 }
 

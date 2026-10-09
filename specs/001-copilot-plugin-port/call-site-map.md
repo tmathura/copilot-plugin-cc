@@ -131,7 +131,7 @@ repo root.
 | `scripts/lib/job-control.mjs` → import of `getSessionRuntimeStatus` | From `codex.mjs` | From `copilot.mjs`. Without a broker this function always reports "direct startup", so ticket 3 creates `copilot.mjs` with only this function. Ticket 4 adds the rest of the adapter | 3 |
 | same → `inferLegacyJobPhase` | Matches "starting codex", "codex error:" | Matches "starting copilot", "copilot error:" | 3 |
 | same → error text | `/codex:status`, `/codex:cancel`, "Codex jobs" | Rename only | 3 |
-| same → `resolveCancelableJob` | Matches an explicit reference only among active jobs | Matches it against all jobs first, then refuses a job that is not queued or running, unless a cancel of it did not stop every process (§7, stopping a job; correctness; added 2026-10-09) | 6 |
+| same → `resolveCancelableJob` | Matches an explicit reference only among active jobs | Matches it against all jobs first, then refuses a job that is not queued or running, unless a stop of its processes did not finish (§7, stopping a job; correctness; added 2026-10-09) | 6 |
 | `scripts/lib/render.mjs` → `formatCodexResumeCommand` and the result renderers | `codex resume <threadId>`, "Codex session ID" | `copilot --resume=<sessionId>` and "Copilot session ID" for write tasks. Read-only jobs show only the session id, with no command: an interactive command would put trust in the plugin home (§7), and the companion's `--resume` means "the newest task", not this session | 3 |
 | same → titles and hints | "# Codex Setup", `- codex:`, `/codex:*` | Rename only | 3 |
 | `scripts/lib/args.mjs`, `scripts/lib/prompts.mjs`, `scripts/lib/workspace.mjs` | No Codex calls | Copied unchanged | 3 |

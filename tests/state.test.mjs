@@ -254,7 +254,7 @@ test("a job file that cannot be removed after the save does not fail the update"
   assert.equal(fs.existsSync(patchDir), false);
 });
 
-test("an older running job, or a cancelled one whose stop did not finish, survives 55 newer finished jobs and can still be cancelled", () => {
+test("an older running job, or a finished one whose stop did not finish, survives 55 newer finished jobs and can still be cancelled", () => {
   const workspace = makeTempDir();
   const runningJob = addJobWithFiles(workspace, {
     id: "task-running",
@@ -268,6 +268,12 @@ test("an older running job, or a cancelled one whose stop did not finish, surviv
     copilotPid: process.pid,
     updatedAt: new Date(Date.UTC(2026, 0, 1)).toISOString()
   });
+  const failedStop = addJobWithFiles(workspace, {
+    id: "task-failed-stop",
+    status: "failed",
+    copilotPid: process.pid,
+    updatedAt: new Date(Date.UTC(2026, 0, 1)).toISOString()
+  });
   const finishedJobs = Array.from({ length: 55 }, (_, index) =>
     addJobWithFiles(workspace, {
       id: `task-done-${index}`,
@@ -277,12 +283,12 @@ test("an older running job, or a cancelled one whose stop did not finish, surviv
   );
 
   updateState(workspace, (state) => {
-    state.jobs = [runningJob, pendingStop, ...finishedJobs];
+    state.jobs = [runningJob, pendingStop, failedStop, ...finishedJobs];
   });
 
   const jobs = listJobs(workspace);
   assert.equal(jobs.filter((job) => job.status === "completed").length, 50);
-  for (const job of [runningJob, pendingStop]) {
+  for (const job of [runningJob, pendingStop, failedStop]) {
     assert.ok(jobs.some((entry) => entry.id === job.id), job.id);
     assert.equal(fs.existsSync(resolveJobFile(workspace, job.id)), true, job.id);
     assert.equal(fs.existsSync(job.logFile), true, job.id);

@@ -1123,6 +1123,41 @@ test("a cancel whose signal fails keeps the pids and blocks a resume, and a seco
   });
 });
 
+test("a run whose Copilot cannot be stopped keeps the Copilot pid, so a cancel can still stop it", async () => {
+  const tasks = setUpTasks("hang-after-result");
+  await withCompanionEnv(tasks.env, async ({ cancelJob }) => {
+    const { guardCopilotStart, runTrackedJob } = await import("../plugins/copilot/scripts/lib/tracked-jobs.mjs");
+    const { runPromptModeTurn } = await import("../plugins/copilot/scripts/lib/copilot.mjs");
+    const { resolveCancelableJob } = await import("../plugins/copilot/scripts/lib/job-control.mjs");
+    const job = { id: "task-stuck-copilot", jobClass: "task", workspaceRoot: tasks.cwd };
+
+    await assert.rejects(
+      runTrackedJob(job, () =>
+        runPromptModeTurn(tasks.cwd, {
+          prompt: "x",
+          resultGraceMs: 100,
+          guardStart: guardCopilotStart(tasks.cwd, job.id),
+          terminateImpl: async () => {
+            throw new Error("taskkill failed");
+          }
+        })
+      ),
+      /Copilot \(process \d+\) could not be stopped: taskkill failed/
+    );
+    const failed = findJob(tasks.dataDir, job.id);
+    const [[copilotPid, childPid]] = readFakeChildPids(tasks.binDir);
+    assert.deepEqual([failed.status, failed.pid, failed.copilotPid], ["failed", null, copilotPid]);
+    assert.ok(isAlive(copilotPid));
+    assert.equal(resolveCancelableJob(tasks.cwd, job.id).job.id, job.id);
+
+    await cancelJob(tasks.cwd, job.id);
+
+    await waitFor(() => !isAlive(copilotPid) && !isAlive(childPid));
+    const stopped = findJob(tasks.dataDir, job.id);
+    assert.deepEqual([stopped.status, stopped.copilotPid], ["failed", null]);
+  });
+});
+
 test("a worker that stops before it runs its job marks the job failed", () => {
   const tasks = setUpTasks();
   const jobId = "task-no-request";

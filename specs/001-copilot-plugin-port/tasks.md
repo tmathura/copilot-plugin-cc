@@ -370,7 +370,8 @@ cancel a second task; its process tree is gone.
 - [X] T065d [US4] Cancel keeps the job's pids until every signal is sent and can run again on a
   cancelled job that still names one, which pruning keeps and which blocks a resume; a worker that stops with an error, or
   whose run could not save its final status, marks its job `failed`; a Copilot that cannot be
-  stopped after a failed pid save is named in the error; test the retry, the pruning, a worker with
+  stopped after a failed pid save is named in the error; a run whose own stop of Copilot fails keeps
+  `copilotPid` as a `failed` job, which cancel can stop; test the retry, the pruning, a worker with
   a broken record and the failed stop in `tests/runtime.test.mjs`, `tests/state.test.mjs` and
   `tests/copilot.test.mjs` (added
   2026-10-09, Codex review; research.md §7, stopping a job and background start order)

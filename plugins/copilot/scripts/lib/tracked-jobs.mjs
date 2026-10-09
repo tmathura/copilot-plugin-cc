@@ -222,6 +222,8 @@ export async function runTrackedJob(job, runner, options = {}) {
   } catch (error) {
     const errorMessage = messageOf(error);
     const completedAt = nowIso();
+    // A Copilot that could not be stopped keeps its pid, so a cancel can still stop it.
+    const copilotPid = error?.copilotStillRunning ? {} : { copilotPid: null };
     try {
       updateRunningJob(
         job.workspaceRoot,
@@ -234,6 +236,7 @@ export async function runTrackedJob(job, runner, options = {}) {
             phase: "failed",
             errorMessage,
             pid: null,
+            ...copilotPid,
             completedAt,
             logFile: options.logFile ?? job.logFile ?? existing.logFile ?? null
           };
@@ -242,6 +245,7 @@ export async function runTrackedJob(job, runner, options = {}) {
           status: "failed",
           phase: "failed",
           pid: null,
+          ...copilotPid,
           errorMessage,
           completedAt
         }
@@ -279,6 +283,7 @@ export async function runTrackedJob(job, runner, options = {}) {
         summary: execution.summary,
         phase: completionStatus === "completed" ? "done" : "failed",
         pid: null,
+        copilotPid: null,
         completedAt
       }
     );

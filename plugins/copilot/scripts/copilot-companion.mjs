@@ -982,7 +982,15 @@ function failWorkerJob(workspaceRoot, jobId, error) {
   try {
     updateJobRecord(workspaceRoot, jobId, (job) =>
       job?.status === "queued" || (job?.status === "running" && job.pid === process.pid)
-        ? { ...job, status: "failed", phase: "failed", pid: null, errorMessage, completedAt: nowIso() }
+        ? {
+            ...job,
+            status: "failed",
+            phase: "failed",
+            pid: null,
+            copilotPid: error?.copilotStillRunning ? job.copilotPid : null,
+            errorMessage,
+            completedAt: nowIso()
+          }
         : null
     );
   } catch {
@@ -1107,14 +1115,17 @@ export async function cancelJob(workspaceRoot, jobId, options = {}) {
           : `No job found for "${jobId}". Run /copilot:status to list known jobs.`
       );
     }
-    cancelled = {
-      ...current,
-      status: "cancelled",
-      phase: "cancelled",
-      completedAt,
-      cancelledAt: completedAt,
-      errorMessage: "Cancelled by user."
-    };
+    // A finished job whose stop did not finish keeps its outcome; only its processes are stopped.
+    cancelled = isActiveJobStatus(current.status)
+      ? {
+          ...current,
+          status: "cancelled",
+          phase: "cancelled",
+          completedAt,
+          cancelledAt: completedAt,
+          errorMessage: "Cancelled by user."
+        }
+      : current;
     return cancelled;
   });
 
@@ -1131,11 +1142,11 @@ export async function cancelJob(workspaceRoot, jobId, options = {}) {
   appendLogLine(cancelled.logFile, "Cancelled by user.");
   if (errors.length > 0) {
     throw new Error(
-      `Job ${jobId} is cancelled, but a process could not be stopped (${errors[0].message}). Run /copilot:cancel ${jobId} again.`
+      `Job ${jobId} is ${cancelled.status}, but a process could not be stopped (${errors[0].message}). Run /copilot:cancel ${jobId} again.`
     );
   }
   updateJobRecord(workspaceRoot, jobId, (current) =>
-    current?.status === "cancelled" ? { ...current, pid: null, copilotPid: null } : null
+    current && hasPendingStop(current) ? { ...current, pid: null, copilotPid: null } : null
   );
   return { job: { ...cancelled, pid: null, copilotPid: null }, interrupt };
 }

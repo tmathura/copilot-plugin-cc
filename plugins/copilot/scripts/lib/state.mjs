@@ -128,10 +128,10 @@ export function loadState(cwd, options = {}) {
   }
 }
 
-// A cancelled job that still names a pid had a cancel that did not finish: its processes may still
-// run, and a retry needs the pids.
+// A finished job names a pid only when a stop did not finish, a cancel's or its own: its processes
+// may still run, and a cancel needs the pids.
 export function hasPendingStop(job) {
-  return job.status === "cancelled" && Boolean(job.pid || job.copilotPid);
+  return (job.status === "cancelled" || job.status === "failed") && Boolean(job.pid || job.copilotPid);
 }
 
 function isActiveJob(job) {
