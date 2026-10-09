@@ -25,7 +25,7 @@ Execution mode rules:
   - For working-tree review, start with `git --no-optional-locks -c core.fsmonitor=false -c diff.autoRefreshIndex=false status --short --untracked-files=all`.
   - For working-tree review, also inspect both `git --no-optional-locks -c core.fsmonitor=false -c diff.autoRefreshIndex=false diff --shortstat --no-textconv --cached` and `git --no-optional-locks -c core.fsmonitor=false -c diff.autoRefreshIndex=false diff --shortstat --no-textconv`.
   - For base-branch review, use `git --no-optional-locks -c core.fsmonitor=false -c diff.autoRefreshIndex=false diff --shortstat --no-textconv <base>...HEAD`.
-  - Use these git options as written. They stop git from writing `.git/index` and from starting programs from the repository's git config.
+  - Use these git options as written. They stop git from writing `.git/index`, and from starting a `core.fsmonitor` hook or a `textconv` program. Clean filters, such as Git LFS, still run, and so can a `textconv` program in a changed submodule.
   - Treat untracked files or directories as reviewable work for auto or working-tree review even when the `--shortstat` output is empty.
   - Only conclude there is nothing to review when the relevant scope is actually empty.
   - Recommend waiting only when the scoped review is clearly tiny, roughly 1-2 files total and no sign of a broader directory-sized change.
