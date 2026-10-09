@@ -119,8 +119,9 @@ claude plugin install copilot@tmathura-copilot
 - Cancel cannot ask a running Copilot to stop its turn, because Copilot has no interrupt that another
   process can send. Cancel stops the process tree instead. `turnInterruptAttempted` is always
   `false`.
-- Cancel first marks the job cancelled, then stops its processes. It stops the companion and then
-  the Copilot process itself, so a Copilot process whose companion was killed is still stopped.
+- Cancel first marks the job cancelled, then stops its processes. It stops the companion and the
+  Copilot process itself at the same time, so a Copilot process whose companion was killed is still
+  stopped, and a process that ignores the stop signal costs one 5-second wait, not two.
   Codex stops the process first and marks the job after, so a job that starts between the two steps
   can keep running. If a process cannot be stopped, by cancel or at the end of a run, the job keeps
   its process ids, and you can run `/copilot:cancel <job id>` again.
