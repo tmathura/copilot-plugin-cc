@@ -17,12 +17,13 @@ One file per workspace, at `<state root>/<slug>-<hash>/state.json`.
 | --- | --- | --- |
 | `version` | number | `1` |
 | `config.stopReviewGate` | boolean | Default `false`. Set by `setup --enable-review-gate` or `--disable-review-gate` |
-| `jobs` | Job summary[] | Newest first. All queued and running jobs, plus at most 50 finished jobs. Pruning deletes the pruned jobs' files and logs |
+| `jobs` | Job summary[] | Newest first. All queued and running jobs, and cancelled or failed jobs that still name a pid because a stop did not finish (added 2026-10-09), plus at most 50 finished jobs. Pruning deletes the pruned jobs' files and logs |
 | `closedSessions` | `{ id, closedAt }[]` | Claude session ids that `SessionEnd` has closed. A companion that started before `closedAt` cannot create, claim or start a job for that session; companions of a resumed session start later and are allowed. Kept for 30 days, with no count cap; a companion paused for longer than that is not covered (research §7, hook time budgets) |
 
 Every update holds the lock file `state.json.lock` and replaces `state.json` through a temp file
 and a rename. Job files are replaced the same way (research §7, locked state updates; job files
-added 2026-10-08).
+added 2026-10-08). On Windows, a rename or read that meets another process is retried for up to 2
+seconds (added 2026-10-09, ticket 6).
 
 ## Job
 
@@ -46,7 +47,7 @@ added 2026-10-09, PR review).
 | `threadId` | string or null | **Copilot session id**, set with `--session-id` before the run starts (upstream: Codex thread id) |
 | `turnId` | string or null | **`turnId` of the last `assistant.turn_start` event** (upstream: Codex turn id) |
 | `pid` | number or null | The process to kill on cancel: the worker for background jobs, the companion for foreground jobs |
-| `copilotPid` | number or null | The Copilot child's process id while a run is active; cancel stops its group too (research §7) |
+| `copilotPid` | number or null | The Copilot child's process id while a run is active; cancel stops its group too (research §7). Cleared when the run ends; kept on a finished job only when Copilot could not be stopped, so a cancel can still stop it (added 2026-10-09) |
 | `write` | boolean | `true` only for `task --write` |
 | `logFile` | string | Path of `jobs/<id>.log` |
 | `request` | object | Background tasks only: the stored task request for `task-worker` |

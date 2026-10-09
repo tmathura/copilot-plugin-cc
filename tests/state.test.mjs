@@ -254,12 +254,24 @@ test("a job file that cannot be removed after the save does not fail the update"
   assert.equal(fs.existsSync(patchDir), false);
 });
 
-test("an older running job survives 55 newer finished jobs and can still be cancelled", () => {
+test("an older running job, or a finished one whose stop did not finish, survives 55 newer finished jobs and can still be cancelled", () => {
   const workspace = makeTempDir();
   const runningJob = addJobWithFiles(workspace, {
     id: "task-running",
     status: "running",
     pid: process.pid,
+    updatedAt: new Date(Date.UTC(2026, 0, 1)).toISOString()
+  });
+  const pendingStop = addJobWithFiles(workspace, {
+    id: "task-pending-stop",
+    status: "cancelled",
+    copilotPid: process.pid,
+    updatedAt: new Date(Date.UTC(2026, 0, 1)).toISOString()
+  });
+  const failedStop = addJobWithFiles(workspace, {
+    id: "task-failed-stop",
+    status: "failed",
+    copilotPid: process.pid,
     updatedAt: new Date(Date.UTC(2026, 0, 1)).toISOString()
   });
   const finishedJobs = Array.from({ length: 55 }, (_, index) =>
@@ -271,15 +283,17 @@ test("an older running job survives 55 newer finished jobs and can still be canc
   );
 
   updateState(workspace, (state) => {
-    state.jobs = [runningJob, ...finishedJobs];
+    state.jobs = [runningJob, pendingStop, failedStop, ...finishedJobs];
   });
 
   const jobs = listJobs(workspace);
   assert.equal(jobs.filter((job) => job.status === "completed").length, 50);
-  assert.ok(jobs.some((job) => job.id === "task-running"));
-  assert.equal(fs.existsSync(resolveJobFile(workspace, "task-running")), true);
-  assert.equal(fs.existsSync(runningJob.logFile), true);
-  assert.equal(resolveCancelableJob(workspace, "task-running").job.id, "task-running");
+  for (const job of [runningJob, pendingStop, failedStop]) {
+    assert.ok(jobs.some((entry) => entry.id === job.id), job.id);
+    assert.equal(fs.existsSync(resolveJobFile(workspace, job.id)), true, job.id);
+    assert.equal(fs.existsSync(job.logFile), true, job.id);
+    assert.equal(resolveCancelableJob(workspace, job.id).job.id, job.id);
+  }
 });
 
 test("processes that add jobs at the same time all keep their records and logs", async () => {
@@ -368,6 +382,30 @@ test("a lock held by a live process stays, however old, and the waiting update c
     fs.rmSync(lockFile, { force: true });
   }
 });
+
+test(
+  "an update waits for a reader that holds the state file open, instead of failing to replace it",
+  { skip: process.platform !== "win32" && "only Windows refuses to replace an open file" },
+  async () => {
+    const workspace = makeTempDir();
+    updateState(workspace, (state) => {
+      state.config.stopReviewGate = false;
+    });
+    const stateFile = resolveStateFile(workspace);
+    const reader = spawn(
+      process.execPath,
+      ["-e", "const fd = require('fs').openSync(process.argv[1], 'r'); console.log('open'); setTimeout(() => require('fs').closeSync(fd), 300);", stateFile],
+      { stdio: ["ignore", "pipe", "ignore"] }
+    );
+    await new Promise((resolve) => reader.stdout.once("data", resolve));
+
+    updateState(workspace, (state) => {
+      state.config.stopReviewGate = true;
+    });
+
+    assert.equal(loadState(workspace).config.stopReviewGate, true);
+  }
+);
 
 test("a lock with no readable owner stays, and the error says how to clear it", () => {
   const workspace = makeTempDir();

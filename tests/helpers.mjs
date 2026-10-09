@@ -1,5 +1,5 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): renamed for the copilot plugin; run() never
-// uses a shell.
+// uses a shell; test repositories run no background git maintenance.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -30,4 +30,7 @@ export function initGitRepo(cwd) {
   run("git", ["config", "user.email", "tests@example.com"], { cwd });
   run("git", ["config", "commit.gpgsign", "false"], { cwd });
   run("git", ["config", "tag.gpgsign", "false"], { cwd });
+  // A commit can start background maintenance, which writes in .git while a test reads it.
+  run("git", ["config", "maintenance.auto", "false"], { cwd });
+  run("git", ["config", "gc.auto", "0"], { cwd });
 }

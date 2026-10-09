@@ -316,13 +316,13 @@ cancel a second task; its process tree is gone.
 
 ### Tests for User Stories 3 and 4
 
-- [ ] T060 [P] [US3] Add task tests to `tests/runtime.test.mjs`: read-only task cannot write; `--write`
+- [X] T060 [P] [US3] Add task tests to `tests/runtime.test.mjs`: read-only task cannot write; `--write`
   builds the write profile; `--model` and `--effort` become Copilot arguments; a bad `--effort` fails;
   `--resume-last` with no earlier task fails with upstream's message; resume passes `--resume=<id>`
   with the profile of the new run; the write profile includes `--sandbox`; resume does not cross modes
   in either direction (a read-only task is not resumed by a `--write` run, and the reverse), and the
   error says to use `--fresh`; `task-resume-candidate` reports the candidate's `write` value
-- [ ] T061 [P] [US4] Add job tests to `tests/runtime.test.mjs`: background task queued then completed;
+- [X] T061 [P] [US4] Add job tests to `tests/runtime.test.mjs`: background task queued then completed;
   `status` table and single job; `result` output with `copilot --resume=<id>` for a write task and
   none for a read-only task; cancel kills the worker, the fake Copilot process and a child that the
   fake starts, within 10 seconds (poll with a time limit, no fixed sleep), and marks the job
@@ -340,39 +340,63 @@ cancel a second task; its process tree is gone.
   `failed` with that error, not `queued`; with cancel paused after it picks a queued job while the
   worker claims it and starts Copilot, the cancel still stops that Copilot (it reads the PIDs under
   the lock) or the job never starts
-- [ ] T062 [P] [US3] Port the `rescue.md` checks in `tests/commands.test.mjs`
+- [X] T062 [P] [US3] Port the `rescue.md` checks in `tests/commands.test.mjs`
 
 ### Implementation for User Stories 3 and 4
 
-- [ ] T063 [US3] Add `resumeThread` (`--resume=<id>`), `findLatestTaskThread` (the newest task job
+- [X] T063 [US3] Add `resumeThread` (`--resume=<id>`), `findLatestTaskThread` (the newest task job
   in the plugin state with the same `write` value), `buildPersistentTaskThreadName`, `DEFAULT_CONTINUE_PROMPT` and
-  `interruptPromptModeTurn` (not attempted) to `P/scripts/lib/copilot.mjs`
-- [ ] T064 [US3] Add `task`, `task-worker` and `task-resume-candidate` to
+  `interruptPromptModeTurn` (not attempted) to `P/scripts/lib/copilot.mjs`. Changed 2026-10-09:
+  `resumeThread` is not a separate function; `buildCopilotArgs` already passes `--resume=<id>` for
+  `resumeSessionId` (ticket 4), as the call-site map row for `resumeThread` says. Rejected
+  alternative: a one-line wrapper with no caller of its own
+- [X] T064 [US3] Add `task`, `task-worker` and `task-resume-candidate` to
   `P/scripts/copilot-companion.mjs` (`MODEL_ALIASES` empty, `VALID_REASONING_EFFORTS` as upstream);
   `enqueueBackgroundTask` writes the `queued` record before it starts the worker, and stores the
   worker's `pid` only if the job is still `queued`, or marks it `failed` if the worker cannot start;
   `task-worker` claims the job inside
   `updateState` only if it is still `queued`, and exits without running a cancelled or missing job
   (research.md §7, background start order)
-- [ ] T065 [US4] Add `status`, `result` and `cancel` to `P/scripts/copilot-companion.mjs`; start
+- [X] T065 [US4] Add `status`, `result` and `cancel` to `P/scripts/copilot-companion.mjs`; start
   Copilot inside `updateState` only if the job is still `running`, and write `copilotPid` in that
   same step, as one synchronous block; if that save fails, kill the new Copilot tree before the
   error is reported (tested with a state save that throws); `cancel` first re-reads the job, marks
   it `cancelled` and reads its current `pid` and `copilotPid` in one `updateState`, then signals
   both (research.md §7, stopping a job and hook time budgets)
-- [ ] T066 [P] [US3] Port `U/commands/rescue.md` to `P/commands/rescue.md` (no `spark`)
-- [ ] T067 [P] [US4] Port `U/commands/status.md`, `U/commands/result.md` and `U/commands/cancel.md` to
+- [X] T065b [US4] In `P/scripts/lib/job-control.mjs`, `resolveCancelableJob` matches an explicit
+  reference against all jobs first, then refuses a job that is not queued or running; test the
+  exact-id clash in `tests/job-control.test.mjs` (added 2026-10-09, from the Copilot review of PR
+  #15; research.md §7, stopping a job)
+- [X] T065d [US4] Cancel keeps the job's pids until every signal is sent and can run again on a
+  cancelled job that still names one, which pruning keeps and which blocks a resume; a worker that stops with an error, or
+  whose run could not save its final status, marks its job `failed`; a Copilot that cannot be
+  stopped after a failed pid save is named in the error; a run whose own stop of Copilot fails keeps
+  `copilotPid` as a `failed` job, which cancel can stop; cancel stops both pids at the same time and
+  clears each when its own stop is done; `terminateProcessTree` accepts the macOS group `EPERM` when
+  the leader is gone (all added 2026-10-09, PR review and CI); test the retry, the pruning, a worker with
+  a broken record and the failed stop in `tests/runtime.test.mjs`, `tests/state.test.mjs` and
+  `tests/copilot.test.mjs` (added
+  2026-10-09, Codex review; research.md §7, stopping a job and background start order)
+- [X] T065c [US4] In `P/scripts/lib/state.mjs`, retry on Windows a rename that meets an open file and
+  a read that misses the file while another process holds the state lock, for up to 2 seconds; test an update while
+  another process holds `state.json` open in `tests/state.test.mjs` (added 2026-10-09, found by the
+  T061 tests; research.md §7, locked state updates)
+- [X] T066 [P] [US3] Port `U/commands/rescue.md` to `P/commands/rescue.md` (no `spark`; when the
+  request continues a task, also with `--resume`, it tells the subagent that task's mode, and the
+  agent and the runtime skill add `--write` only for a `--write` task; added 2026-10-09, research.md
+  §7, resume stays in one mode)
+- [X] T067 [P] [US4] Port `U/commands/status.md`, `U/commands/result.md` and `U/commands/cancel.md` to
   `P/commands/`
-- [ ] T068 [P] [US3] Port `U/agents/codex-rescue.md` to `P/agents/copilot-rescue.md`
-- [ ] T069 [P] [US3] Port `U/skills/gpt-5-4-prompting/` to `P/skills/gpt-5-4-prompting/` (same name;
+- [X] T068 [P] [US3] Port `U/agents/codex-rescue.md` to `P/agents/copilot-rescue.md`
+- [X] T069 [P] [US3] Port `U/skills/gpt-5-4-prompting/` to `P/skills/gpt-5-4-prompting/` (same name;
   references renamed to `copilot-prompt-*.md`; `Codex` becomes `Copilot`)
-- [ ] T070 [P] [US4] Write `docs/operations.md`: job states, where logs and state live, how to cancel,
+- [X] T070 [P] [US4] Write `docs/operations.md`: job states, where logs and state live, how to cancel,
   how to clean up (including read-only sessions in the plugin `COPILOT_HOME`), how to resume a write
   task in the Copilot CLI, and a warning never to start Copilot by hand with the plugin `COPILOT_HOME`
-- [ ] T071 [US3] Add the Phase 6 differences (no `spark`, cancel without protocol interrupt, task lookup
+- [X] T071 [US3] Add the Phase 6 differences (no `spark`, cancel without protocol interrupt, task lookup
   by plugin state, resume within one mode, `--sandbox` for write tasks and what happens where the host
   cannot sandbox) to the README section
-- [ ] T072 [US3] Run `claude plugin validate .`, `npm run build` and `node --test tests/*.test.mjs`;
+- [X] T072 [US3] Run `claude plugin validate .`, `npm run build` and `node --test tests/*.test.mjs`;
   all pass
 
 **Checkpoint**: rescue, status, result and cancel work against a real Copilot.

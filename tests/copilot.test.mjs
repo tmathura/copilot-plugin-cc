@@ -8,8 +8,11 @@ import {
   buildCopilotEnv,
   getCopilotAuthStatus,
   getCopilotAvailability,
+  findLatestTaskThread,
   runPromptModeTurn
 } from "../plugins/copilot/scripts/lib/copilot.mjs";
+import { terminateProcessTree } from "../plugins/copilot/scripts/lib/process.mjs";
+import { updateState } from "../plugins/copilot/scripts/lib/state.mjs";
 import { buildEnv, installFakeCopilot, readFakeCopilotRuns, readFakeVersionPids } from "./fake-copilot-fixture.mjs";
 import { makeTempDir } from "./helpers.mjs";
 
@@ -232,6 +235,96 @@ test("a process that hangs after a successful result still counts as a success",
 
   assert.equal(result.status, 0);
   assert.equal(result.finalMessage, "Fake Copilot answer.");
+});
+
+test("a run whose start guard declines never starts Copilot and reports no session to resume", async () => {
+  const { workDir, env, runs } = setUp("ok");
+  const events = [];
+
+  await assert.rejects(
+    runPromptModeTurn(workDir, { prompt: "x", env, guardStart: () => {}, onProgress: (event) => events.push(event) }),
+    /cancelled or removed before Copilot started/
+  );
+  assert.deepEqual(runs(), []);
+  assert.ok(!events.some((event) => event?.threadId), JSON.stringify(events));
+});
+
+test("a run whose start guard fails after the start stops the new Copilot before it reports the error", async () => {
+  const { workDir, env } = setUp("hang");
+  let copilotPid = null;
+
+  await assert.rejects(
+    runPromptModeTurn(workDir, {
+      prompt: "x",
+      env,
+      guardStart: (start) => {
+        copilotPid = start();
+        throw new Error("the state save failed");
+      }
+    }),
+    /the state save failed/
+  );
+  assert.ok(copilotPid > 0);
+  await waitFor(() => !isAlive(copilotPid));
+});
+
+test("a run whose start guard fails and whose Copilot cannot be stopped names that process", async () => {
+  const { workDir, env } = setUp("hang");
+  let copilotPid = null;
+
+  try {
+    await assert.rejects(
+      runPromptModeTurn(workDir, {
+        prompt: "x",
+        env,
+        guardStart: (start) => {
+          copilotPid = start();
+          throw new Error("the state save failed.");
+        },
+        terminateImpl: async () => {
+          throw new Error("taskkill failed");
+        }
+      }),
+      (error) => {
+        assert.equal(
+          error.message,
+          `the state save failed. Copilot (process ${copilotPid}) could not be stopped either (taskkill failed); stop it by hand.`
+        );
+        return true;
+      }
+    );
+    assert.ok(isAlive(copilotPid));
+  } finally {
+    await terminateProcessTree(copilotPid);
+  }
+});
+
+test("the latest task thread is the newest finished task of the same mode", () => {
+  const previousDataDir = process.env.CLAUDE_PLUGIN_DATA;
+  process.env.CLAUDE_PLUGIN_DATA = makeTempDir();
+  try {
+    const workspace = makeTempDir();
+    const at = (minute) => new Date(Date.UTC(2026, 0, 1, 0, minute)).toISOString();
+    updateState(workspace, (state) => {
+      state.jobs = [
+        { id: "task-read-old", jobClass: "task", status: "completed", write: false, threadId: "s-read-old", updatedAt: at(1) },
+        { id: "task-read-new", jobClass: "task", status: "failed", write: false, threadId: "s-read-new", updatedAt: at(2) },
+        { id: "task-write", jobClass: "task", status: "completed", write: true, threadId: "s-write", updatedAt: at(3) },
+        { id: "task-running", jobClass: "task", status: "running", write: false, threadId: "s-running", updatedAt: at(4) },
+        { id: "review-new", jobClass: "review", status: "completed", threadId: "s-review", updatedAt: at(5) }
+      ];
+    });
+
+    assert.deepEqual(findLatestTaskThread(workspace), { id: "s-read-new" });
+    assert.deepEqual(findLatestTaskThread(workspace, { write: true }), { id: "s-write" });
+    assert.equal(findLatestTaskThread(makeTempDir(), { write: true }), null);
+  } finally {
+    if (previousDataDir === undefined) {
+      delete process.env.CLAUDE_PLUGIN_DATA;
+    } else {
+      process.env.CLAUDE_PLUGIN_DATA = previousDataDir;
+    }
+  }
 });
 
 test("a run refuses to start when Copilot is missing, too old or its version cannot be read", async () => {

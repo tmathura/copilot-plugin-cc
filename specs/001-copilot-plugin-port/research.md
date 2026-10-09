@@ -402,7 +402,11 @@ Later tickets apply these rules. The call-site map uses them.
 - **Resume stays in one mode**: a session lives in the home of the mode that made it. `--resume-last`
   only picks a task with the same `write` value as the new run. If there is none, the error says to
   use `--fresh`. `task-resume-candidate` runs before the mode is known, so it reports the
-  candidate's `write` value and does not filter.
+  candidate's `write` value and does not filter. `/copilot:rescue` passes that value on: when the
+  request continues a task, also with an explicit `--resume`, it tells the subagent the mode of that
+  task, and the subagent adds `--write` only for a `--write` task (added 2026-10-09, ticket 6;
+  rejected alternatives: no hint, so the resume fails; the companion takes the mode from the resumed
+  job, which would ignore an explicit `--write`).
 - **Type check**: upstream type-checks its protocol client with generated types. Copilot has no
   generator. The port hand-writes the few event types in `scripts/lib/prompt-mode-protocol.d.ts` and
   keeps the `tsc` check with `typescript` and `@types/node` as devDependencies.
@@ -437,7 +441,14 @@ Later tickets apply these rules. The call-site map uses them.
     Claude's Bash tool started (a foreground or Bash-background review) is not a group leader, and
     upstream returns without signalling it. Any other group signal error (such as `EPERM`, which
     means no process in the group could be signalled) is thrown, not hidden (added 2026-10-08, PR
-    review; upstream then tries the process and can report "not delivered" instead).
+    review; upstream then tries the process and can report "not delivered" instead). Changed
+    2026-10-09 (ticket 6, macOS CI): macOS answers `EPERM` for a group that holds an exited process
+    its parent has not reaped yet, although the other members get the signal. So on macOS only (a
+    group `EPERM` on other systems is still thrown), a group `EPERM` signals the leader itself: if the leader is gone, nothing is left to stop; if the leader cannot
+    be signalled either, the `EPERM` is real and is thrown. While waiting, a group `EPERM` counts as
+    alive only while the leader is, and a group `SIGKILL` that answers `EPERM` goes to the leader
+    itself, whose own `EPERM` is thrown. Rejected alternative: throw every group `EPERM`, which
+    failed a normal cancel on macOS.
   - It waits up to 5 seconds (an option, so tests can use less). If the process or its group is
     still alive, it sends `SIGKILL` to it. Windows already uses `taskkill /T /F`.
   - A pid that is not a positive integer is never signalled: `kill(0)` would signal the caller's own
@@ -449,16 +460,33 @@ Later tickets apply these rules. The call-site map uses them.
     `SessionEnd`) can also wait for all of them at once. Rejected alternative: a blocking wait, as
     upstream's synchronous function would need.
   - The job record also keeps `copilotPid`, the Copilot child's process id, set when the run starts.
-    Cancel stops the job's `pid` and then the `copilotPid` group, so a Copilot run whose companion
-    was killed with `SIGKILL` is still stopped.
+    Cancel stops the job's `pid` and the `copilotPid` group, so a Copilot run whose companion was
+    killed with `SIGKILL` is still stopped. It stops both at the same time (changed 2026-10-09,
+    ticket 6, Ubuntu CI): one after the other, a companion and a Copilot that both outlive `SIGTERM`
+    take two 5-second waits, past the 10 seconds of SC-007. Rejected alternative: the companion
+    first, then Copilot.
   - Cancel first re-reads the job, marks it `cancelled` and reads its current `pid` and
     `copilotPid` in one `updateState`, and only then sends signals, as `SessionEnd` does (decided
     2026-10-08, after Copilot PR review). The worker claim and the Copilot start use the same lock,
     so a job either was claimed and started before this step (its PIDs are read) or finds itself
     cancelled and never starts. Upstream signals first and saves `cancelled` after (rejected: a job
     that starts between the two steps escapes the kill).
-  - The rule for every stopper (cancel, `SessionEnd`, the review gate): stop the companion, then
-    stop the `copilotPid` of its job record itself. Never rely only on the companion's `SIGTERM`
+  - The cancelled record keeps its `pid` and `copilotPid` until their stops are done, and cancel
+    clears each one only when its own stop is done (per pid added 2026-10-09, PR review). If a signal fails, or the cancel itself is stopped, `/copilot:cancel
+    <job id>` can run again on that cancelled job, and pruning keeps it like an active job. Such a
+    task also blocks `--resume-last` and is never a resume candidate, because its Copilot may still
+    run in that session (decided 2026-10-09, ticket 6 Codex review rounds 1 to 3; correctness).
+    The same holds for a run whose own stop of Copilot failed (for example the kill after `result`):
+    every normal final status write clears `copilotPid`, but a run that ends because Copilot could
+    not be stopped keeps it, with status `failed`. Cancel then stops that Copilot and leaves the job
+    `failed` (added 2026-10-09, Codex review round 5). Rejected alternative: clear the pids in the
+    locked step, which leaves a live Copilot that no later cancel can find.
+  - Cancel matches an explicit job reference against all jobs first (exact id, then a unique
+    prefix), then refuses a matched job that is not queued or running (decided 2026-10-09, ticket 6,
+    from the Copilot review of PR #15; correctness). Rejected alternative: upstream, which matches
+    only active jobs, so the exact id of a finished `task-abc` cancels a running `task-abcdef`.
+  - The rule for every stopper (cancel, `SessionEnd`, the review gate): stop the companion, and
+    also stop the `copilotPid` of its job record itself. Never rely only on the companion's `SIGTERM`
     handler, because the companion can be killed before the handler finishes. The gate finds the
     record by the companion's `pid`.
 - **Gate context folder**: the gate hook writes the patch folder (§2) and passes it to the companion
@@ -471,9 +499,17 @@ Later tickets apply these rules. The call-site map uses them.
   worker first; a worker that reads the job record before it exists exits at once, and the job stays
   `queued` forever. Rejected alternative: upstream's order, kept for parity.
   If the worker cannot be started (`spawn` reports an error, or gives no `pid`), the companion marks
-  the job `failed` through `updateState` with the error, so it never stays `queued`.
+  the job `failed` through `updateState` with the error, so it never stays `queued`. If the worker
+  started but its `pid` cannot be saved, the launch still counts: the worker claims the queued job
+  and saves its own `pid` (added 2026-10-09, PR review; rejected alternative: report a failed launch
+  while the worker runs the job).
   The worker claims the job inside `updateState`: only if the job is still `queued` does it set
   `running` and its own `pid`. Otherwise (cancelled or missing) it exits without running anything.
+  A worker that stops with an error before its run records an outcome (an unreadable record, a
+  state lock it cannot take), or whose run could not save its final status, marks its job `failed`,
+  if the job is still `queued` or is `running` under its own `pid`; its output goes nowhere, so
+  nothing else would (decided 2026-10-09, ticket 6 Codex review rounds 1 and 2; correctness). Rejected alternative: upstream, where such a job stays active and
+  blocks every later `--resume-last` until someone cancels it.
   Cancel also changes the job inside `updateState`, so a cancel and a claim never both win. Reason:
   without the claim, a job cancelled before its worker starts would still run, even with `--write`.
   `runTrackedJob` follows the same rule (decided 2026-10-08, after Copilot PR review). Its start
@@ -508,11 +544,16 @@ Later tickets apply these rules. The call-site map uses them.
     cannot push an entry out early. Not covered: a companion paused for longer than 30 days. The worker claim and
     the Copilot start use the same lock: a companion starts Copilot only inside `updateState`,
     after it checks that its job is still `running`, and it writes `copilotPid` in that same step
-    (Node returns the child's `pid` from `spawn` at once). The check, the spawn and the save run as
+    (Node returns the child's `pid` from `spawn` at once). The adapter takes a `guardStart` option
+    for this: the companion passes `guardCopilotStart` from `tracked-jobs.mjs`, which calls the
+    adapter's start function inside its `updateState`, so only `copilot.mjs` imports
+    `prompt-mode.mjs` (added 2026-10-09, ticket 6). The check, the spawn and the save run as
     one synchronous block (synchronous file calls, as upstream `state.mjs` uses), so no signal
     handler runs inside it, and the plugin's own `SIGKILL` comes seconds after its `SIGTERM`. If the
     save fails after the spawn, the companion kills the new Copilot process tree before it reports
-    the error. So
+    the error. If that kill fails too, the error names the Copilot process id, so the user can stop
+    it (added 2026-10-09, ticket 6 Codex review round 4; rejected alternative: keep the pid for a
+    cancel retry, which needs the state save that has just failed). So
     every Copilot child either is in the `SessionEnd` snapshot or is never started, and a worker
     either claimed before this step or finds its job cancelled. Not covered: an outside `kill -9`
     that lands inside that block. Rejected alternative: a supervisor process that gates every
@@ -564,6 +605,17 @@ Later tickets apply these rules. The call-site map uses them.
   the final write).
   Rejected alternative: keep upstream's unlocked update for parity; upstream has the same race, but
   this port relies on the job records to stop processes.
+  On Windows a rename cannot replace a file that another process has open (`EPERM`), and a reader
+  can miss the file during a rename (`ENOENT`). Measured on Windows 11 (2026-10-09, ticket 6): with
+  one process reading `state.json` in a loop, most renames over it failed, and some reads found no
+  file. So the state module retries a rename that fails with `EPERM`, `EACCES` or `EBUSY`, and a
+  read that fails with one of these or with `ENOENT` while the state lock exists, for up to 2
+  seconds (decided 2026-10-09, ticket 6; correctness, platform support). Writers replace these
+  files only under the state lock, so a missing file is retried only while another process holds
+  that lock, or when the file is back by the time the reader checks (the writer has finished); with
+  no lock, or with the reader's own lock, the file is missing for real. Rejected alternatives: no retry, where a job fails,
+  or a worker misses its job record, when `/copilot:status` reads at the same moment; readers that
+  take the state lock too, where every status read writes a lock file and waits for writers.
   Without `CLAUDE_PLUGIN_DATA`, the state lives in `~/.copilot-companion/state`, owned by the user,
   as the plugin's Copilot home does (§3). On macOS and Linux, `~/.copilot-companion` is set to
   owner-only (`0700`) before each state write, also when it already exists, so other users cannot

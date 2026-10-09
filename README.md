@@ -7,8 +7,8 @@ keeps the same commands and layout, and calls the Copilot CLI instead of Codex.
 
 ## Status
 
-Work in progress. The plugin has `/copilot:setup`, `/copilot:review` and
-`/copilot:adversarial-review`. The other commands below describe what the first release will do.
+Work in progress. The plugin has every command below and the `copilot-rescue` subagent. The review
+gate comes next. [docs/operations.md](docs/operations.md) says how to look after jobs.
 
 ## What you get
 
@@ -88,7 +88,8 @@ claude plugin install copilot@tmathura-copilot
   holds a lock file, and pruning never removes a queued or running job. Codex can lose a job in that
   case, and cancel then cannot find the process to stop.
 - Cancel waits up to 5 seconds and then force-stops a process that ignores the stop signal. It also
-  stops a process that Claude's Bash tool started, which leads no process group.
+  stops a process that Claude's Bash tool started, which leads no process group. On macOS it
+  accepts the error that macOS gives for a process group whose members have exited.
 - A job that was cancelled, or a job whose Claude session has ended, never starts and is never
   marked as running again.
 - Job reports show a `copilot --resume=<id>` command only for `--write` tasks. Read-only jobs run
@@ -103,6 +104,43 @@ claude plugin install copilot@tmathura-copilot
   that starts any other tool is stopped.
 - When the companion is stopped with `SIGTERM` or `SIGINT`, it first stops its Copilot process and
   that process's children.
+- `/copilot:rescue` has no `spark` model name. Copilot has no such model.
+- `/copilot:rescue --resume` continues only a task of the same mode: a read-only task continues a
+  read-only task, and a `--write` task a `--write` task. Each mode keeps its sessions in a different
+  Copilot folder. If there is no such task, the error says to use `--fresh`. The rescue command tells
+  the subagent the mode of the task it continues, so the subagent adds `--write` only for a
+  `--write` task.
+- `/copilot:rescue --resume` finds the last task in the plugin's own job records. Codex asks its app
+  server for its list of threads. Copilot has no such list.
+- A `--write` task runs shell commands in Copilot's sandbox (`--sandbox`). The sandbox lets commands
+  write in the working folder, the temp folder and your user folder, so it is wider than Codex's
+  `workspace-write`. Where your system cannot run the sandbox, Copilot runs shell commands with your
+  full rights, and the plugin cannot detect this.
+- Cancel cannot ask a running Copilot to stop its turn, because Copilot has no interrupt that another
+  process can send. Cancel stops the process tree instead. `turnInterruptAttempted` is always
+  `false`.
+- Cancel first marks the job cancelled, then stops its processes. It stops the companion and the
+  Copilot process itself at the same time, so a Copilot process whose companion was killed is still
+  stopped, and a process that ignores the stop signal costs one 5-second wait, not two.
+  Codex stops the process first and marks the job after, so a job that starts between the two steps
+  can keep running. If a process cannot be stopped, by cancel or at the end of a run, the job keeps
+  its process ids, and you can run `/copilot:cancel <job id>` again.
+- A background task's record is written before its worker starts. Codex starts the worker first, and
+  a worker that finds no record leaves the job queued forever. If the worker cannot start, or stops
+  with an error before its run ends, the job is marked failed.
+- A task that fails after Copilot has answered, for example when a read-only task starts a write
+  tool, shows the answer and then why the run failed, also in `/copilot:result`. Codex shows only
+  the answer, which reads like a success.
+- `/copilot:cancel <job id>` with the full id of a finished job says that the job has finished. Codex
+  can pick a different, running job whose id starts with the same text.
+- The rescue skill rule that defaults to `--write` repeats the exceptions for review, diagnosis and
+  research without edits, and the prompt recipes run diagnosis without edits read-only. The Codex
+  skill lists the exceptions in one rule but not in the other, and its recipes run diagnosis in
+  write mode.
+- The plugin replaces the job state and job files through a temp file and a rename, so a reader
+  never sees half a file. Codex writes over the file. On Windows a rename fails while another
+  process reads the file, and a reader can miss the file during a rename, so the plugin retries both
+  for up to 2 seconds.
 
 ## Development
 

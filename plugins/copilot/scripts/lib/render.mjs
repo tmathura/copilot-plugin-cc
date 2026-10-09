@@ -1,5 +1,6 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): renamed for the copilot plugin; only write tasks
-// show a resume command, as copilot --resume=<id>.
+// show a resume command, as copilot --resume=<id>; a cancel of a failed job reports that it stays
+// failed; a failed job's result is its rendered text, which says why it failed.
 function severityRank(severity) {
   switch (severity) {
     case "critical":
@@ -398,7 +399,8 @@ export function renderStoredJobResult(job, storedJob) {
     `Copilot session ID: ${threadId}`,
     ...(resumeCommand ? [`Resume in Copilot: ${resumeCommand}`] : [])
   ];
-  if (isStructuredReviewStoredResult(storedJob) && storedJob?.rendered) {
+  // A failed run's rendered text says why it failed; its raw answer alone would not.
+  if ((isStructuredReviewStoredResult(storedJob) || storedJob?.status === "failed") && storedJob?.rendered) {
     const output = storedJob.rendered.endsWith("\n") ? storedJob.rendered : `${storedJob.rendered}\n`;
     if (!threadId) {
       return output;
@@ -456,7 +458,8 @@ export function renderCancelReport(job) {
   const lines = [
     "# Copilot Cancel",
     "",
-    `Cancelled ${job.id}.`,
+    // A failed job whose Copilot outlived its run keeps its outcome; only its processes were stopped.
+    job.status === "failed" ? `Stopped the remaining processes of ${job.id}, which stays failed.` : `Cancelled ${job.id}.`,
     ""
   ];
 

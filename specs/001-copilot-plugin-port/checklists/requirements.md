@@ -36,3 +36,9 @@
 - FR-031 was resolved: port `gpt-5-4-prompting` with the same name.
 - FR-017 holds for reviews above the inline limit: their patch folder is a job file in the plugin's
   job storage, outside the repository (research.md §2, 2026-10-09).
+- FR-020 holds: the companion runs a task read-only unless `--write` is given. The subagent adds
+  `--write` under the upstream rule (constitution IV), except for review, diagnosis or research
+  without edits, and a continued task keeps its mode (research.md §7, 2026-10-09).
+- FR-024 and SC-007 hold: cancel stops the companion and Copilot at the same time, within one 5 s
+  wait and a `SIGKILL`; a process that cannot be stopped keeps its pid in the job, so cancel can run
+  again (research.md §7, stopping a job, 2026-10-09).

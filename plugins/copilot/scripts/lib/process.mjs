@@ -1,6 +1,7 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): never starts a shell; adds resolveLauncher for
 // Windows npm shims; terminateProcessTree returns a promise, signals a process that leads no group,
-// and sends SIGKILL to what is still alive after a wait.
+// sends SIGKILL to what is still alive after a wait, and accepts the macOS EPERM for a group whose
+// members have exited.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -134,12 +135,31 @@ function looksLikeMissingProcessMessage(text) {
   return /not found|no running instance|cannot find|does not exist|no such process/i.test(text);
 }
 
-function isAlive(target, killImpl) {
+// macOS answers EPERM for a group that holds an exited process not yet reaped, though the others
+// still get the signal; there the leader shows whether the refusal is real. Elsewhere EPERM is real.
+function isMacGroupRefusal(error, target, darwin) {
+  return darwin && target < 0 && error?.code === "EPERM";
+}
+
+function isAlive(target, killImpl, darwin = false) {
   try {
     killImpl(target, 0);
     return true;
   } catch (error) {
+    if (isMacGroupRefusal(error, target, darwin)) {
+      return isAlive(-target, killImpl);
+    }
     return error?.code !== "ESRCH";
+  }
+}
+
+function killLeaderOrThrow(pid, killImpl) {
+  try {
+    killImpl(pid, "SIGKILL");
+  } catch (error) {
+    if (error?.code !== "ESRCH") {
+      throw error;
+    }
   }
 }
 
@@ -147,13 +167,16 @@ function isAlive(target, killImpl) {
 // loop: Node reaps the caller's own exited child only from the loop, and until then it looks alive.
 async function forceKillAfterWait(target, options, killImpl) {
   const deadline = Date.now() + (options.forceKillAfterMs ?? DEFAULT_FORCE_KILL_AFTER_MS);
-  while (isAlive(target, killImpl)) {
+  const darwin = (options.platform ?? process.platform) === "darwin";
+  while (isAlive(target, killImpl, darwin)) {
     const remaining = deadline - Date.now();
     if (remaining <= 0) {
       try {
         killImpl(target, "SIGKILL");
       } catch (error) {
-        if (error?.code !== "ESRCH") {
+        if (isMacGroupRefusal(error, target, darwin)) {
+          killLeaderOrThrow(-target, killImpl);
+        } else if (error?.code !== "ESRCH") {
           throw error;
         }
       }
@@ -213,12 +236,15 @@ export async function terminateProcessTree(pid, options = {}) {
     killImpl(-pid, "SIGTERM");
   } catch (error) {
     // A process that Claude's Bash tool started leads no group (ESRCH), but it must still stop. Any
-    // other error means the group could not be signalled, and the caller must know.
-    if (error?.code !== "ESRCH") {
+    // other error, apart from the macOS group refusal, means the group could not be signalled, and the
+    // caller must know.
+    if (error?.code !== "ESRCH" && !isMacGroupRefusal(error, -pid, platform === "darwin")) {
       throw error;
     }
-    target = pid;
-    method = "process";
+    if (error.code === "ESRCH") {
+      target = pid;
+      method = "process";
+    }
     try {
       killImpl(pid, "SIGTERM");
     } catch (innerError) {

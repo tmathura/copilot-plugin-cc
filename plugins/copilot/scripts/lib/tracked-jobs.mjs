@@ -1,5 +1,6 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): renamed for the copilot plugin; job status and
-// progress writes go through one locked update and never revive a cancelled or missing job.
+// progress writes go through one locked update and never revive a cancelled or missing job; a job
+// starts Copilot inside a locked update and saves its pid there.
 import fs from "node:fs";
 import process from "node:process";
 
@@ -96,6 +97,26 @@ function updateRunningJob(workspaceRoot, jobId, buildRecord, statePatch) {
       updatedAt: nowIso()
     };
   });
+}
+
+// Cancel reads a job's pids under the same lock, so it either sees the Copilot pid or finds a job that
+// never starts Copilot. The check, the start and the save run as one synchronous step.
+export function guardCopilotStart(workspaceRoot, jobId) {
+  return (start) => {
+    updateState(workspaceRoot, (state) => {
+      const index = state.jobs.findIndex((job) => job.id === jobId);
+      if (index === -1 || state.jobs[index].status !== "running") {
+        return;
+      }
+      assertSessionOpen(state, state.jobs[index].sessionId);
+      const copilotPid = start();
+      const storedJob = readJobFileOrNull(resolveJobFile(workspaceRoot, jobId));
+      if (storedJob) {
+        writeJobFile(workspaceRoot, jobId, { ...storedJob, copilotPid });
+      }
+      state.jobs[index] = { ...state.jobs[index], copilotPid, updatedAt: nowIso() };
+    });
+  };
 }
 
 export function createJobProgressUpdater(workspaceRoot, jobId) {
@@ -201,6 +222,8 @@ export async function runTrackedJob(job, runner, options = {}) {
   } catch (error) {
     const errorMessage = messageOf(error);
     const completedAt = nowIso();
+    // A Copilot that could not be stopped keeps its pid, so a cancel can still stop it.
+    const copilotPid = error?.copilotStillRunning ? {} : { copilotPid: null };
     try {
       updateRunningJob(
         job.workspaceRoot,
@@ -213,6 +236,7 @@ export async function runTrackedJob(job, runner, options = {}) {
             phase: "failed",
             errorMessage,
             pid: null,
+            ...copilotPid,
             completedAt,
             logFile: options.logFile ?? job.logFile ?? existing.logFile ?? null
           };
@@ -221,6 +245,7 @@ export async function runTrackedJob(job, runner, options = {}) {
           status: "failed",
           phase: "failed",
           pid: null,
+          ...copilotPid,
           errorMessage,
           completedAt
         }
@@ -258,6 +283,7 @@ export async function runTrackedJob(job, runner, options = {}) {
         summary: execution.summary,
         phase: completionStatus === "completed" ? "done" : "failed",
         pid: null,
+        copilotPid: null,
         completedAt
       }
     );
