@@ -17,7 +17,7 @@ One file per workspace, at `<state root>/<slug>-<hash>/state.json`.
 | --- | --- | --- |
 | `version` | number | `1` |
 | `config.stopReviewGate` | boolean | Default `false`. Set by `setup --enable-review-gate` or `--disable-review-gate` |
-| `jobs` | Job summary[] | Newest first. All queued and running jobs, plus at most 50 finished jobs. Pruning deletes the pruned jobs' files and logs |
+| `jobs` | Job summary[] | Newest first. All queued and running jobs, and cancelled jobs whose cancel did not stop every process (added 2026-10-09), plus at most 50 finished jobs. Pruning deletes the pruned jobs' files and logs |
 | `closedSessions` | `{ id, closedAt }[]` | Claude session ids that `SessionEnd` has closed. A companion that started before `closedAt` cannot create, claim or start a job for that session; companions of a resumed session start later and are allowed. Kept for 30 days, with no count cap; a companion paused for longer than that is not covered (research §7, hook time budgets) |
 
 Every update holds the lock file `state.json.lock` and replaces `state.json` through a temp file

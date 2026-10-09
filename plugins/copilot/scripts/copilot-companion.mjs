@@ -916,6 +916,8 @@ async function handleTaskWorker(argv) {
     failWorkerJob(workspaceRoot, jobId, error);
     throw error;
   }
+  // The run's final status write can fail and be logged only; the job must not stay running.
+  failWorkerJob(workspaceRoot, jobId, new Error("its final status could not be saved; the job log has its output"));
 }
 
 async function runClaimedTask(workspaceRoot, jobId) {

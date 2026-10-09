@@ -254,12 +254,18 @@ test("a job file that cannot be removed after the save does not fail the update"
   assert.equal(fs.existsSync(patchDir), false);
 });
 
-test("an older running job survives 55 newer finished jobs and can still be cancelled", () => {
+test("an older running job, or a cancelled one whose stop did not finish, survives 55 newer finished jobs and can still be cancelled", () => {
   const workspace = makeTempDir();
   const runningJob = addJobWithFiles(workspace, {
     id: "task-running",
     status: "running",
     pid: process.pid,
+    updatedAt: new Date(Date.UTC(2026, 0, 1)).toISOString()
+  });
+  const pendingStop = addJobWithFiles(workspace, {
+    id: "task-pending-stop",
+    status: "cancelled",
+    copilotPid: process.pid,
     updatedAt: new Date(Date.UTC(2026, 0, 1)).toISOString()
   });
   const finishedJobs = Array.from({ length: 55 }, (_, index) =>
@@ -271,15 +277,17 @@ test("an older running job survives 55 newer finished jobs and can still be canc
   );
 
   updateState(workspace, (state) => {
-    state.jobs = [runningJob, ...finishedJobs];
+    state.jobs = [runningJob, pendingStop, ...finishedJobs];
   });
 
   const jobs = listJobs(workspace);
   assert.equal(jobs.filter((job) => job.status === "completed").length, 50);
-  assert.ok(jobs.some((job) => job.id === "task-running"));
-  assert.equal(fs.existsSync(resolveJobFile(workspace, "task-running")), true);
-  assert.equal(fs.existsSync(runningJob.logFile), true);
-  assert.equal(resolveCancelableJob(workspace, "task-running").job.id, "task-running");
+  for (const job of [runningJob, pendingStop]) {
+    assert.ok(jobs.some((entry) => entry.id === job.id), job.id);
+    assert.equal(fs.existsSync(resolveJobFile(workspace, job.id)), true, job.id);
+    assert.equal(fs.existsSync(job.logFile), true, job.id);
+    assert.equal(resolveCancelableJob(workspace, job.id).job.id, job.id);
+  }
 });
 
 test("processes that add jobs at the same time all keep their records and logs", async () => {
