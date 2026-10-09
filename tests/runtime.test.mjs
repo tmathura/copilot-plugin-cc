@@ -1053,6 +1053,44 @@ test("a job cancelled before its worker claims it never runs and stays cancelled
   });
 });
 
+test("a started worker still counts as a launch when its pid cannot be saved, even with no log", async () => {
+  for (const breakLog of [false, true]) {
+    const tasks = setUpTasks();
+    await withCompanionEnv(tasks.env, async ({ enqueueBackgroundTask }) => {
+      const { job, request } = makeQueuedTask(tasks.cwd);
+      const standIn = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+      let lockFile = null;
+      try {
+        const { payload } = await enqueueBackgroundTask(tasks.cwd, job, request, {
+          spawnWorkerImpl: () => {
+            // A live process holds the state lock past the save's 5 second wait.
+            const workspaceDir = path.join(tasks.dataDir, "state", fs.readdirSync(path.join(tasks.dataDir, "state"))[0]);
+            lockFile = path.join(workspaceDir, "state.json.lock");
+            fs.writeFileSync(lockFile, JSON.stringify({ pid: standIn.pid, token: "held-by-test" }));
+            if (breakLog) {
+              const logFile = path.join(workspaceDir, "jobs", `${job.id}.log`);
+              fs.rmSync(logFile);
+              fs.mkdirSync(logFile);
+            }
+            return standIn;
+          }
+        });
+
+        assert.equal(payload.status, "queued");
+        if (!breakLog) {
+          assert.match(fs.readFileSync(payload.logFile, "utf8"), /Could not save the worker pid: Timed out/);
+        }
+      } finally {
+        if (lockFile) {
+          fs.rmSync(lockFile, { force: true });
+        }
+        standIn.kill("SIGKILL");
+      }
+      assert.deepEqual([findJob(tasks.dataDir, job.id).status, findJob(tasks.dataDir, job.id).pid], ["queued", null]);
+    });
+  }
+});
+
 test("a worker that cannot start fails the job with the spawn error", async () => {
   const tasks = setUpTasks();
   await withCompanionEnv(tasks.env, async ({ enqueueBackgroundTask }) => {
@@ -1075,7 +1113,7 @@ test("a worker that cannot start fails the job with the spawn error", async () =
   });
 });
 
-test("a cancel whose signal fails keeps the pids and blocks a resume, and a second cancel stops the processes", async () => {
+test("a cancel whose signal fails keeps that pid and blocks a resume, and a second cancel stops the process", async () => {
   const tasks = setUpTasks();
   await withCompanionEnv(tasks.env, async ({ cancelJob }) => {
     const { updateState } = await import("../plugins/copilot/scripts/lib/state.mjs");
@@ -1096,12 +1134,18 @@ test("a cancel whose signal fails keeps the pids and blocks a resume, and a seco
       });
     });
     try {
-      const failing = async () => {
-        throw new Error("taskkill failed");
+      const { terminateProcessTree } = await import("../plugins/copilot/scripts/lib/process.mjs");
+      // The companion stops; Copilot does not.
+      const failing = async (pid) => {
+        if (pid === copilot.pid) {
+          throw new Error("taskkill failed");
+        }
+        return terminateProcessTree(pid);
       };
       await assert.rejects(cancelJob(tasks.cwd, jobId, { terminateImpl: failing }), /could not be stopped \(taskkill failed\)\. Run \/copilot:cancel task-cancel-retry again\./);
+      await waitFor(() => !isAlive(worker.pid));
       const pending = findJob(tasks.dataDir, jobId);
-      assert.deepEqual([pending.status, pending.pid, pending.copilotPid], ["cancelled", worker.pid, copilot.pid]);
+      assert.deepEqual([pending.status, pending.pid, pending.copilotPid], ["cancelled", null, copilot.pid]);
       assert.equal(resolveCancelableJob(tasks.cwd, jobId).job.id, jobId);
       const blocked = tasks.companion(["task", "--resume-last", "next step"]);
       assert.equal(blocked.status, 1);

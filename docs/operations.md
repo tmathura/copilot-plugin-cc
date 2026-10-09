@@ -33,7 +33,8 @@ Each workspace has one folder in the state folder. In it:
 
 `/copilot:status <job id>` shows the last lines of the log. `/copilot:result <job id>` shows the
 stored result. The plugin keeps all queued and running jobs and the 50 newest finished jobs. It
-deletes the files of older jobs.
+deletes the files of older jobs. It also keeps a cancelled or failed job whose processes could not
+all be stopped, until a cancel stops them.
 
 ## Cancel
 

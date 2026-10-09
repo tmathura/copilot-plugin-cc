@@ -2,7 +2,7 @@
 
 Use these as starting templates for Copilot task prompts or other Copilot/GPT-5.4 prompt construction.
 Copy the smallest recipe that fits the task, then trim anything you do not need.
-In `copilot:copilot-rescue`, run diagnosis and fix-oriented recipes in write mode by default unless the user explicitly asked for read-only behavior.
+In `copilot:copilot-rescue`, run fix-oriented recipes in write mode by default unless the user explicitly asked for read-only behavior. Run diagnosis without edits read-only.
 
 ## Diagnosis
 

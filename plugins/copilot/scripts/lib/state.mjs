@@ -302,10 +302,12 @@ function isLockHeldByOther(lockFile) {
   return fs.existsSync(lockFile) && readLockOwner(lockFile)?.pid !== process.pid;
 }
 
+// The writer may also have finished, and released the lock, by the time the reader checks.
 function readTextFile(filePath, lockFile) {
   return retryOnWindows(
     () => fs.readFileSync(filePath, "utf8"),
-    (error) => isBusyFileError(error) || (error?.code === "ENOENT" && isLockHeldByOther(lockFile))
+    (error) =>
+      isBusyFileError(error) || (error?.code === "ENOENT" && (isLockHeldByOther(lockFile) || fs.existsSync(filePath)))
   );
 }
 

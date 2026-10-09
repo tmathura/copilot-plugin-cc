@@ -371,7 +371,9 @@ cancel a second task; its process tree is gone.
   cancelled job that still names one, which pruning keeps and which blocks a resume; a worker that stops with an error, or
   whose run could not save its final status, marks its job `failed`; a Copilot that cannot be
   stopped after a failed pid save is named in the error; a run whose own stop of Copilot fails keeps
-  `copilotPid` as a `failed` job, which cancel can stop; test the retry, the pruning, a worker with
+  `copilotPid` as a `failed` job, which cancel can stop; cancel stops both pids at the same time and
+  clears each when its own stop is done; `terminateProcessTree` accepts the macOS group `EPERM` when
+  the leader is gone (all added 2026-10-09, PR review and CI); test the retry, the pruning, a worker with
   a broken record and the failed stop in `tests/runtime.test.mjs`, `tests/state.test.mjs` and
   `tests/copilot.test.mjs` (added
   2026-10-09, Codex review; research.md §7, stopping a job and background start order)

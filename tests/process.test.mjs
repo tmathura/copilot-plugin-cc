@@ -227,7 +227,76 @@ test("terminateProcessTree reports a group it is not allowed to signal", async (
     }),
     /operation not permitted/
   );
-  assert.deepEqual(calls, [[-1234, "SIGTERM"]]);
+  assert.deepEqual(calls, [
+    [-1234, "SIGTERM"],
+    [1234, "SIGTERM"]
+  ]);
+});
+
+test("terminateProcessTree accepts the macOS EPERM for a group whose members have exited", async () => {
+  const eperm = () => Object.assign(new Error("operation not permitted"), { code: "EPERM" });
+  const esrch = () => Object.assign(new Error("no such process"), { code: "ESRCH" });
+
+  // The leader has exited too: nothing is left to stop.
+  const gone = await terminateProcessTree(1234, {
+    platform: "darwin",
+    killImpl(target) {
+      throw target < 0 ? eperm() : esrch();
+    }
+  });
+  assert.equal(gone.delivered, false);
+
+  // The leader still runs, takes the signal and then exits; the group keeps answering EPERM.
+  let leaderAlive = true;
+  const calls = [];
+  const stopped = await terminateProcessTree(1234, {
+    platform: "darwin",
+    forceKillAfterMs: 1000,
+    killImpl(target, signal) {
+      calls.push([target, signal]);
+      if (target < 0) {
+        throw eperm();
+      }
+      if (!leaderAlive) {
+        throw esrch();
+      }
+      if (signal === "SIGTERM") {
+        leaderAlive = false;
+      }
+    }
+  });
+  assert.equal(stopped.delivered, true);
+  assert.ok(!calls.some(([, signal]) => signal === "SIGKILL"), JSON.stringify(calls));
+});
+
+test("terminateProcessTree sends SIGKILL to a leader that outlives SIGTERM when its group answers EPERM", async () => {
+  const eperm = () => Object.assign(new Error("operation not permitted"), { code: "EPERM" });
+  const run = (leaderKill) => {
+    const calls = [];
+    const outcome = terminateProcessTree(1234, {
+      platform: "darwin",
+      forceKillAfterMs: 50,
+      killImpl(target, signal) {
+        calls.push([target, signal]);
+        if (target < 0) {
+          throw eperm();
+        }
+        if (signal === "SIGKILL") {
+          leaderKill();
+        }
+      }
+    });
+    return { calls, outcome };
+  };
+
+  const killed = run(() => {});
+  await killed.outcome;
+  assert.deepEqual(killed.calls.at(-1), [1234, "SIGKILL"]);
+
+  const refused = run(() => {
+    throw eperm();
+  });
+  await assert.rejects(refused.outcome, /operation not permitted/);
 });
 
 test("terminateProcessTree reports a process that is already gone", async () => {

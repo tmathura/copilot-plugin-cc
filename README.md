@@ -88,7 +88,8 @@ claude plugin install copilot@tmathura-copilot
   holds a lock file, and pruning never removes a queued or running job. Codex can lose a job in that
   case, and cancel then cannot find the process to stop.
 - Cancel waits up to 5 seconds and then force-stops a process that ignores the stop signal. It also
-  stops a process that Claude's Bash tool started, which leads no process group.
+  stops a process that Claude's Bash tool started, which leads no process group. On macOS it
+  accepts the error that macOS gives for a process group whose members have exited.
 - A job that was cancelled, or a job whose Claude session has ended, never starts and is never
   marked as running again.
 - Job reports show a `copilot --resume=<id>` command only for `--write` tasks. Read-only jobs run
@@ -129,7 +130,9 @@ claude plugin install copilot@tmathura-copilot
 - `/copilot:cancel <job id>` with the full id of a finished job says that the job has finished. Codex
   can pick a different, running job whose id starts with the same text.
 - The rescue skill rule that defaults to `--write` repeats the exceptions for review, diagnosis and
-  research without edits. The Codex skill lists them in one rule but not in the other.
+  research without edits, and the prompt recipes run diagnosis without edits read-only. The Codex
+  skill lists the exceptions in one rule but not in the other, and its recipes run diagnosis in
+  write mode.
 - The plugin replaces the job state and job files through a temp file and a rename, so a reader
   never sees half a file. Codex writes over the file. On Windows a rename fails while another
   process reads the file, and a reader can miss the file during a rename, so the plugin retries both

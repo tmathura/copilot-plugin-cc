@@ -751,14 +751,28 @@ export async function enqueueBackgroundTask(cwd, job, request, options = {}) {
   const patch = errorMessage
     ? { status: "failed", phase: "failed", pid: null, errorMessage, completedAt: nowIso() }
     : { pid: child.pid };
-  updateState(job.workspaceRoot, (state) => {
-    const index = state.jobs.findIndex((entry) => entry.id === job.id);
-    if (index === -1 || state.jobs[index].status !== "queued") {
-      return;
+  try {
+    updateState(job.workspaceRoot, (state) => {
+      const index = state.jobs.findIndex((entry) => entry.id === job.id);
+      if (index === -1 || state.jobs[index].status !== "queued") {
+        return;
+      }
+      writeJobFile(job.workspaceRoot, job.id, { ...queuedRecord, ...patch });
+      state.jobs[index] = { ...state.jobs[index], ...patch, updatedAt: nowIso() };
+    });
+  } catch (saveError) {
+    // A started worker runs the queued job and saves its own pid when it claims it, so the launch
+    // still counts; only a worker that never started must be reported.
+    if (!errorMessage) {
+      try {
+        appendLogLine(logFile, `Could not save the worker pid: ${saveError.message}`);
+      } catch {
+        // The log can fail with the state; the launch has still happened.
+      }
+    } else {
+      throw new Error(`${errorMessage} The job could not be marked failed either: ${saveError.message}`);
     }
-    writeJobFile(job.workspaceRoot, job.id, { ...queuedRecord, ...patch });
-    state.jobs[index] = { ...state.jobs[index], ...patch, updatedAt: nowIso() };
-  });
+  }
   if (errorMessage) {
     appendLogLine(logFile, errorMessage);
     throw new Error(errorMessage);
@@ -1130,24 +1144,29 @@ export async function cancelJob(workspaceRoot, jobId, options = {}) {
   });
 
   const interrupt = await interruptPromptModeTurn();
-  // The companion first, then Copilot itself: a companion killed outright cannot stop its Copilot.
-  const errors = [];
-  for (const pid of [cancelled.pid, cancelled.copilotPid]) {
-    try {
+  // Copilot is stopped as well as the companion, because a companion killed outright cannot stop its
+  // Copilot. Both waits run at once, so a process that ignores SIGTERM costs one wait, not two. Each
+  // pid is cleared once its own stop is done, so a retry never signals a stopped process again.
+  const outcomes = await Promise.allSettled(
+    ["pid", "copilotPid"].map(async (key) => {
+      const pid = cancelled[key];
       await terminate(pid ?? Number.NaN);
-    } catch (error) {
-      errors.push(error);
-    }
+      if (pid) {
+        updateJobRecord(workspaceRoot, jobId, (current) => (current?.[key] === pid ? { ...current, [key]: null } : null));
+      }
+    })
+  );
+  try {
+    appendLogLine(cancelled.logFile, "Cancelled by user.");
+  } catch {
+    // The log is only a record; the processes are what matter.
   }
-  appendLogLine(cancelled.logFile, "Cancelled by user.");
-  if (errors.length > 0) {
+  const failure = outcomes.find((outcome) => outcome.status === "rejected");
+  if (failure) {
     throw new Error(
-      `Job ${jobId} is ${cancelled.status}, but a process could not be stopped (${errors[0].message}). Run /copilot:cancel ${jobId} again.`
+      `Job ${jobId} is ${cancelled.status}, but a process could not be stopped (${failure.reason?.message ?? failure.reason}). Run /copilot:cancel ${jobId} again.`
     );
   }
-  updateJobRecord(workspaceRoot, jobId, (current) =>
-    current && hasPendingStop(current) ? { ...current, pid: null, copilotPid: null } : null
-  );
   return { job: { ...cancelled, pid: null, copilotPid: null }, interrupt };
 }
 
@@ -1164,7 +1183,7 @@ async function handleCancel(argv) {
 
   const payload = {
     jobId: job.id,
-    status: "cancelled",
+    status: job.status,
     title: job.title,
     turnInterruptAttempted: interrupt.attempted,
     turnInterrupted: interrupt.interrupted

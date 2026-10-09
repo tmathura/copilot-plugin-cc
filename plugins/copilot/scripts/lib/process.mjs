@@ -1,6 +1,7 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): never starts a shell; adds resolveLauncher for
 // Windows npm shims; terminateProcessTree returns a promise, signals a process that leads no group,
-// and sends SIGKILL to what is still alive after a wait.
+// sends SIGKILL to what is still alive after a wait, and accepts the macOS EPERM for a group whose
+// members have exited.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -139,7 +140,21 @@ function isAlive(target, killImpl) {
     killImpl(target, 0);
     return true;
   } catch (error) {
+    // macOS answers EPERM for a group that holds only exited processes not yet reaped.
+    if (error?.code === "EPERM" && target < 0) {
+      return isAlive(-target, killImpl);
+    }
     return error?.code !== "ESRCH";
+  }
+}
+
+function killLeaderOrThrow(pid, killImpl) {
+  try {
+    killImpl(pid, "SIGKILL");
+  } catch (error) {
+    if (error?.code !== "ESRCH") {
+      throw error;
+    }
   }
 }
 
@@ -153,7 +168,10 @@ async function forceKillAfterWait(target, options, killImpl) {
       try {
         killImpl(target, "SIGKILL");
       } catch (error) {
-        if (error?.code !== "ESRCH") {
+        if (error?.code === "EPERM" && target < 0) {
+          // The macOS answer for exited members: the leader shows whether the refusal is real.
+          killLeaderOrThrow(-target, killImpl);
+        } else if (error?.code !== "ESRCH") {
           throw error;
         }
       }
@@ -212,13 +230,17 @@ export async function terminateProcessTree(pid, options = {}) {
   try {
     killImpl(-pid, "SIGTERM");
   } catch (error) {
-    // A process that Claude's Bash tool started leads no group (ESRCH), but it must still stop. Any
-    // other error means the group could not be signalled, and the caller must know.
-    if (error?.code !== "ESRCH") {
+    // A process that Claude's Bash tool started leads no group (ESRCH), but it must still stop.
+    // macOS answers EPERM for a group that holds an exited process not yet reaped, though the others
+    // still get the signal; the leader then shows whether the refusal is real. Any other error means
+    // the group could not be signalled, and the caller must know.
+    if (error?.code !== "ESRCH" && error?.code !== "EPERM") {
       throw error;
     }
-    target = pid;
-    method = "process";
+    if (error.code === "ESRCH") {
+      target = pid;
+      method = "process";
+    }
     try {
       killImpl(pid, "SIGTERM");
     } catch (innerError) {
