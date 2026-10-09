@@ -371,7 +371,8 @@ async function withPromptMode(cwd, options, fn) {
       env: options.env,
       prompt: options.prompt,
       resultGraceMs: options.resultGraceMs,
-      timeoutMs: options.timeoutMs
+      timeoutMs: options.timeoutMs,
+      terminateImpl: options.terminateImpl
     });
     return client.proc?.pid ?? null;
   };
@@ -385,7 +386,13 @@ async function withPromptMode(cwd, options, fn) {
     }
   } catch (error) {
     // Copilot may have started before the guard failed, for example when its pid could not be saved.
-    await client?.close().catch(() => {});
+    // No job record holds that pid then, so a failed stop is reported with it.
+    const stopError = client ? await client.close().then(() => null, (closeError) => closeError) : null;
+    if (stopError) {
+      throw new Error(
+        `${error.message} Copilot (process ${client.proc.pid}) could not be stopped either (${stopError.message}); stop it by hand.`
+      );
+    }
     throw error;
   }
   if (!client) {
@@ -439,7 +446,8 @@ async function runCopilotTurn(cwd, options = {}) {
     prompt,
     resultGraceMs: options.resultGraceMs,
     timeoutMs: options.timeoutMs,
-    guardStart: options.guardStart
+    guardStart: options.guardStart,
+    terminateImpl: options.terminateImpl
   };
   return withPromptMode(cwd, launch, async (client) => {
     // Only now does the session exist, so a job that never started Copilot gets no session to resume.

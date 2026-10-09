@@ -534,7 +534,9 @@ Later tickets apply these rules. The call-site map uses them.
     one synchronous block (synchronous file calls, as upstream `state.mjs` uses), so no signal
     handler runs inside it, and the plugin's own `SIGKILL` comes seconds after its `SIGTERM`. If the
     save fails after the spawn, the companion kills the new Copilot process tree before it reports
-    the error. So
+    the error. If that kill fails too, the error names the Copilot process id, so the user can stop
+    it (added 2026-10-09, ticket 6 Codex review round 4; rejected alternative: keep the pid for a
+    cancel retry, which needs the state save that has just failed). So
     every Copilot child either is in the `SessionEnd` snapshot or is never started, and a worker
     either claimed before this step or finds its job cancelled. Not covered: an outside `kill -9`
     that lands inside that block. Rejected alternative: a supervisor process that gates every

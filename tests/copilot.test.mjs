@@ -11,6 +11,7 @@ import {
   findLatestTaskThread,
   runPromptModeTurn
 } from "../plugins/copilot/scripts/lib/copilot.mjs";
+import { terminateProcessTree } from "../plugins/copilot/scripts/lib/process.mjs";
 import { updateState } from "../plugins/copilot/scripts/lib/state.mjs";
 import { buildEnv, installFakeCopilot, readFakeCopilotRuns, readFakeVersionPids } from "./fake-copilot-fixture.mjs";
 import { makeTempDir } from "./helpers.mjs";
@@ -265,6 +266,37 @@ test("a run whose start guard fails after the start stops the new Copilot before
   );
   assert.ok(copilotPid > 0);
   await waitFor(() => !isAlive(copilotPid));
+});
+
+test("a run whose start guard fails and whose Copilot cannot be stopped names that process", async () => {
+  const { workDir, env } = setUp("hang");
+  let copilotPid = null;
+
+  try {
+    await assert.rejects(
+      runPromptModeTurn(workDir, {
+        prompt: "x",
+        env,
+        guardStart: (start) => {
+          copilotPid = start();
+          throw new Error("the state save failed.");
+        },
+        terminateImpl: async () => {
+          throw new Error("taskkill failed");
+        }
+      }),
+      (error) => {
+        assert.equal(
+          error.message,
+          `the state save failed. Copilot (process ${copilotPid}) could not be stopped either (taskkill failed); stop it by hand.`
+        );
+        return true;
+      }
+    );
+    assert.ok(isAlive(copilotPid));
+  } finally {
+    await terminateProcessTree(copilotPid);
+  }
 });
 
 test("the latest task thread is the newest finished task of the same mode", () => {
