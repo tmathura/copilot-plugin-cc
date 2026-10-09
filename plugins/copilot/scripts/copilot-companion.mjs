@@ -570,18 +570,23 @@ async function executeTaskRun(request) {
 
   const rawOutput = typeof result.finalMessage === "string" ? result.finalMessage : "";
   const failureMessage = describeRunFailure(result);
-  const rendered = renderTaskResult(
-    {
-      rawOutput,
-      failureMessage,
-      reasoningSummary: result.reasoningSummary
-    },
-    {
-      title: taskMetadata.title,
-      jobId: request.jobId ?? null,
-      write: Boolean(request.write)
-    }
-  );
+  // A run can fail after Copilot answered, for example when a read-only run starts a write tool, and
+  // the answer alone would read like a success.
+  const failureNote =
+    result.status !== 0 && rawOutput ? `\nThe Copilot run failed${failureMessage ? `: ${failureMessage}` : "."}\n` : "";
+  const rendered =
+    renderTaskResult(
+      {
+        rawOutput,
+        failureMessage,
+        reasoningSummary: result.reasoningSummary
+      },
+      {
+        title: taskMetadata.title,
+        jobId: request.jobId ?? null,
+        write: Boolean(request.write)
+      }
+    ) + failureNote;
   const payload = {
     status: result.status,
     threadId: result.threadId,

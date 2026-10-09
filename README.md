@@ -128,6 +128,9 @@ claude plugin install copilot@tmathura-copilot
 - A background task's record is written before its worker starts. Codex starts the worker first, and
   a worker that finds no record leaves the job queued forever. If the worker cannot start, or stops
   with an error before its run ends, the job is marked failed.
+- A task that fails after Copilot has answered, for example when a read-only task starts a write
+  tool, shows the answer and then why the run failed, also in `/copilot:result`. Codex shows only
+  the answer, which reads like a success.
 - `/copilot:cancel <job id>` with the full id of a finished job says that the job has finished. Codex
   can pick a different, running job whose id starts with the same text.
 - The rescue skill rule that defaults to `--write` repeats the exceptions for review, diagnosis and

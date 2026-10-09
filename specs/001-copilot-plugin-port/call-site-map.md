@@ -82,7 +82,7 @@ repo root.
 | `executeReviewRun` (native branch) | `runAppServerReview` | `runPromptModeReview` with the review prompt | 5 |
 | `executeReviewRun` (adversarial branch) | `runAppServerTurn` with `sandbox: "read-only"` and `outputSchema` | `runPromptModeTurn` with the read-only profile; the schema goes into the prompt | 5 |
 | `buildAdversarialReviewPrompt` | Fills the template | Also fills `{{OUTPUT_SCHEMA}}` (§7) | 5 |
-| `executeTaskRun` | `sandbox: write ? "workspace-write" : "read-only"`, `persistThread: true` | Write profile or read-only profile (§3). Sessions always persist | 6 |
+| `executeTaskRun` | `sandbox: write ? "workspace-write" : "read-only"`, `persistThread: true` | Write profile or read-only profile (§3). Sessions always persist. A run that fails after Copilot answered adds why it failed to the rendered output, and `renderStoredJobResult` shows a failed job's rendered output (correctness; added 2026-10-09, PR review) | 6 |
 | `resolveLatestTrackedTaskThread`, `findLatestResumableTaskJob` | Pick the newest finished task | Only tasks with the same `write` value as the new run; otherwise the error says to use `--fresh` (§7) | 6 |
 | `handleTaskResumeCandidate` | Reports the newest finished task | Same, and the candidate also reports its `write` value (§7) | 6 |
 | `handleTask`, `buildTaskRequest` | Parse task options and build the request | Also accept the internal `--context-dir <path>` option, which only the review gate uses (§7, gate context folder) | 6, 7 |

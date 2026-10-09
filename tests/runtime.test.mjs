@@ -903,6 +903,19 @@ test("a forbidden tool fails the task and a grace kill after the result keeps it
   }
 });
 
+test("a task that fails after Copilot answered says so, in its output and in its stored result", () => {
+  const { companion, dataDir } = setUpTasks("forbidden-tool", { env: { FAKE_COPILOT_ANSWER: "Partial answer." } });
+
+  const task = companion(["task", "look at it"]);
+
+  assert.equal(task.status, 1);
+  const failure = /^Partial answer\.\n\nThe Copilot run failed: Copilot started the tool "create", which a read-only run does not allow/;
+  assert.match(task.stdout, failure);
+  const [job] = readJobs(dataDir);
+  assert.equal(job.status, "failed");
+  assert.match(companion(["result", job.id]).stdout, failure);
+});
+
 test("cancel stops a review whose companion leads no process group, also after that companion was killed", async () => {
   for (const killFirst of [false, true]) {
     const repo = makeRepo();
