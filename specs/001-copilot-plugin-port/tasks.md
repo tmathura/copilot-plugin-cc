@@ -367,6 +367,10 @@ cancel a second task; its process tree is gone.
   reference against all jobs first, then refuses a job that is not queued or running; test the
   exact-id clash in `tests/job-control.test.mjs` (added 2026-10-09, from the Copilot review of PR
   #15; research.md §7, stopping a job)
+- [X] T065d [US4] Cancel keeps the job's pids until every signal is sent and can run again on a
+  cancelled job that still names one; a worker that stops with an error marks its job `failed`;
+  test both in `tests/runtime.test.mjs` (added 2026-10-09, Codex review; research.md §7, stopping a
+  job and background start order)
 - [X] T065c [US4] In `P/scripts/lib/state.mjs`, retry on Windows a rename that meets an open file and
   a read that misses the file while another process holds the state lock, for up to 2 seconds; test an update while
   another process holds `state.json` open in `tests/state.test.mjs` (added 2026-10-09, found by the

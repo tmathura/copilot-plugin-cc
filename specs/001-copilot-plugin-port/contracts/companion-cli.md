@@ -14,7 +14,7 @@ subcommand takes `--cwd <path>` (alias `-C`) and, where upstream does, `--json`.
 | `task-resume-candidate` | `--json` | `available`, `sessionId`, `candidate`; the candidate also reports its `write` value | **changed**: `write` field |
 | `status` | `[job-id]`, `--all`, `--wait`, `--timeout-ms`, `--poll-interval-ms`, `--json` | Status table or one job report | none |
 | `result` | `[job-id]`, `--json` | Stored output, with `Copilot session ID`; `copilot --resume=<id>` for write tasks only | **changed**: resume command |
-| `cancel` | `[job-id]`, `--json` | Cancel report; `turnInterruptAttempted` is always `false` | **changed**: no protocol interrupt across processes; a job id matches all jobs first, and a finished job is refused (added 2026-10-09) |
+| `cancel` | `[job-id]`, `--json` | Cancel report; `turnInterruptAttempted` is always `false` | **changed**: no protocol interrupt across processes; a job id matches all jobs first, and a finished job is refused, except a cancelled job whose cancel did not stop every process (added 2026-10-09) |
 | `transfer` | | | **dropped** |
 
 Exit codes: `0` on success; `1` on an error, with the message on stderr; the job's exit status for a

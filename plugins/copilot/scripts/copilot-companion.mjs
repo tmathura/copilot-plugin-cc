@@ -910,6 +910,15 @@ async function handleTaskWorker(argv) {
 
   const workspaceRoot = resolveCommandWorkspace(options);
   const jobId = options["job-id"];
+  try {
+    await runClaimedTask(workspaceRoot, jobId);
+  } catch (error) {
+    failWorkerJob(workspaceRoot, jobId, error);
+    throw error;
+  }
+}
+
+async function runClaimedTask(workspaceRoot, jobId) {
   const storedJob = readStoredJob(workspaceRoot, jobId);
   if (!storedJob) {
     throw new Error(`No stored job found for ${jobId}.`);
@@ -957,6 +966,21 @@ async function handleTaskWorker(argv) {
       }),
     { logFile }
   );
+}
+
+// The worker's output goes nowhere, and nothing else watches it. A worker that stops early must not
+// leave its job queued or running, but a cancel or a finished run stays as it is.
+function failWorkerJob(workspaceRoot, jobId, error) {
+  const errorMessage = `The background worker stopped: ${error instanceof Error ? error.message : String(error)}`;
+  try {
+    updateJobRecord(workspaceRoot, jobId, (job) =>
+      job?.status === "queued" || (job?.status === "running" && job.pid === process.pid)
+        ? { ...job, status: "failed", phase: "failed", pid: null, errorMessage, completedAt: nowIso() }
+        : null
+    );
+  } catch {
+    // The job stays active; /copilot:cancel still clears it.
+  }
 }
 
 async function handleStatus(argv) {
@@ -1048,56 +1072,69 @@ function readStoredJobOrEmpty(workspaceRoot, jobId) {
   }
 }
 
-// The job is marked cancelled and its pids are read in one locked step, as the worker claim and the
-// Copilot start use the same lock: a job either started before this step, and its pids are stopped, or
-// finds itself cancelled and never starts. The signals come only after the lock is released.
-export async function cancelJob(workspaceRoot, jobId) {
-  const completedAt = nowIso();
-  let cancelled = null;
-  let pids = [];
+// Changes the job record and its state entry in one locked step.
+function updateJobRecord(workspaceRoot, jobId, change) {
   updateState(workspaceRoot, (state) => {
     const index = state.jobs.findIndex((job) => job.id === jobId);
-    const current = index === -1 ? null : state.jobs[index];
-    if (!current || !isActiveJobStatus(current.status)) {
+    const next = change(index === -1 ? null : state.jobs[index]);
+    if (next) {
+      writeJobFile(workspaceRoot, jobId, { ...readStoredJobOrEmpty(workspaceRoot, jobId), ...next });
+      state.jobs[index] = { ...next, updatedAt: nowIso() };
+    }
+  });
+}
+
+// The job is marked cancelled and its pids are read in one locked step, as the worker claim and the
+// Copilot start use the same lock: a job either started before this step, and its pids are stopped, or
+// finds itself cancelled and never starts. The signals come only after the lock is released. The pids
+// stay in the record until every signal is sent, so a cancel that fails or is stopped can run again.
+export async function cancelJob(workspaceRoot, jobId, options = {}) {
+  const terminate = options.terminateImpl ?? terminateProcessTree;
+  const completedAt = nowIso();
+  let cancelled = null;
+  updateJobRecord(workspaceRoot, jobId, (current) => {
+    if (!current || !(isActiveJobStatus(current.status) || hasPendingStop(current))) {
       throw new Error(
         current
           ? `Job ${jobId} is already ${current.status}, so there is nothing to cancel.`
           : `No job found for "${jobId}". Run /copilot:status to list known jobs.`
       );
     }
-    pids = [current.pid, current.copilotPid];
     cancelled = {
       ...current,
       status: "cancelled",
       phase: "cancelled",
-      pid: null,
-      copilotPid: null,
       completedAt,
+      cancelledAt: completedAt,
       errorMessage: "Cancelled by user."
     };
-    writeJobFile(workspaceRoot, jobId, {
-      ...readStoredJobOrEmpty(workspaceRoot, jobId),
-      ...cancelled,
-      cancelledAt: completedAt
-    });
-    state.jobs[index] = { ...cancelled, updatedAt: completedAt };
+    return cancelled;
   });
 
   const interrupt = await interruptPromptModeTurn();
   // The companion first, then Copilot itself: a companion killed outright cannot stop its Copilot.
   const errors = [];
-  for (const pid of pids) {
+  for (const pid of [cancelled.pid, cancelled.copilotPid]) {
     try {
-      await terminateProcessTree(pid ?? Number.NaN);
+      await terminate(pid ?? Number.NaN);
     } catch (error) {
       errors.push(error);
     }
   }
   appendLogLine(cancelled.logFile, "Cancelled by user.");
   if (errors.length > 0) {
-    throw errors[0];
+    throw new Error(
+      `Job ${jobId} is cancelled, but a process could not be stopped (${errors[0].message}). Run /copilot:cancel ${jobId} again.`
+    );
   }
-  return { job: cancelled, interrupt };
+  updateJobRecord(workspaceRoot, jobId, (current) =>
+    current?.status === "cancelled" ? { ...current, pid: null, copilotPid: null } : null
+  );
+  return { job: { ...cancelled, pid: null, copilotPid: null }, interrupt };
+}
+
+function hasPendingStop(job) {
+  return job.status === "cancelled" && Boolean(job.pid || job.copilotPid);
 }
 
 async function handleCancel(argv) {

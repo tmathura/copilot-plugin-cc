@@ -290,9 +290,11 @@ export function resolveCancelableJob(cwd, reference, options = {}) {
   const activeJobs = jobs.filter((job) => job.status === "queued" || job.status === "running");
 
   // The exact id of a finished job must not select a different, running job that it is a prefix of.
+  // A cancelled job that still names a pid had a cancel that did not finish, so it can run again.
   if (reference) {
     const selected = matchJobReference(jobs, reference);
-    if (selected.status !== "queued" && selected.status !== "running") {
+    const stopPending = selected.status === "cancelled" && Boolean(selected.pid || selected.copilotPid);
+    if (selected.status !== "queued" && selected.status !== "running" && !stopPending) {
       throw new Error(`Job ${selected.id} is already ${selected.status}, so there is nothing to cancel.`);
     }
     return { workspaceRoot, job: selected };

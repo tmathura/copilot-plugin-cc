@@ -41,7 +41,8 @@ Run `/copilot:cancel <job id>`. Without a job id, the command cancels the only a
 current session.
 
 Cancel first marks the job `cancelled`. Then it stops the job's companion process and the Copilot
-process, with the children of each. A process that does not stop in 5 seconds is killed. On macOS
+process, with the children of each. A process that does not stop in 5 seconds is killed. If a
+process cannot be stopped, cancel says so, and you can run `/copilot:cancel <job id>` again. On macOS
 and Linux, a program that a `--write` task detaches on purpose (for example with `setsid`) is not
 stopped.
 

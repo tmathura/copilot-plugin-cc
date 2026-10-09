@@ -110,6 +110,11 @@ and the optional Stop-hook review gate. Drop transfer. The first ticket chooses 
   is not queued or running (decided 2026-10-09, ticket 6, from the Copilot review of PR #15;
   correctness; research.md §7, stopping a job). Rejected alternative: upstream, which matches only
   active jobs, so the id can select a different running job by prefix.
+- Q: What happens when cancel cannot stop a process, or a background worker stops early? → A: The
+  cancelled job keeps its `pid` and `copilotPid` until every signal is sent, so `/copilot:cancel
+  <job id>` can run again; a worker that stops with an error marks its job `failed` (decided
+  2026-10-09, ticket 6 Codex review; research.md §7, stopping a job and background start order).
+  Rejected alternatives: clearing the pids before the signals; leaving the job active.
 - Q: How does a continued task keep its mode, when the rescue subagent picks `--write` from the
   request? → A: `/copilot:rescue` reads the candidate's `write` value, also for an explicit
   `--resume`, and tells the subagent the mode of the continued task; the subagent adds `--write` only

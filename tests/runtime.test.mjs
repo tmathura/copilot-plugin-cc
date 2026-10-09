@@ -1075,6 +1075,61 @@ test("a worker that cannot start fails the job with the spawn error", async () =
   });
 });
 
+test("a cancel whose signal fails keeps the pids, and a second cancel stops the processes", async () => {
+  const tasks = setUpTasks();
+  await withCompanionEnv(tasks.env, async ({ cancelJob }) => {
+    const { updateState } = await import("../plugins/copilot/scripts/lib/state.mjs");
+    const { resolveCancelableJob } = await import("../plugins/copilot/scripts/lib/job-control.mjs");
+    const [worker, copilot] = [0, 1].map(() =>
+      spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" })
+    );
+    const jobId = "task-cancel-retry";
+    updateState(tasks.cwd, (state) => {
+      state.jobs.unshift({ id: jobId, status: "running", jobClass: "task", pid: worker.pid, copilotPid: copilot.pid });
+    });
+    try {
+      const failing = async () => {
+        throw new Error("taskkill failed");
+      };
+      await assert.rejects(cancelJob(tasks.cwd, jobId, { terminateImpl: failing }), /could not be stopped \(taskkill failed\)\. Run \/copilot:cancel task-cancel-retry again\./);
+      const pending = findJob(tasks.dataDir, jobId);
+      assert.deepEqual([pending.status, pending.pid, pending.copilotPid], ["cancelled", worker.pid, copilot.pid]);
+      assert.equal(resolveCancelableJob(tasks.cwd, jobId).job.id, jobId);
+
+      await cancelJob(tasks.cwd, jobId);
+
+      await waitFor(() => !isAlive(worker.pid) && !isAlive(copilot.pid));
+      const done = findJob(tasks.dataDir, jobId);
+      assert.deepEqual([done.status, done.pid, done.copilotPid], ["cancelled", null, null]);
+      assert.throws(() => resolveCancelableJob(tasks.cwd, jobId), /already cancelled/);
+    } finally {
+      worker.kill("SIGKILL");
+      copilot.kill("SIGKILL");
+    }
+  });
+});
+
+test("a worker that stops before it runs its job marks the job failed", () => {
+  const tasks = setUpTasks();
+  const jobId = "task-no-request";
+  const stateDir = path.join(tasks.dataDir, "state");
+  // A real job gives the folder its name, so the broken one goes in the same workspace.
+  assert.equal(tasks.companion(["task", "first"]).status, 0);
+  const [workspace] = fs.readdirSync(stateDir);
+  const stateFile = path.join(stateDir, workspace, "state.json");
+  const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+  state.jobs.unshift({ id: jobId, status: "queued", jobClass: "task", updatedAt: new Date().toISOString() });
+  fs.writeFileSync(stateFile, JSON.stringify(state));
+  fs.writeFileSync(path.join(stateDir, workspace, "jobs", `${jobId}.json`), JSON.stringify({ id: jobId }));
+
+  const worker = tasks.companion(["task-worker", "--job-id", jobId]);
+
+  assert.equal(worker.status, 1);
+  const failed = findJob(tasks.dataDir, jobId);
+  assert.equal(failed.status, "failed");
+  assert.match(failed.errorMessage, /The background worker stopped: Stored job task-no-request is missing its task request payload\./);
+});
+
 test("a cancel that picked a queued job still stops the Copilot that its worker started since", async () => {
   const tasks = setUpTasks("hang");
   await withCompanionEnv(tasks.env, async ({ enqueueBackgroundTask, cancelJob }) => {

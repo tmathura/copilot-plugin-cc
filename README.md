@@ -121,10 +121,11 @@ claude plugin install copilot@tmathura-copilot
 - Cancel first marks the job cancelled, then stops its processes. It stops the companion and then
   the Copilot process itself, so a Copilot process whose companion was killed is still stopped.
   Codex stops the process first and marks the job after, so a job that starts between the two steps
-  can keep running.
+  can keep running. If a process cannot be stopped, the job keeps its process ids, and you can run
+  `/copilot:cancel <job id>` again.
 - A background task's record is written before its worker starts. Codex starts the worker first, and
-  a worker that finds no record leaves the job queued forever. If the worker cannot start, the job
-  is marked failed.
+  a worker that finds no record leaves the job queued forever. If the worker cannot start, or stops
+  with an error before its run ends, the job is marked failed.
 - `/copilot:cancel <job id>` with the full id of a finished job says that the job has finished. Codex
   can pick a different, running job whose id starts with the same text.
 - The rescue skill rule that defaults to `--write` repeats the exceptions for review, diagnosis and

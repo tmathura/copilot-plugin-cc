@@ -461,6 +461,11 @@ Later tickets apply these rules. The call-site map uses them.
     so a job either was claimed and started before this step (its PIDs are read) or finds itself
     cancelled and never starts. Upstream signals first and saves `cancelled` after (rejected: a job
     that starts between the two steps escapes the kill).
+  - The cancelled record keeps its `pid` and `copilotPid` until every signal is sent, and cancel
+    clears them only then. If a signal fails, or the cancel itself is stopped, `/copilot:cancel
+    <job id>` can run again on that cancelled job (decided 2026-10-09, ticket 6 Codex review;
+    correctness). Rejected alternative: clear the pids in the locked step, which leaves a live
+    Copilot that no later cancel can find.
   - Cancel matches an explicit job reference against all jobs first (exact id, then a unique
     prefix), then refuses a matched job that is not queued or running (decided 2026-10-09, ticket 6,
     from the Copilot review of PR #15; correctness). Rejected alternative: upstream, which matches
@@ -482,6 +487,11 @@ Later tickets apply these rules. The call-site map uses them.
   the job `failed` through `updateState` with the error, so it never stays `queued`.
   The worker claims the job inside `updateState`: only if the job is still `queued` does it set
   `running` and its own `pid`. Otherwise (cancelled or missing) it exits without running anything.
+  A worker that stops with an error before its run records an outcome (an unreadable record, a
+  state lock it cannot take) marks its job `failed`, if the job is still `queued` or is `running`
+  under its own `pid`; its output goes nowhere, so nothing else would (decided 2026-10-09, ticket 6
+  Codex review; correctness). Rejected alternative: upstream, where such a job stays active and
+  blocks every later `--resume-last` until someone cancels it.
   Cancel also changes the job inside `updateState`, so a cancel and a claim never both win. Reason:
   without the claim, a job cancelled before its worker starts would still run, even with `--write`.
   `runTrackedJob` follows the same rule (decided 2026-10-08, after Copilot PR review). Its start
