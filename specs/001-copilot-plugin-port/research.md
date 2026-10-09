@@ -115,7 +115,24 @@ Evidence, run on 2026-10-08:
   and above it the companion writes the exact patches (the same `git diff` commands upstream inlines:
   staged, unstaged, untracked files, or the branch range) to a new folder for the run. It passes that
   folder with `--add-dir`, which lets the `view` tool read it, names the files in the prompt, and
-  deletes the folder after the run.
+  deletes the folder after the run. Git writes each patch straight to its file, so a patch has no
+  size limit and its bytes are exact. The folder is `jobs/<job id>.patches` in the plugin's job
+  storage (changed 2026-10-09, PR review). Reason: constitution IV, "the only files a review may
+  write are the plugin's own job files". Rejected alternative: a new folder in the OS temp folder.
+  While the folder exists, the companion handles `SIGTERM` and `SIGINT`: it deletes the folder, and
+  it exits itself only when prompt-mode's handler is not active, so a signal before Copilot starts
+  is covered too. Limit (2026-10-09, ticket 5 code review): a companion killed outright (`SIGKILL`,
+  or `taskkill /F` on Windows) leaves the folder, and its job stays `running`. Removing the job record
+  removes the folder: pruning of a finished job, or the `SessionEnd` cleanup (§7, hook time budgets),
+  which removes the session's jobs. Rejected alternative (PR review, Codex): pruning a `running` job
+  whose `pid` is dead; that changes the job lifecycle for every job type, and a `pid` can be reused.
+  Rejected alternative: a sweep of old patch folders at the next review, which could delete the
+  folder of a review that is still running.
+- **Untracked files above the inline limit** (decided 2026-10-09, PR review): `untracked.md` holds
+  the same text as the inline context (`formatUntrackedFile`: no symlink targets, no binary files,
+  at most 24 KiB each). Copilot's working folder is the repository, so the `view` tool can read any
+  other untracked file in place. Rejected alternative: a binary-safe copy of every untracked file,
+  which would duplicate files that Copilot can already read.
 - **A shared runtime.** Upstream's broker shares one `codex app-server` per Claude session. Prompt
   mode has no server to share. The broker files are not ported.
 - **Policy hooks.** An administrator can install machine-wide policy hooks. They run in every mode
@@ -259,6 +276,10 @@ data model, the contracts, the plan and the tasks link here.
   still run, as they do in every `git status` or `git diff` the user runs. They are needed for a
   correct diff. Their commands come from the user's own git config; a cloned repository can only name
   a driver in `.gitattributes`, not define its command.
+- **Untracked file names** (decided 2026-10-09, ticket 5 Codex review round 3): the untracked
+  list comes from `git ls-files -z`. Without `-z`, git quotes a name with non-ASCII letters, tabs or
+  quotes, and the review skips that file as unreadable. Rejected alternative: upstream's list
+  without `-z`.
 - **Untracked symlinks** (decided 2026-10-08, ticket 3 Codex review round 4): the review context
   shows an untracked symlink as `(skipped: symlink)` and never reads its target. Reason: security.
   A link can point outside the repository, for example at a key file, and upstream would put that

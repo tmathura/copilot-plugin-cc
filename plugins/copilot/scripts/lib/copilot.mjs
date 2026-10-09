@@ -24,6 +24,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 
+import { readJsonFile } from "./fs.mjs";
 import { CopilotPromptModeClient, runShortCommand } from "./prompt-mode.mjs";
 import { resolveLauncher } from "./process.mjs";
 import { ensurePluginDataDir, resolvePluginDataDir } from "./state.mjs";
@@ -197,6 +198,9 @@ export function buildCopilotArgs(options = {}) {
   }
   if (options.name) {
     args.push(`--name=${options.name}`);
+  }
+  for (const dir of options.addDirs ?? []) {
+    args.push(`--add-dir=${dir}`);
   }
   return args;
 }
@@ -389,7 +393,8 @@ async function runCopilotTurn(cwd, options = {}) {
     resumeSessionId: options.resumeSessionId,
     model: options.model,
     effort: options.effort,
-    name: options.threadName
+    name: options.threadName,
+    addDirs: options.addDirs
   });
 
   emitProgress(
@@ -575,4 +580,118 @@ export async function runPromptModeTurn(cwd, options = {}) {
     throw new Error(formatUnavailableError(availability));
   }
   return runCopilotTurn(cwd, options);
+}
+
+// Copilot's built-in reviewer gets the diff in the prompt: with only the read tools it cannot run git.
+export async function runPromptModeReview(cwd, options = {}) {
+  const result = await runPromptModeTurn(cwd, { ...options, write: false, resumeSessionId: null });
+  return { ...result, reviewText: result.finalMessage };
+}
+
+// Prompt mode has no output schema setting, so the model may wrap its JSON in one code fence.
+function stripCodeFence(text) {
+  const match = /^\s*```[\w-]*[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*```\s*$/.exec(text);
+  return match ? match[1] : text;
+}
+
+export function parseStructuredOutput(rawOutput, fallback = {}) {
+  if (!rawOutput) {
+    return {
+      parsed: null,
+      parseError: fallback.failureMessage ?? "Copilot did not return a final structured message.",
+      rawOutput: rawOutput ?? "",
+      ...fallback
+    };
+  }
+
+  try {
+    return {
+      parsed: JSON.parse(stripCodeFence(rawOutput)),
+      parseError: null,
+      rawOutput,
+      ...fallback
+    };
+  } catch (error) {
+    return {
+      parsed: null,
+      parseError: error.message,
+      rawOutput,
+      ...fallback
+    };
+  }
+}
+
+export function readOutputSchema(schemaPath) {
+  return readJsonFile(schemaPath);
+}
+
+function matchesSchemaType(value, type) {
+  switch (type) {
+    case "object":
+      return value !== null && typeof value === "object" && !Array.isArray(value);
+    case "array":
+      return Array.isArray(value);
+    case "string":
+      return typeof value === "string";
+    case "integer":
+      return Number.isInteger(value);
+    case "number":
+      return typeof value === "number" && Number.isFinite(value);
+    case "boolean":
+      return typeof value === "boolean";
+    default:
+      return false;
+  }
+}
+
+// Codex enforced the schema itself. Copilot cannot, so the review checks the keywords its schema uses.
+export function validateReviewOutput(value, schema, at = "") {
+  const where = at ? `\`${at}\`` : "The review output";
+  if (schema.type && !matchesSchemaType(value, schema.type)) {
+    return `${where} must be of type ${schema.type}.`;
+  }
+  if (schema.enum && !schema.enum.includes(value)) {
+    return `${where} must be one of: ${schema.enum.join(", ")}.`;
+  }
+  if (typeof value === "string" && schema.minLength !== undefined && [...value].length < schema.minLength) {
+    return `${where} must have at least ${schema.minLength} character(s).`;
+  }
+  if (typeof value === "number") {
+    if (schema.minimum !== undefined && value < schema.minimum) {
+      return `${where} must be at least ${schema.minimum}.`;
+    }
+    if (schema.maximum !== undefined && value > schema.maximum) {
+      return `${where} must be at most ${schema.maximum}.`;
+    }
+  }
+  if (Array.isArray(value) && schema.items) {
+    for (const [index, item] of value.entries()) {
+      const error = validateReviewOutput(item, schema.items, `${at}[${index}]`);
+      if (error) {
+        return error;
+      }
+    }
+  }
+  if (matchesSchemaType(value, "object")) {
+    for (const key of schema.required ?? []) {
+      if (!Object.hasOwn(value, key)) {
+        return `${where} is missing \`${key}\`.`;
+      }
+    }
+    for (const [key, item] of Object.entries(value)) {
+      // An own-property check: a field named like an inherited name such as `constructor` is unknown too.
+      const property = schema.properties && Object.hasOwn(schema.properties, key) ? schema.properties[key] : null;
+      if (!property) {
+        if (schema.additionalProperties === false) {
+          return `${where} has the unknown field \`${key}\`.`;
+        }
+        continue;
+      }
+      const error = validateReviewOutput(item, property, at ? `${at}.${key}` : key);
+      if (error) {
+        return error;
+      }
+    }
+  }
+  return null;
 }

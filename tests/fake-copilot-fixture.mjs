@@ -29,10 +29,15 @@ export const NOT_LOGGED_IN_STDERR = [
 //   not-logged-in       the real "no authentication" output
 //   bad-json            a line that is not JSON, then exits
 //   truncated           exits 1 before the result event
-//   fail                a result with exitCode 1, then exits 1
-//   forbidden-tool      starts the create tool, then runs until killed
+//   fail                sends FAKE_COPILOT_ANSWER if set, a result with exitCode 1, then exits 1
+//   forbidden-tool      sends FAKE_COPILOT_ANSWER if set, starts the create tool, then runs until killed
 //   hang                starts a child, then runs until killed
 //   hang-after-result   a full successful turn, then runs until killed
+//   write-attempt       writes a file in its working folder if the create tool is available
+//   reject-flags        rejects its arguments and exits 1 before it reads the prompt
+// Every run records its arguments, environment, prompt, pid and the files of each --add-dir folder
+// (base64, so the bytes stay exact).
+// FAKE_COPILOT_ANSWER replaces the final answer text.
 export function installFakeCopilot(binDir, behavior = "ok") {
   const scriptPath = path.join(binDir, "copilot");
   const recordPath = path.join(binDir, "fake-copilot-runs.jsonl");
@@ -75,6 +80,22 @@ if (!args.includes("--output-format") || args[args.indexOf("--output-format") + 
   process.exit(1);
 }
 
+if (BEHAVIOR === "reject-flags") {
+  console.error("error: unknown option '" + args.find((arg) => arg.startsWith("--available-tools")) + "'");
+  process.exit(1);
+}
+
+function readAddDirFiles() {
+  const files = {};
+  for (const arg of args.filter((value) => value.startsWith("--add-dir="))) {
+    const dir = arg.slice("--add-dir=".length);
+    for (const name of fs.readdirSync(dir)) {
+      files[name] = fs.readFileSync(dir + "/" + name).toString("base64");
+    }
+  }
+  return files;
+}
+
 function emit(event) {
   process.stdout.write(JSON.stringify(event) + "\\n");
 }
@@ -97,7 +118,7 @@ function emitTurn() {
   emit({ type: "tool.execution_start", data: { toolCallId: "call-1", toolName: "view", arguments: { path: "a.txt" } } });
   emit({ type: "tool.execution_complete", data: { toolCallId: "call-1", success: true } });
   emit({ type: "assistant.turn_start", data: { turnId: "1" } });
-  emit({ type: "assistant.message", data: { content: "Fake Copilot answer." } });
+  emit({ type: "assistant.message", data: { content: process.env.FAKE_COPILOT_ANSWER ?? "Fake Copilot answer." } });
 }
 
 function emitResult(exitCode) {
@@ -115,7 +136,8 @@ process.stdin.on("data", (chunk) => {
   prompt += chunk;
 });
 process.stdin.on("end", () => {
-  fs.appendFileSync(RECORD_PATH, JSON.stringify({ args, cwd: process.cwd(), env: process.env, prompt }) + "\\n");
+  const record = { args, cwd: process.cwd(), env: process.env, prompt, pid: process.pid, addDirFiles: readAddDirFiles() };
+  fs.appendFileSync(RECORD_PATH, JSON.stringify(record) + "\\n");
 
   switch (BEHAVIOR) {
     case "not-logged-in":
@@ -134,12 +156,18 @@ process.stdin.on("end", () => {
       break;
     case "fail":
       emit({ type: "assistant.turn_start", data: { turnId: "0" } });
+      if (process.env.FAKE_COPILOT_ANSWER) {
+        emit({ type: "assistant.message", data: { content: process.env.FAKE_COPILOT_ANSWER } });
+      }
       process.stderr.write("\\nfake copilot: model request failed\\n\\n");
       emitResult(1);
       process.exit(1);
       break;
     case "forbidden-tool":
       emit({ type: "assistant.turn_start", data: { turnId: "0" } });
+      if (process.env.FAKE_COPILOT_ANSWER) {
+        emit({ type: "assistant.message", data: { content: process.env.FAKE_COPILOT_ANSWER } });
+      }
       emit({ type: "tool.execution_start", data: { toolCallId: "call-1", toolName: "create", arguments: { path: "x.txt" } } });
       runForever();
       break;
@@ -148,6 +176,16 @@ process.stdin.on("end", () => {
       emit({ type: "fake.child", data: { pid: child.pid } });
       emit({ type: "assistant.turn_start", data: { turnId: "0" } });
       runForever();
+      break;
+    }
+    case "write-attempt": {
+      const tools = (args.find((arg) => arg.startsWith("--available-tools=")) || "").split("=")[1] || "";
+      if (tools.split(",").includes("create")) {
+        fs.writeFileSync("fake-write.txt", "written by the fake copilot\\n");
+      }
+      emitTurn();
+      emitResult(0);
+      process.exit(0);
       break;
     }
     case "hang-after-result":
@@ -206,7 +244,8 @@ const MACHINE_AUTH_VARS = [
   "COPILOT_PROVIDER_TYPE",
   "COPILOT_HOME",
   "CLAUDE_PLUGIN_DATA",
-  "FAKE_COPILOT_BEHAVIOR"
+  "FAKE_COPILOT_BEHAVIOR",
+  "FAKE_COPILOT_ANSWER"
 ];
 
 // Windows keeps the search path as "Path"; a second "PATH" key would leave the child with either one.

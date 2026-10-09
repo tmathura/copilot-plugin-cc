@@ -14,6 +14,7 @@ import {
   listJobs,
   loadState,
   resolveJobFile,
+  resolveJobPatchDir,
   resolveJobLogFile,
   resolveStateDir,
   resolveStateFile,
@@ -122,6 +123,12 @@ test("updateState prunes dropped job artifacts when indexed jobs exceed the cap"
     };
   });
 
+  // A review patch folder left by a killed review goes with its job.
+  for (const jobId of ["job-0", "job-50"]) {
+    fs.mkdirSync(resolveJobPatchDir(workspace, jobId));
+    fs.writeFileSync(path.join(resolveJobPatchDir(workspace, jobId), "staged.patch"), "patch\n", "utf8");
+  }
+
   fs.writeFileSync(
     stateFile,
     `${JSON.stringify(
@@ -156,9 +163,10 @@ test("updateState prunes dropped job artifacts when indexed jobs exceed the cap"
   );
   assert.deepEqual(
     fs.readdirSync(jobsDir).sort(),
-    Array.from({ length: 50 }, (_, index) => `job-${index + 1}`)
-      .flatMap((jobId) => [`${jobId}.json`, `${jobId}.log`])
-      .sort()
+    [
+      ...Array.from({ length: 50 }, (_, index) => `job-${index + 1}`).flatMap((jobId) => [`${jobId}.json`, `${jobId}.log`]),
+      "job-50.patches"
+    ].sort()
   );
 });
 
@@ -229,6 +237,8 @@ test("jobs added and pruned in the same update lose their files", () => {
 test("a job file that cannot be removed after the save does not fail the update", (t) => {
   const workspace = makeTempDir();
   const { oldJob, newerJobs } = stateWithPrunableJob(workspace);
+  const patchDir = resolveJobPatchDir(workspace, oldJob.id);
+  fs.mkdirSync(patchDir);
   const failingUnlink = t.mock.method(fs, "unlinkSync", () => {
     throw Object.assign(new Error("file in use"), { code: "EBUSY" });
   });
@@ -240,6 +250,8 @@ test("a job file that cannot be removed after the save does not fail the update"
   assert.ok(failingUnlink.mock.callCount() > 0, "the pruned job's files were never deleted");
   assert.equal(listJobs(workspace).length, 50);
   assert.equal(listJobs(workspace).some((job) => job.id === "task-old"), false);
+  // The patch folder is removed even though the job's other files could not be.
+  assert.equal(fs.existsSync(patchDir), false);
 });
 
 test("an older running job survives 55 newer finished jobs and can still be cancelled", () => {

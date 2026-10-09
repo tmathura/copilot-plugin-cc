@@ -86,6 +86,20 @@ and the optional Stop-hook review gate. Drop transfer. The first ticket chooses 
   not answer (decided 2026-10-08, ticket 4 Codex review; research.md §5). Rejected alternative: no
   limit, as upstream.
 
+### Session 2026-10-09
+
+- Q: Where is the review patch folder, and is it always deleted? → A: In the plugin's job storage,
+  `jobs/<job id>.patches`, so a review writes only its own job files (constitution IV; changed
+  2026-10-09, PR review; rejected: the OS temp folder). It is deleted after every run, and when the
+  companion is stopped with `SIGTERM` or `SIGINT`, also before Copilot starts. A companion killed
+  outright (`SIGKILL`, `taskkill /F`) leaves it until its job record is removed, by pruning or by the
+  `SessionEnd` cleanup (decided 2026-10-09, ticket 5 code review; research.md §2). Rejected
+  alternatives: a sweep of old patch folders at the next review, which could delete a running
+  review's folder; pruning a `running` job whose `pid` is dead.
+- Q: Does a review read an untracked file whose name git quotes, such as one with non-ASCII letters?
+  → A: Yes. The list comes from `git ls-files -z` (decided 2026-10-09, ticket 5 Codex review;
+  research.md §4b). Rejected alternative: upstream's list without `-z`, which skips the file.
+
 ## User Scenarios & Testing *(mandatory)*
 
 The user is a developer who works in Claude Code and has the GitHub Copilot CLI. The owner is the

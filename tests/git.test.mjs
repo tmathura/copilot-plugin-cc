@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { collectReviewContext, resolveReviewTarget } from "../plugins/copilot/scripts/lib/git.mjs";
+import { collectReviewContext, getWorkingTreeState, resolveReviewTarget } from "../plugins/copilot/scripts/lib/git.mjs";
 import { initGitRepo, makeTempDir, run } from "./helpers.mjs";
 
 function sha256File(filePath) {
@@ -221,6 +221,21 @@ test("collectReviewContext keeps untracked file content in lightweight working t
   assert.doesNotMatch(context.content, /TRACKED_MARKER_[AB]/);
   assert.match(context.content, /## Untracked Files/);
   assert.match(context.content, /UNTRACKED_RISK_MARKER/);
+});
+
+test("collectReviewContext reads an untracked file whose name git would quote", () => {
+  const cwd = makeTempDir();
+  initGitRepo(cwd);
+  fs.writeFileSync(path.join(cwd, "a.js"), "export const value = 1;\n");
+  run("git", ["add", "a.js"], { cwd });
+  run("git", ["commit", "-m", "init"], { cwd });
+  fs.writeFileSync(path.join(cwd, "naïve café.js"), 'export const value = "QUOTED_NAME_MARKER";\n');
+
+  const state = getWorkingTreeState(cwd);
+  const context = collectReviewContext(cwd, resolveReviewTarget(cwd, {}));
+
+  assert.deepEqual(state.untracked, ["naïve café.js"]);
+  assert.match(context.content, /### naïve café\.js\n```\nexport const value = "QUOTED_NAME_MARKER";\n```/);
 });
 
 test("collectReviewContext never reads the target of an untracked symlink", () => {

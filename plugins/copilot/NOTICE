@@ -23,5 +23,9 @@ GitHub Copilot instead of Codex:
 
 - .claude-plugin/plugin.json
 - CHANGELOG.md
+- commands/adversarial-review.md
+- commands/review.md
 - commands/setup.md
+- prompts/adversarial-review.md
 - skills/copilot-cli-runtime/SKILL.md (from skills/codex-cli-runtime/SKILL.md)
+- skills/copilot-result-handling/SKILL.md (from skills/codex-result-handling/SKILL.md)
