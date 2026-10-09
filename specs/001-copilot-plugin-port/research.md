@@ -463,8 +463,9 @@ Later tickets apply these rules. The call-site map uses them.
     that starts between the two steps escapes the kill).
   - The cancelled record keeps its `pid` and `copilotPid` until every signal is sent, and cancel
     clears them only then. If a signal fails, or the cancel itself is stopped, `/copilot:cancel
-    <job id>` can run again on that cancelled job, and pruning keeps it like an active job (decided
-    2026-10-09, ticket 6 Codex review rounds 1 and 2; correctness). Rejected alternative: clear the pids in the locked step, which leaves a live
+    <job id>` can run again on that cancelled job, and pruning keeps it like an active job. Such a
+    task also blocks `--resume-last` and is never a resume candidate, because its Copilot may still
+    run in that session (decided 2026-10-09, ticket 6 Codex review rounds 1 to 3; correctness). Rejected alternative: clear the pids in the locked step, which leaves a live
     Copilot that no later cancel can find.
   - Cancel matches an explicit job reference against all jobs first (exact id, then a unique
     prefix), then refuses a matched job that is not queued or running (decided 2026-10-09, ticket 6,

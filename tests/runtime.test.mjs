@@ -1075,7 +1075,7 @@ test("a worker that cannot start fails the job with the spawn error", async () =
   });
 });
 
-test("a cancel whose signal fails keeps the pids, and a second cancel stops the processes", async () => {
+test("a cancel whose signal fails keeps the pids and blocks a resume, and a second cancel stops the processes", async () => {
   const tasks = setUpTasks();
   await withCompanionEnv(tasks.env, async ({ cancelJob }) => {
     const { updateState } = await import("../plugins/copilot/scripts/lib/state.mjs");
@@ -1085,7 +1085,15 @@ test("a cancel whose signal fails keeps the pids, and a second cancel stops the 
     );
     const jobId = "task-cancel-retry";
     updateState(tasks.cwd, (state) => {
-      state.jobs.unshift({ id: jobId, status: "running", jobClass: "task", pid: worker.pid, copilotPid: copilot.pid });
+      state.jobs.unshift({
+        id: jobId,
+        status: "running",
+        jobClass: "task",
+        write: false,
+        threadId: "session-of-the-cancelled-task",
+        pid: worker.pid,
+        copilotPid: copilot.pid
+      });
     });
     try {
       const failing = async () => {
@@ -1095,6 +1103,10 @@ test("a cancel whose signal fails keeps the pids, and a second cancel stops the 
       const pending = findJob(tasks.dataDir, jobId);
       assert.deepEqual([pending.status, pending.pid, pending.copilotPid], ["cancelled", worker.pid, copilot.pid]);
       assert.equal(resolveCancelableJob(tasks.cwd, jobId).job.id, jobId);
+      const blocked = tasks.companion(["task", "--resume-last", "next step"]);
+      assert.equal(blocked.status, 1);
+      assert.match(blocked.stderr, /Task task-cancel-retry is still running/);
+      assert.equal(JSON.parse(tasks.companion(["task-resume-candidate", "--json"]).stdout).available, false);
 
       await cancelJob(tasks.cwd, jobId);
 
@@ -1102,6 +1114,8 @@ test("a cancel whose signal fails keeps the pids, and a second cancel stops the 
       const done = findJob(tasks.dataDir, jobId);
       assert.deepEqual([done.status, done.pid, done.copilotPid], ["cancelled", null, null]);
       assert.throws(() => resolveCancelableJob(tasks.cwd, jobId), /already cancelled/);
+      assert.equal(JSON.parse(tasks.companion(["task-resume-candidate", "--json"]).stdout).candidate.id, jobId);
+      assert.deepEqual(tasks.runs(), []);
     } finally {
       worker.kill("SIGKILL");
       copilot.kill("SIGKILL");

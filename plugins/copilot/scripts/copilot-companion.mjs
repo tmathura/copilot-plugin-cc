@@ -38,6 +38,7 @@ import { loadPromptTemplate, interpolateTemplate } from "./lib/prompts.mjs";
 import {
   generateJobId,
   getConfig,
+  hasPendingStop,
   listJobs,
   resolveJobPatchDir,
   setConfig,
@@ -480,6 +481,7 @@ function findLatestResumableTaskJob(jobs, write = null) {
         job.threadId &&
         job.status !== "queued" &&
         job.status !== "running" &&
+        !hasPendingStop(job) &&
         (write === null || Boolean(job.write) === write)
     ) ?? null
   );
@@ -508,7 +510,10 @@ async function resolveLatestTrackedTaskThread(cwd, options = {}) {
   const sessionId = getCurrentClaudeSessionId();
   const jobs = sortJobsNewestFirst(listJobs(workspaceRoot)).filter((job) => job.id !== options.excludeJobId);
   const visibleJobs = filterJobsForCurrentClaudeSession(jobs);
-  const activeTask = visibleJobs.find((job) => job.jobClass === "task" && (job.status === "queued" || job.status === "running"));
+  // A cancelled task whose processes may still run counts too: a resume would share its session.
+  const activeTask = visibleJobs.find(
+    (job) => job.jobClass === "task" && (job.status === "queued" || job.status === "running" || hasPendingStop(job))
+  );
   if (activeTask) {
     throw new Error(`Task ${activeTask.id} is still running. Use /copilot:status before continuing it.`);
   }
@@ -1133,10 +1138,6 @@ export async function cancelJob(workspaceRoot, jobId, options = {}) {
     current?.status === "cancelled" ? { ...current, pid: null, copilotPid: null } : null
   );
   return { job: { ...cancelled, pid: null, copilotPid: null }, interrupt };
-}
-
-function hasPendingStop(job) {
-  return job.status === "cancelled" && Boolean(job.pid || job.copilotPid);
 }
 
 async function handleCancel(argv) {

@@ -4,7 +4,7 @@
 import fs from "node:fs";
 
 import { getSessionRuntimeStatus } from "./copilot.mjs";
-import { getConfig, listJobs, readJobFile, resolveJobFile } from "./state.mjs";
+import { getConfig, hasPendingStop, listJobs, readJobFile, resolveJobFile } from "./state.mjs";
 import { SESSION_ID_ENV } from "./tracked-jobs.mjs";
 import { resolveWorkspaceRoot } from "./workspace.mjs";
 
@@ -293,8 +293,7 @@ export function resolveCancelableJob(cwd, reference, options = {}) {
   // A cancelled job that still names a pid had a cancel that did not finish, so it can run again.
   if (reference) {
     const selected = matchJobReference(jobs, reference);
-    const stopPending = selected.status === "cancelled" && Boolean(selected.pid || selected.copilotPid);
-    if (selected.status !== "queued" && selected.status !== "running" && !stopPending) {
+    if (selected.status !== "queued" && selected.status !== "running" && !hasPendingStop(selected)) {
       throw new Error(`Job ${selected.id} is already ${selected.status}, so there is nothing to cancel.`);
     }
     return { workspaceRoot, job: selected };

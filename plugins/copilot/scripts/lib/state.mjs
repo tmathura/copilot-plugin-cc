@@ -128,9 +128,14 @@ export function loadState(cwd, options = {}) {
   }
 }
 
-// A cancelled job that still names a pid had a cancel that did not finish; a retry needs its pids.
+// A cancelled job that still names a pid had a cancel that did not finish: its processes may still
+// run, and a retry needs the pids.
+export function hasPendingStop(job) {
+  return job.status === "cancelled" && Boolean(job.pid || job.copilotPid);
+}
+
 function isActiveJob(job) {
-  return job.status === "queued" || job.status === "running" || (job.status === "cancelled" && Boolean(job.pid || job.copilotPid));
+  return job.status === "queued" || job.status === "running" || hasPendingStop(job);
 }
 
 // The cap counts finished jobs only: pruning a running job would lose the pids that cancel needs.

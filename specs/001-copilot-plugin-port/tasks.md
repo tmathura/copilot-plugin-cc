@@ -368,7 +368,7 @@ cancel a second task; its process tree is gone.
   exact-id clash in `tests/job-control.test.mjs` (added 2026-10-09, from the Copilot review of PR
   #15; research.md §7, stopping a job)
 - [X] T065d [US4] Cancel keeps the job's pids until every signal is sent and can run again on a
-  cancelled job that still names one, which pruning keeps; a worker that stops with an error, or
+  cancelled job that still names one, which pruning keeps and which blocks a resume; a worker that stops with an error, or
   whose run could not save its final status, marks its job `failed`; test the retry, the pruning
   and a worker with a broken record in `tests/runtime.test.mjs` and `tests/state.test.mjs` (added
   2026-10-09, Codex review; research.md §7, stopping a job and background start order)
