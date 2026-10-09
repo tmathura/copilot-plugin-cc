@@ -443,8 +443,8 @@ Later tickets apply these rules. The call-site map uses them.
     means no process in the group could be signalled) is thrown, not hidden (added 2026-10-08, PR
     review; upstream then tries the process and can report "not delivered" instead). Changed
     2026-10-09 (ticket 6, macOS CI): macOS answers `EPERM` for a group that holds an exited process
-    its parent has not reaped yet, although the other members get the signal. So a group `EPERM`
-    signals the leader itself: if the leader is gone, nothing is left to stop; if the leader cannot
+    its parent has not reaped yet, although the other members get the signal. So on macOS only (a
+    group `EPERM` on other systems is still thrown), a group `EPERM` signals the leader itself: if the leader is gone, nothing is left to stop; if the leader cannot
     be signalled either, the `EPERM` is real and is thrown. While waiting, a group `EPERM` counts as
     alive only while the leader is, and a group `SIGKILL` that answers `EPERM` goes to the leader
     itself, whose own `EPERM` is thrown. Rejected alternative: throw every group `EPERM`, which

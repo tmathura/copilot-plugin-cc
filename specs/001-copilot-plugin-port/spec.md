@@ -107,7 +107,8 @@ and the optional Stop-hook review gate. Drop transfer. The first ticket chooses 
   readers that also take the state lock, where every status read writes a lock file and waits.
 - Q: What does `/copilot:cancel <job id>` do with the full id of a finished job? → A: It says the
   job has already finished. It matches the reference against all jobs first, then refuses a job that
-  is not queued or running (decided 2026-10-09, ticket 6, from the Copilot review of PR #15;
+  is not queued or running, unless that cancelled or failed job still names a pid because a stop did
+  not finish; then cancel stops those processes (decided 2026-10-09, ticket 6, from the Copilot review of PR #15;
   correctness; research.md §7, stopping a job). Rejected alternative: upstream, which matches only
   active jobs, so the id can select a different running job by prefix.
 - Q: What happens when cancel cannot stop a process, or a background worker stops early? → A: The

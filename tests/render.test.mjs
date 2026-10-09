@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { renderJobStatusReport, renderReviewResult, renderStoredJobResult } from "../plugins/copilot/scripts/lib/render.mjs";
+import { renderCancelReport, renderJobStatusReport, renderReviewResult, renderStoredJobResult } from "../plugins/copilot/scripts/lib/render.mjs";
 
 test("renderReviewResult degrades gracefully when JSON is missing required review fields", () => {
   const output = renderReviewResult(
@@ -78,6 +78,11 @@ test("renderStoredJobResult reads the native review text from the copilot payloa
   );
 
   assert.equal(output, "No issues found.\n");
+});
+
+test("renderCancelReport says when a failed job keeps its outcome", () => {
+  assert.match(renderCancelReport({ id: "task-1", status: "cancelled" }), /\nCancelled task-1\.\n/);
+  assert.match(renderCancelReport({ id: "task-2", status: "failed" }), /\nStopped the remaining processes of task-2, which stays failed\.\n/);
 });
 
 test("renderJobStatusReport uses copilot hints and keeps read-only sessions without a command", () => {

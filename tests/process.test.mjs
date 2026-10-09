@@ -227,10 +227,8 @@ test("terminateProcessTree reports a group it is not allowed to signal", async (
     }),
     /operation not permitted/
   );
-  assert.deepEqual(calls, [
-    [-1234, "SIGTERM"],
-    [1234, "SIGTERM"]
-  ]);
+  // Only macOS gives EPERM for exited members, so elsewhere the leader is not tried.
+  assert.deepEqual(calls, [[-1234, "SIGTERM"]]);
 });
 
 test("terminateProcessTree accepts the macOS EPERM for a group whose members have exited", async () => {
