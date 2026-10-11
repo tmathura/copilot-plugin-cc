@@ -43,7 +43,8 @@
   wait and a `SIGKILL`; a process that cannot be stopped keeps its pid in the job, so cancel can run
   again (research.md §7, stopping a job, 2026-10-09).
 - FR-025 was changed to match upstream: the gate also blocks when its review cannot give an
-  `ALLOW:` answer; a missing Copilot or an unreadable job state gives only a note (research.md §7,
+  `ALLOW:` answer; a Copilot that setup would not accept (missing, unsupported version, failed
+  version check) or an unreadable job state gives only a note (research.md §7,
   gate run limit and stop, 2026-10-11).
 - FR-026 holds: `SessionStart` exports the session id and the plugin data folder, the folder as
   `COPILOT_COMPANION_PLUGIN_DATA`, which the companion reads before `CLAUDE_PLUGIN_DATA`; the hooks

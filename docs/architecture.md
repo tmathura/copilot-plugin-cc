@@ -155,7 +155,10 @@ sequenceDiagram
 
 - The gate's run stops 14 minutes after the hook starts. Then the hook stops the companion's process
   tree and marks the job `cancelled`, inside Claude Code's 15-minute hook limit.
-- When the gate is on and its review cannot run, the hook blocks the stop and says why.
+- When the gate is on and its review cannot run, for example because `git` fails, the hook blocks
+  the stop and says why. A Copilot that setup would not accept (missing, an unsupported version, or
+  a version check that fails) gives only a note, as in Codex. A job state that cannot be read lets
+  Claude stop, with a note, because whether the gate is on is unknown.
 
 ## Job state
 

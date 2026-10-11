@@ -377,8 +377,9 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
   the job cancelled. Codex stops only the companion and leaves the job marked as running.
 - When the review gate is on and its review cannot run, for example because `git` fails, the gate
   blocks the stop and says why. Codex's hook fails with an error that Claude Code does not treat as
-  a block, so the stop goes through unreviewed. A missing Copilot still gives only a note, as in
-  Codex.
+  a block, so the stop goes through unreviewed. A Copilot that setup would not accept (missing, an
+  unsupported version, or a version check that fails) still gives only a note, as an unavailable
+  Codex does.
 - When `git` fails, the plugin uses the nearest folder above that holds `.git` as the workspace,
   not the current folder. So the hooks still find the plugin's state for that repository when
   Claude works in a subfolder. Codex uses the current folder.

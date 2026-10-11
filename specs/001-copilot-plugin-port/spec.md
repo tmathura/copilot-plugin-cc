@@ -443,8 +443,10 @@ the matching function names in it.
 
 - **FR-025**: The plugin MUST offer an optional Stop-hook review gate, off by default, that blocks a
   stop when Copilot finds a problem, and also when the review cannot give an `ALLOW:` answer (it
-  fails, times out or answers something else), as upstream does. A missing Copilot gives only a
-  note (changed 2026-10-11, ticket 7 PR review; the earlier text said "only when Copilot finds a
+  fails, times out or answers something else), as upstream does. A Copilot that setup would not
+  accept (missing, an unsupported version, or a version check that fails) gives only a note, as
+  upstream's unavailable Codex does (wording widened from "a missing Copilot" 2026-10-11, ticket 8
+  Codex review; the code did not change) (changed 2026-10-11, ticket 7 PR review; the earlier text said "only when Copilot finds a
   problem", which did not match upstream).
 - **FR-026**: The plugin MUST have session start and end hooks that do the same job as upstream.
 
@@ -505,7 +507,8 @@ the matching function names in it.
 
 ## Assumptions
 
-- The user has Node 22 or later and a GitHub account with Copilot access.
+- The user has Node 22 or later, and a GitHub account with Copilot access or their own model
+  provider (BYOK), which needs no GitHub login (added 2026-10-11, ticket 8 PR review).
 - The owner reads every upstream file line by line before it is ported. Code from other Copilot
   ports is never copied.
 - Upstream behaviour that Copilot supports (session resume, reasoning effort, `task-resume-candidate`)
