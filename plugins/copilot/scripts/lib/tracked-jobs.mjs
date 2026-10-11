@@ -1,12 +1,15 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): renamed for the copilot plugin; job status and
 // progress writes go through one locked update and never revive a cancelled or missing job; a job
-// starts Copilot inside a locked update and saves its pid there.
+// starts Copilot inside a locked update and saves its pid there; a job record keeps the review gate's
+// run id.
 import fs from "node:fs";
 import process from "node:process";
 
 import { assertSessionOpen, readJobFile, resolveJobFile, resolveJobLogFile, updateState, writeJobFile } from "./state.mjs";
 
 export const SESSION_ID_ENV = "COPILOT_COMPANION_SESSION_ID";
+// The review gate names its run, so its job is found by this id, not by its pid or its prompt.
+export const STOP_GATE_RUN_ENV = "COPILOT_COMPANION_STOP_GATE_RUN_ID";
 
 export function nowIso() {
   return new Date().toISOString();
@@ -63,10 +66,12 @@ export function createJobLogFile(workspaceRoot, jobId, title) {
 export function createJobRecord(base, options = {}) {
   const env = options.env ?? process.env;
   const sessionId = env[options.sessionIdEnv ?? SESSION_ID_ENV];
+  const stopGateRunId = env[STOP_GATE_RUN_ENV];
   return {
     ...base,
     createdAt: nowIso(),
-    ...(sessionId ? { sessionId } : {})
+    ...(sessionId ? { sessionId } : {}),
+    ...(stopGateRunId ? { stopGateRunId } : {})
   };
 }
 

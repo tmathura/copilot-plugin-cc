@@ -7,6 +7,7 @@
 // ended before its job did.
 
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import process from "node:process";
 import path from "node:path";
@@ -18,16 +19,9 @@ import { readStdinSync } from "./lib/fs.mjs";
 import { collectReviewContext, resolveReviewTarget } from "./lib/git.mjs";
 import { terminateProcessTree } from "./lib/process.mjs";
 import { loadPromptTemplate, interpolateTemplate } from "./lib/prompts.mjs";
-import {
-  LAUNCHED_AT_ENV,
-  listJobs,
-  loadState,
-  processStartedAtMs,
-  resolveJobsDir,
-  STOP_GATE_JOB_TITLE
-} from "./lib/state.mjs";
+import { LAUNCHED_AT_ENV, listJobs, loadState, processStartedAtMs, resolveJobsDir } from "./lib/state.mjs";
 import { sortJobsNewestFirst } from "./lib/job-control.mjs";
-import { SESSION_ID_ENV } from "./lib/tracked-jobs.mjs";
+import { SESSION_ID_ENV, STOP_GATE_RUN_ENV } from "./lib/tracked-jobs.mjs";
 import { resolveWorkspaceRoot } from "./lib/workspace.mjs";
 
 // The hook's own timeout is 900 s. The rest is for the stop, the cleanup and the answer.
@@ -168,15 +162,11 @@ function parseStopReviewOutput(rawOutput) {
 
 // A companion that dies outright cannot stop its Copilot, and its record stays running, so its job is
 // cancelled, which stops the Copilot of the record. The record is read once the companion is gone,
-// when no new Copilot can start. A pid can be reused, so only a gate job made after the companion
-// started can be its job.
-async function cancelCompanionJob(workspaceRoot, pid, spawnedAt, reason) {
-  const job = listJobs(workspaceRoot).find(
-    (entry) =>
-      entry.pid === pid &&
-      entry.status === "running" &&
-      entry.title === STOP_GATE_JOB_TITLE &&
-      String(entry.createdAt ?? "") >= spawnedAt
+// when no new Copilot can start. It is found by the gate's run id, which a pid or a prompt cannot
+// fake, and read strictly, so a state that cannot be read is an error, not "no job".
+async function cancelCompanionJob(workspaceRoot, runId, reason) {
+  const job = loadState(workspaceRoot, { strict: true }).jobs.find(
+    (entry) => entry.stopGateRunId === runId && entry.status === "running"
   );
   if (job) {
     await cancelJob(workspaceRoot, job.id, { reason });
@@ -192,36 +182,36 @@ async function runCompanionTask(cwd, prompt, options) {
   if (options.contextDir) {
     args.push("--context-dir", options.contextDir);
   }
-  const spawnedAt = new Date().toISOString();
-  const child = spawn(process.execPath, args, {
-    cwd,
-    env: options.env,
-    detached: process.platform !== "win32",
-    stdio: "pipe",
-    windowsHide: true
-  });
-  let stdout = "";
-  let stderr = "";
-  child.stdout.setEncoding("utf8").on("data", (chunk) => {
-    stdout += chunk;
-  });
-  child.stderr.setEncoding("utf8").on("data", (chunk) => {
-    stderr += chunk;
-  });
-  // A companion that exits before it reads the whole prompt closes the pipe; its exit says why.
-  child.stdin.on("error", () => {});
-  child.stdin.end(prompt);
-
   let stop;
   const stopped = new Promise((resolve) => {
     stop = resolve;
   });
   const onSignal = (signal) => stop({ signal });
-  const timer = setTimeout(() => stop({ timedOut: true }), options.timeoutMs);
-  // The handlers stay until the cleanup is done, so a second signal cannot end the hook halfway.
+  // The handlers come before the spawn, so no signal can leave the companion running, and they stay
+  // until the cleanup is done, so a second signal cannot end the hook halfway.
   process.on("SIGTERM", onSignal);
   process.on("SIGINT", onSignal);
   try {
+    const child = spawn(process.execPath, args, {
+      cwd,
+      env: options.env,
+      detached: process.platform !== "win32",
+      stdio: "pipe",
+      windowsHide: true
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8").on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.setEncoding("utf8").on("data", (chunk) => {
+      stderr += chunk;
+    });
+    // A companion that exits before it reads the whole prompt closes the pipe; its exit says why.
+    child.stdin.on("error", () => {});
+    child.stdin.end(prompt);
+
+    const timer = setTimeout(() => stop({ timedOut: true }), options.timeoutMs);
     const outcome = await Promise.race([
       new Promise((resolve) => child.on("close", (status) => resolve({ status }))),
       new Promise((_, reject) => child.on("error", reject)),
@@ -235,14 +225,13 @@ async function runCompanionTask(cwd, prompt, options) {
       const errors = [];
       const keepError = (error) => errors.push(error instanceof Error ? error.message : String(error));
       await terminate(child.pid).catch(keepError);
-      await cancelCompanionJob(options.workspaceRoot, child.pid, spawnedAt, reason).catch(keepError);
+      await cancelCompanionJob(options.workspaceRoot, options.runId, reason).catch(keepError);
       return errors.length > 0 ? { ...outcome, stopError: errors.join(" ") } : outcome;
     }
     try {
       await cancelCompanionJob(
         options.workspaceRoot,
-        child.pid,
-        spawnedAt,
+        options.runId,
         "The stop-time review's companion ended before its job did."
       );
     } catch (error) {
@@ -258,10 +247,12 @@ async function runCompanionTask(cwd, prompt, options) {
 export async function runStopReview(cwd, input = {}, options = {}) {
   const deadline = Date.now() + (options.timeoutMs ?? STOP_REVIEW_TIMEOUT_MS);
   const workspaceRoot = resolveWorkspaceRoot(cwd);
+  const runId = randomUUID();
   const childEnv = {
     ...process.env,
     ...(input.session_id ? { [SESSION_ID_ENV]: input.session_id } : {}),
-    [LAUNCHED_AT_ENV]: String(processStartedAtMs())
+    [LAUNCHED_AT_ENV]: String(processStartedAtMs()),
+    [STOP_GATE_RUN_ENV]: runId
   };
   const result = await withStopReviewContext(cwd, workspaceRoot, ({ reviewInput, addDirs }) =>
     runCompanionTask(cwd, buildStopReviewPrompt(input, reviewInput), {
@@ -269,6 +260,7 @@ export async function runStopReview(cwd, input = {}, options = {}) {
       env: childEnv,
       timeoutMs: Math.max(0, deadline - Date.now()),
       workspaceRoot,
+      runId,
       terminateImpl: options.terminateImpl
     })
   );

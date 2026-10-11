@@ -29,7 +29,7 @@ import process from "node:process";
 import { readJsonFile } from "./fs.mjs";
 import { CopilotPromptModeClient, runShortCommand } from "./prompt-mode.mjs";
 import { resolveLauncher } from "./process.mjs";
-import { ensurePluginDataDir, hasPendingStop, listJobs, resolvePluginDataDir, STOP_GATE_JOB_TITLE } from "./state.mjs";
+import { ensurePluginDataDir, hasPendingStop, listJobs, resolvePluginDataDir } from "./state.mjs";
 
 const TASK_THREAD_PREFIX = "Copilot Companion Task";
 const DEFAULT_CONTINUE_PROMPT =
@@ -652,7 +652,7 @@ export function findLatestTaskThread(cwd, options = {}) {
     .find(
       (entry) =>
         entry.jobClass === "task" &&
-        entry.title !== STOP_GATE_JOB_TITLE &&
+        !entry.stopGateRunId &&
         entry.threadId &&
         Boolean(entry.write) === write &&
         entry.status !== "queued" &&

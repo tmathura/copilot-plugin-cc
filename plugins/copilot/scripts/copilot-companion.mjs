@@ -43,7 +43,6 @@ import {
   listJobs,
   resolveJobPatchDir,
   setConfig,
-  STOP_GATE_JOB_TITLE,
   updateState,
   upsertJob,
   writeJobFile
@@ -480,7 +479,7 @@ function findLatestResumableTaskJob(jobs, write = null) {
     jobs.find(
       (job) =>
         job.jobClass === "task" &&
-        job.title !== STOP_GATE_JOB_TITLE &&
+        !job.stopGateRunId &&
         job.threadId &&
         job.status !== "queued" &&
         job.status !== "running" &&
@@ -517,7 +516,7 @@ async function resolveLatestTrackedTaskThread(cwd, options = {}) {
   const activeTask = visibleJobs.find(
     (job) =>
       job.jobClass === "task" &&
-      job.title !== STOP_GATE_JOB_TITLE &&
+      !job.stopGateRunId &&
       (job.status === "queued" || job.status === "running" || hasPendingStop(job))
   );
   if (activeTask) {
@@ -658,7 +657,7 @@ function createTrackedProgress(job, options = {}) {
 function buildTaskRunMetadata({ prompt, resumeLast = false }) {
   if (!resumeLast && String(prompt ?? "").includes(STOP_REVIEW_TASK_MARKER)) {
     return {
-      title: STOP_GATE_JOB_TITLE,
+      title: "Copilot Stop Gate Review",
       summary: "Stop-gate review of previous Claude turn"
     };
   }

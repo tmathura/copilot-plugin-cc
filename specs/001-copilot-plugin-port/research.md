@@ -537,11 +537,14 @@ Later tickets apply these rules. The call-site map uses them.
   upstream. A job state that cannot be read also gives a note that names the file, and no block,
   because whether the gate is on is then unknown (added 2026-10-11, PR review; rejected
   alternatives: upstream's silent fallback to "off"; a block, which would stop every user, also
-  those who never turned the gate on). The hook finds the companion's job by its `pid` and also by
-  the gate's title and a `createdAt` no earlier than the companion's start, because a pid can be
-  reused by a later process while a stale `running` record still names it (added 2026-10-11, PR
-  review; rejected alternative: the `pid` and `running` alone, which can cancel another job).
-  `main` takes the run limit as an option, so a test can run the whole hook in a child process.
+  those who never turned the gate on). Each gate run has a random run id, which the hook passes in
+  `COPILOT_COMPANION_STOP_GATE_RUN_ID`; the companion's job record keeps it as `stopGateRunId`. The
+  hook finds its job by that id, with a strict state read (changed 2026-10-11, PR review round 2;
+  rejected alternatives: the companion's `pid`, which can be reused, also with a title and
+  `createdAt` check, which a newer gate can still match; a non-strict read, which turns an
+  unreadable state into "no job"). The signal handlers are installed before the companion starts,
+  so a signal at any moment stops it (PR review round 2). `main` takes the run limit as an option,
+  so a test can run the whole hook in a child process.
 - **The gate's companion counts from the hook's start** (decided 2026-10-11, ticket 7 Codex review
   round 1; correctness): a session can end while the gate hook still collects the context, and the
   companion that the hook starts after that would pass the closed-session check, which compares
@@ -551,9 +554,11 @@ Later tickets apply these rules. The call-site map uses them.
   between the read and the companion's job creation.
 - **The gate's job is never resumed** (decided 2026-10-11, ticket 7 code review; correctness): the
   gate runs as a read-only task titled "Copilot Stop Gate Review". Its session reviews Claude's
-  turn, so `--resume-last`, `task-resume-candidate` and `findLatestTaskThread` skip a job with that
-  title, and a running gate job does not count as a running task for `--resume-last` (added
-  2026-10-11, PR review). Rejected alternative: upstream, where the gate's job can become the task
+  turn, so `--resume-last`, `task-resume-candidate` and `findLatestTaskThread` skip a job with a
+  `stopGateRunId`, and a running gate job does not count as a running task for `--resume-last`
+  (added 2026-10-11, PR review). The title alone does not mark a gate job, because the companion
+  sets it for any prompt that holds the gate's marker sentence, which a user's own task can quote
+  (changed 2026-10-11, PR review round 2). Rejected alternative: upstream, where the gate's job can become the task
   that `/copilot:rescue --resume` continues.
 - **Reading a prompt from stdin** (decided 2026-10-11, ticket 7 code review and PR review;
   correctness): `readStdinIfPiped` checks for a terminal with `tty.isatty(0)`, and reads with

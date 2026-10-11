@@ -153,7 +153,8 @@ and the optional Stop-hook review gate. Drop transfer. The first ticket chooses 
   review round 2; research.md §7, hook time budgets). Rejected alternative: upstream's early return
   when there is no state file.
 - Q: Can `/copilot:rescue --resume` continue the gate's review session? → A: No. Resume skips the
-  job titled "Copilot Stop Gate Review", and a running gate job does not count as a running task
+  gate's job, which its record marks with the gate's run id (not by its title, which a user's
+  prompt can trigger), and a running gate job does not count as a running task
   (decided 2026-10-11, ticket 7 code review and PR review; research.md §7). Rejected alternative:
   upstream, where it can.
 - Q: What does the gate do when the job state cannot be read? → A: It prints a note that names the

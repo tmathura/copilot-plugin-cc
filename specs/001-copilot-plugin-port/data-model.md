@@ -46,6 +46,7 @@ later gate deletes the folder of a hook that has ended (research §7, gate conte
 | `title`, `summary` | string | "Copilot Review", "Copilot Task", "Copilot Stop Gate Review", and so on |
 | `workspaceRoot` | string | Git top level, or the cwd outside git |
 | `sessionId` | string | Claude session id from `COPILOT_COMPANION_SESSION_ID`, when set |
+| `stopGateRunId` | string | Only on a review gate job: the gate run's id from `COPILOT_COMPANION_STOP_GATE_RUN_ID`. The hook finds its job by it, and resume skips such a job (research §7; added 2026-10-11, ticket 7) |
 | `status` | string | See the state flow below |
 | `phase` | string | `queued`, `starting`, `reviewing`, `investigating`, `running`, `verifying`, `editing`, `finalizing`, `done`, `failed`, `cancelled` |
 | `threadId` | string or null | **Copilot session id**, set with `--session-id` before the run starts (upstream: Codex thread id) |

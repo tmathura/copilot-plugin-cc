@@ -1435,6 +1435,7 @@ test("a running gate job does not block --resume-last", () => {
     status: "running",
     jobClass: "task",
     title: GATE_TITLE,
+    stopGateRunId: "gate-run",
     threadId: "gate-session",
     updatedAt: new Date().toISOString()
   });
@@ -1443,6 +1444,17 @@ test("a running gate job does not block --resume-last", () => {
   const resumed = companion(["task", "--resume-last", "next step"]);
 
   assert.equal(resumed.status, 0, resumed.stderr);
+});
+
+test("a user task that quotes the gate's marker sentence can still be resumed", () => {
+  const { companion } = setUpTasks();
+  const prompt = "Explain this line: Run a stop-gate review of the previous Claude turn.";
+  assert.equal(companion(["task", prompt]).status, 0);
+
+  const payload = JSON.parse(companion(["task-resume-candidate", "--json"]).stdout);
+
+  assert.equal(payload.available, true);
+  assert.equal(payload.candidate.title, GATE_TITLE);
 });
 
 test("the whole gate hook, with a short limit, prints the block decision and cleans up before its own timeout", async () => {
