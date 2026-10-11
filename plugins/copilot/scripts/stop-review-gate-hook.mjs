@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 
 import { cancelJob, withReviewPatches } from "./copilot-companion.mjs";
 import { getCopilotAvailability } from "./lib/copilot.mjs";
-import { collectReviewContext, ensureGitRepository, resolveReviewTarget } from "./lib/git.mjs";
+import { collectReviewContext, resolveReviewTarget } from "./lib/git.mjs";
 import { terminateProcessTree } from "./lib/process.mjs";
 import { loadPromptTemplate, interpolateTemplate } from "./lib/prompts.mjs";
 import { getConfig, LAUNCHED_AT_ENV, listJobs, processStartedAtMs, resolveJobsDir } from "./lib/state.mjs";
@@ -89,12 +89,26 @@ function removeStaleGateFolders(workspaceRoot) {
   }
 }
 
+// Git's own error text can be translated, so a folder counts as outside Git only when no folder above
+// it holds .git. Any other git failure must block the stop, not pass as "no diff".
+function isOutsideGit(cwd) {
+  if (process.env.GIT_DIR) {
+    return false;
+  }
+  for (let dir = path.resolve(cwd); ; dir = path.dirname(dir)) {
+    if (fs.existsSync(path.join(dir, ".git"))) {
+      return false;
+    }
+    if (path.dirname(dir) === dir) {
+      return true;
+    }
+  }
+}
+
 // The read-only profile has no shell, so Copilot cannot run git to see the changes. Above the inline
 // limit the exact patches go to a folder in the plugin's job storage, which is removed after the run.
 async function withStopReviewContext(cwd, workspaceRoot, run) {
-  try {
-    ensureGitRepository(cwd);
-  } catch {
+  if (isOutsideGit(cwd)) {
     return run({ reviewInput: "The working folder is not a Git repository, so there is no diff.", addDirs: [] });
   }
   removeStaleGateFolders(workspaceRoot);

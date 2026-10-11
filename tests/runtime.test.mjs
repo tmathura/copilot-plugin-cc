@@ -1363,18 +1363,45 @@ test("the gate blocks on BLOCK, and on an answer that is neither ALLOW nor BLOCK
   }
 });
 
-test("the gate blocks when it cannot collect the working-tree context", () => {
-  const { gate, repo, runs } = setUpGate("ok");
-  const before = runs().length;
-  fs.writeFileSync(path.join(repo, ".git", "index"), "not an index");
+test("the gate blocks when git fails in a repository, also when git is missing", () => {
+  const sep = process.platform === "win32" ? ";" : ":";
+  for (const [label, breakRepo, detail] of [
+    ["unreadable index", (repo) => fs.writeFileSync(path.join(repo, ".git", "index"), "not an index"), /failed: /],
+    [
+      "broken .git link",
+      (repo) => {
+        fs.rmSync(path.join(repo, ".git"), { recursive: true, force: true });
+        fs.writeFileSync(path.join(repo, ".git"), "gitdir: missing-folder\n");
+      },
+      /must run inside a Git repository/
+    ],
+    ["git missing", () => {}, /git is not installed/]
+  ]) {
+    const { gate, repo, runs, binDir } = setUpGate("ok");
+    const before = runs().length;
+    breakRepo(repo);
+    // Only the fake Copilot and Node stay on the path, so git cannot be found.
+    const env = label === "git missing" ? { PATH: `${binDir}${sep}${path.dirname(process.execPath)}` } : {};
 
-  const result = gate({ last_assistant_message: "Edited src/app.js." });
+    const result = gate({ last_assistant_message: "Edited src/app.js." }, env);
+
+    assert.equal(result.status, 0, `${label}: ${result.stderr}`);
+    const { decision, reason } = JSON.parse(result.stdout);
+    assert.equal(decision, "block", label);
+    assert.match(reason, /^The stop-time Copilot review task failed: /, label);
+    assert.match(reason, detail, label);
+    assert.equal(runs().length, before, label);
+  }
+});
+
+test("outside Git, the gate runs with a note that there is no diff", () => {
+  const { gate, gateRun } = setUpGate("ok", { repo: makeTempDir(), env: { FAKE_COPILOT_ANSWER: "ALLOW: nothing to fix" } });
+
+  const result = gate({ last_assistant_message: "Edited notes.txt." });
 
   assert.equal(result.status, 0, result.stderr);
-  const { decision, reason } = JSON.parse(result.stdout);
-  assert.equal(decision, "block");
-  assert.match(reason, /^The stop-time Copilot review task failed: /);
-  assert.equal(runs().length, before);
+  assert.equal(result.stdout, "");
+  assert.match(gateRun().prompt, /<repository_context>\nThe working folder is not a Git repository, so there is no diff\.\n/);
 });
 
 test("the gate with no Copilot gives a setup note and lets Claude stop", () => {

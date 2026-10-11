@@ -487,6 +487,9 @@ and to `BLOCK`.
   ends. Test: a second signal during the timeout kill wait (research.md §7, gate run limit and stop)
 - [X] T076f [US5] From Codex review round 8: with the gate on, an error in the gate run blocks the
   stop. Test: a repository whose git index cannot be read (research.md §7, gate run limit and stop)
+- [X] T076g [US5] From Codex review round 9: a folder counts as outside Git only when no folder above
+  it holds `.git`; inside, a git failure blocks. Tests: a broken repository, a broken `.git` link,
+  git missing, and a folder outside Git (research.md §7, gate context folder)
 - [X] T077b [US5] From the ticket 7 code review: `SessionEnd` removes only the session's finished
   jobs and the jobs whose processes all stopped; a job whose stop failed, or whose earlier stop never
   finished, keeps its record and the pids whose stop failed; a pid that stopped is cleared (Codex

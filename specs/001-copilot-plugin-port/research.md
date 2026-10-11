@@ -506,7 +506,11 @@ Later tickets apply these rules. The call-site map uses them.
   it: before it writes its own folder, the gate removes each `stop-gate-*` folder whose hook pid
   has ended, which a hook killed outright left behind. Outside a Git repository the context says
   that there is no diff, and the gate still runs, as upstream's does (all decided 2026-10-11,
-  ticket 7 and its code review). Rejected alternatives: the OS temp folder, because a review writes
+  ticket 7 and its code review). A folder counts as outside Git only when `GIT_DIR` is not set and
+  no folder above it holds `.git`; inside, any git failure (a broken repository, unsafe ownership,
+  git missing) blocks the stop, because Git's own message can be translated and so cannot tell
+  these cases apart (added 2026-10-11, Codex review round 9; rejected alternative: every
+  `ensureGitRepository` failure counts as outside Git, so a broken repository passes as "no diff"). Rejected alternatives: the OS temp folder, because a review writes
   only the plugin's own job files (constitution IV); a folder named by time only, which nothing
   could ever clean up; refusing the gate outside Git, which upstream does not do.
 - **Gate run limit and stop** (decided 2026-10-11, ticket 7 code review; correctness): the 840 s
