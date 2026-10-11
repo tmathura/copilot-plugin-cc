@@ -78,7 +78,8 @@ sequenceDiagram
   A-->>C: status, answer, session id, touched files
 ```
 
-- The `result` event decides the outcome. A run without one fails with the process exit code.
+- The `result` event decides the outcome. A run without one fails, and its error names the process
+  exit code or signal.
 - A line that is not JSON stops the run. The error quotes the line.
 - When the companion gets `SIGTERM` or `SIGINT`, it stops its Copilot process tree first.
 

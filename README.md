@@ -67,6 +67,8 @@ A simple first run:
 /copilot:result
 ```
 
+`/copilot:status` returns at once. Run `/copilot:result` when the status shows the job finished.
+
 ## Usage
 
 ### `/copilot:review`
@@ -208,7 +210,8 @@ Start something long:
 /copilot:rescue --background investigate the flaky test
 ```
 
-Then check in with:
+Then check in with `/copilot:status`, and collect the output with `/copilot:result` when the job has
+finished:
 
 ```bash
 /copilot:status
