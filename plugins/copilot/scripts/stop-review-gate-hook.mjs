@@ -180,39 +180,42 @@ async function runCompanionTask(cwd, prompt, options) {
   child.stdin.on("error", () => {});
   child.stdin.end(prompt);
 
-  let timer;
-  let onSignal;
-  const outcome = await Promise.race([
-    new Promise((resolve) => child.on("close", (status) => resolve({ status }))),
-    new Promise((_, reject) => child.on("error", reject)),
-    new Promise((resolve) => {
-      timer = setTimeout(() => resolve({ timedOut: true }), options.timeoutMs);
-      onSignal = (signal) => resolve({ signal });
-      process.on("SIGTERM", onSignal);
-      process.on("SIGINT", onSignal);
-    })
-  ]).finally(() => {
-    clearTimeout(timer);
+  let stop;
+  const stopped = new Promise((resolve) => {
+    stop = resolve;
+  });
+  const onSignal = (signal) => stop({ signal });
+  const timer = setTimeout(() => stop({ timedOut: true }), options.timeoutMs);
+  // The handlers stay until the cleanup is done, so a second signal cannot end the hook halfway.
+  process.on("SIGTERM", onSignal);
+  process.on("SIGINT", onSignal);
+  try {
+    const outcome = await Promise.race([
+      new Promise((resolve) => child.on("close", (status) => resolve({ status }))),
+      new Promise((_, reject) => child.on("error", reject)),
+      stopped
+    ]).finally(() => clearTimeout(timer));
+
+    if (outcome.timedOut || outcome.signal) {
+      const reason = outcome.signal ? "The stop-time review was stopped." : "The stop-time review timed out.";
+      try {
+        await terminateProcessTree(child.pid);
+        await cancelCompanionJob(options.workspaceRoot, child.pid, reason);
+      } catch (error) {
+        return { ...outcome, stopError: error instanceof Error ? error.message : String(error) };
+      }
+      return outcome;
+    }
+    try {
+      await cancelCompanionJob(options.workspaceRoot, child.pid, "The stop-time review's companion ended before its job did.");
+    } catch (error) {
+      stderr += `\n${error instanceof Error ? error.message : String(error)}`;
+    }
+    return { status: outcome.status, stdout, stderr };
+  } finally {
     process.off("SIGTERM", onSignal);
     process.off("SIGINT", onSignal);
-  });
-
-  if (outcome.timedOut || outcome.signal) {
-    const reason = outcome.signal ? "The stop-time review was stopped." : "The stop-time review timed out.";
-    try {
-      await terminateProcessTree(child.pid);
-      await cancelCompanionJob(options.workspaceRoot, child.pid, reason);
-    } catch (error) {
-      return { ...outcome, stopError: error instanceof Error ? error.message : String(error) };
-    }
-    return outcome;
   }
-  try {
-    await cancelCompanionJob(options.workspaceRoot, child.pid, "The stop-time review's companion ended before its job did.");
-  } catch (error) {
-    stderr += `\n${error instanceof Error ? error.message : String(error)}`;
-  }
-  return { status: outcome.status, stdout, stderr };
 }
 
 export async function runStopReview(cwd, input = {}, options = {}) {

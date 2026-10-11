@@ -514,7 +514,9 @@ Later tickets apply these rules. The call-site map uses them.
   too. The companion leads its own process group on macOS and Linux, so a signal to the hook's
   group does not reach it. The hook therefore handles `SIGTERM` and `SIGINT` while the companion
   runs: it stops the companion and cancels its job, as on the limit, with the message "The
-  stop-time review was stopped.", removes the patch folder, and exits with 143 or 130. Rejected
+  stop-time review was stopped.", removes the patch folder, and exits with 143 or 130. The handlers
+  stay until that cleanup ends, so a second signal during the kill wait changes nothing (added
+  2026-10-11, ticket 7 Codex review round 7). Rejected
   alternatives: a limit that starts when the companion starts, which can pass the 900 s timeout;
   no handler, which leaves the companion and Copilot running. When the companion ends on its own,
   the hook also cancels its job if the record still says `running` (the companion died before its

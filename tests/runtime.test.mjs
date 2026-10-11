@@ -1432,6 +1432,12 @@ test("a gate run past its limit blocks, stops the companion, Copilot and its chi
       }, timeoutMs);
       const [[copilotPid, childPid]] = readFakeChildPids(tasks.binDir);
       assert.equal(findPatchDirs(tasks.dataDir).length, 1);
+      if (behavior === "hang-ignore-sigterm") {
+        // A signal in the kill wait, where a Copilot that ignores SIGTERM keeps the companion alive,
+        // must not end the cleanup halfway; with no handler left, it would end this test process.
+        await waitFor(() => Date.now() - started > timeoutMs + 300, timeoutMs + 5000);
+        process.emit("SIGTERM", "SIGTERM");
+      }
       const review = await pending;
 
       assert.deepEqual(review, {
