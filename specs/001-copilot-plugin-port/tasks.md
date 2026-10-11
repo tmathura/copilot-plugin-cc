@@ -480,6 +480,9 @@ and to `BLOCK`.
   `COPILOT_COMPANION_LAUNCHED_AT`, and the closed-session check uses the earlier of that and the
   companion's start. Test: after `SessionEnd`, a gate from the old launch is refused and starts no
   Copilot (research.md §7, the gate's companion counts from the hook's start)
+- [X] T076d [US5] From Codex review round 5: when the gate's companion ends while its record still
+  says `running`, the hook cancels the job, which stops its Copilot. Test: a companion killed
+  outright (research.md §7, gate run limit and stop)
 - [X] T077b [US5] From the ticket 7 code review: `SessionEnd` removes only the session's finished
   jobs and the jobs whose processes all stopped; a job whose stop failed, or whose earlier stop never
   finished, keeps its record and the pids whose stop failed; a pid that stopped is cleared (Codex

@@ -1450,6 +1450,32 @@ test("a gate run past its limit blocks, stops the companion, Copilot and its chi
   }
 });
 
+test("a gate whose companion is killed outright cancels its job, stops Copilot and its child, and blocks", async () => {
+  const repo = makeLargeRepo();
+  const tasks = setUpTasks("hang", { cwd: repo });
+  await withCompanionEnv(tasks.env, async () => {
+    const { runStopReview } = await import(pathToFileURL(GATE_HOOK).href);
+
+    const pending = runStopReview(repo, { last_assistant_message: "Edited." }, { timeoutMs: 60000 });
+    let job = null;
+    await waitFor(() => {
+      job = findJobByTitle(tasks.dataDir, GATE_TITLE);
+      return job?.copilotPid && readFakeChildPids(tasks.binDir).length > 0;
+    }, 30000);
+    const [[copilotPid, childPid]] = readFakeChildPids(tasks.binDir);
+    process.kill(job.pid, "SIGKILL");
+    const review = await pending;
+
+    assert.equal(review.ok, false);
+    assert.match(review.reason, /^The stop-time Copilot review task failed/);
+    await waitFor(() => [job.pid, copilotPid, childPid].every((pid) => !isAlive(pid)), 10000);
+    const stopped = findJob(tasks.dataDir, job.id);
+    assert.deepEqual([stopped.status, stopped.copilotPid], ["cancelled", null]);
+    assert.equal(stopped.errorMessage, "The stop-time review's companion ended before its job did.");
+    assert.deepEqual(findPatchDirs(tasks.dataDir), []);
+  });
+});
+
 test(
   "a gate hook stopped with SIGTERM stops its companion, Copilot and Copilot's child, and removes its patch folder",
   { skip: process.platform === "win32" && "Windows has no SIGTERM that a process can handle" },

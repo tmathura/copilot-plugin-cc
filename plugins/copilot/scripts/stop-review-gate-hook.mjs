@@ -3,7 +3,8 @@
 // Copilot CLI. The prompt holds the working-tree context, with the exact patches in a folder above the
 // inline limit, and reaches the companion on stdin. The run limit is 840 s from the hook's start; on
 // the limit, or when the hook itself is stopped, the hook stops the companion's process tree and
-// cancels its job, which stops the job's Copilot process.
+// cancels its job, which stops the job's Copilot process; it also cancels the job of a companion that
+// ended before its job did.
 
 import { spawn } from "node:child_process";
 import fs from "node:fs";
@@ -142,10 +143,10 @@ function parseStopReviewOutput(rawOutput) {
   };
 }
 
-// A companion killed outright cannot stop its Copilot, so the job is cancelled too, which stops the
-// Copilot of its record. The record is read once the companion is gone, when no new Copilot can start.
-async function stopCompanion(workspaceRoot, pid, reason) {
-  await terminateProcessTree(pid);
+// A companion that dies outright cannot stop its Copilot, and its record stays running, so its job is
+// cancelled, which stops the Copilot of the record. The record is read once the companion is gone,
+// when no new Copilot can start.
+async function cancelCompanionJob(workspaceRoot, pid, reason) {
   const job = listJobs(workspaceRoot).find((entry) => entry.pid === pid && entry.status === "running");
   if (job) {
     await cancelJob(workspaceRoot, job.id, { reason });
@@ -199,11 +200,17 @@ async function runCompanionTask(cwd, prompt, options) {
   if (outcome.timedOut || outcome.signal) {
     const reason = outcome.signal ? "The stop-time review was stopped." : "The stop-time review timed out.";
     try {
-      await stopCompanion(options.workspaceRoot, child.pid, reason);
+      await terminateProcessTree(child.pid);
+      await cancelCompanionJob(options.workspaceRoot, child.pid, reason);
     } catch (error) {
       return { ...outcome, stopError: error instanceof Error ? error.message : String(error) };
     }
     return outcome;
+  }
+  try {
+    await cancelCompanionJob(options.workspaceRoot, child.pid, "The stop-time review's companion ended before its job did.");
+  } catch (error) {
+    stderr += `\n${error instanceof Error ? error.message : String(error)}`;
   }
   return { status: outcome.status, stdout, stderr };
 }

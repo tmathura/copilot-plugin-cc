@@ -140,7 +140,8 @@ and the optional Stop-hook review gate. Drop transfer. The first ticket chooses 
   folder that nothing cleans up; refusing the gate outside Git.
 - Q: When does the gate's 840 s limit start, and what happens when the hook itself is stopped? → A:
   At the hook's start. A hook stopped with `SIGTERM` or `SIGINT` stops its companion, cancels the job
-  and removes the patch folder (decided 2026-10-11, ticket 7 code review; research.md §7, gate run
+  and removes the patch folder. If the companion itself dies before its job ends, the hook cancels
+  the job, which stops its Copilot (added 2026-10-11, Codex review round 5) (decided 2026-10-11, ticket 7 code review; research.md §7, gate run
   limit and stop). Rejected alternatives: a limit from the companion's start; leaving the companion
   running.
 - Q: Can the gate start Copilot when the session ends while the hook still prepares? → A: No. The
