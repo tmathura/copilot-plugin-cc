@@ -22,9 +22,10 @@ this research, the map and this plan. Tickets 2 to 8 build the plugin in the pha
 **Primary Dependencies**: none at runtime. The Copilot CLI 1.0.93 or later is an external program.
 devDependencies for the type check only: `typescript` and `@types/node`
 
-**Storage**: JSON files per workspace under `$CLAUDE_PLUGIN_DATA/state/`, as upstream `state.mjs`.
-The companion reads the folder from `COPILOT_COMPANION_PLUGIN_DATA` first, because another plugin's
-export of `CLAUDE_PLUGIN_DATA` can reach the same shell (changed 2026-10-11, ticket 8; research.md §7).
+**Storage**: JSON files per workspace under `<plugin data>/state/`, as upstream `state.mjs`.
+`<plugin data>` is `COPILOT_COMPANION_PLUGIN_DATA`, then `CLAUDE_PLUGIN_DATA`, because another
+plugin's export of `CLAUDE_PLUGIN_DATA` can reach the same shell (changed 2026-10-11, ticket 8;
+research.md §7, data folder export; earlier: `$CLAUDE_PLUGIN_DATA/state/`).
 The fallback is `~/.copilot-companion/state/`, not upstream's shared temp folder (research §7).
 A review above the inline limit also has `jobs/<id>.patches/` while it runs; it is removed at the
 end, and with its job record (research §2, added 2026-10-09)

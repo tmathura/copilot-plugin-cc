@@ -6,9 +6,10 @@ in [configuration.md](configuration.md). The job states, files and cancel are in
 
 ## Overview
 
-Claude Code reads the plugin's commands, agent, skills and hooks. Each of them runs one Node script,
-the companion. The companion keeps the job state and calls Copilot through one adapter module. The
-adapter starts one `copilot` process for each run.
+Claude Code reads the plugin's commands, agent, skills and hooks. The commands and the agent run one
+Node script, the companion. The hooks run their own scripts: the session hook works on the job state
+directly, and the review gate hook starts the companion. The companion keeps the job state and calls
+Copilot through one adapter module. The adapter starts one `copilot` process for each run.
 
 ```mermaid
 flowchart LR

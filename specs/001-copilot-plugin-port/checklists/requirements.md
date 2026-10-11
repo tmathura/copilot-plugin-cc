@@ -45,7 +45,10 @@
 - FR-025 was changed to match upstream: the gate also blocks when its review cannot give an
   `ALLOW:` answer; a missing Copilot or an unreadable job state gives only a note (research.md §7,
   gate run limit and stop, 2026-10-11).
-- FR-026 holds: `SessionStart` exports the session id and the plugin data folder; `SessionEnd`
+- FR-026 holds: `SessionStart` exports the session id and the plugin data folder, the folder as
+  `COPILOT_COMPANION_PLUGIN_DATA`, which the companion reads before `CLAUDE_PLUGIN_DATA`; the hooks
+  use their own `CLAUDE_PLUGIN_DATA`, or the owner-only fallback when they have none (research.md
+  §7, data folder export, 2026-10-11); `SessionEnd`
   closes the session, cancels and stops its jobs inside a 3.5 s budget, and keeps a job whose stop
   failed for a later cancel (research.md §7, hook time budgets, 2026-10-11).
 - FR-017 holds for the gate: its patch folder is in the plugin's job storage, outside the repository

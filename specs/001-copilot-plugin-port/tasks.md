@@ -547,8 +547,10 @@ and to `BLOCK`.
 - [X] T082 [US6] Update `UPSTREAM.md`: every upstream file has a status (ported or skipped with a
   reason). Check that every changed file without a change comment is listed under "Changes" in
   `NOTICE`
-- [X] T083 Run the manual check in specs/001-copilot-plugin-port/quickstart.md with
-  `claude --plugin-dir` on a throwaway git repo; record the results in the PR
+- [ ] T083 Run the manual check in specs/001-copilot-plugin-port/quickstart.md with
+  `claude --plugin-dir` on a throwaway git repo; record the results in the PR. Done on Windows
+  (results in PR #24). Still open: steps 2 and 3 on macOS or Linux, and the owner's own run
+  (constitution, Principle VI)
 - [X] T083b Export the plugin data folder as `COPILOT_COMPANION_PLUGIN_DATA` and read it before
   `CLAUDE_PLUGIN_DATA`, because the T083 run with the Codex plugin installed saved the review gate
   setting in the Codex folder (research.md §7, data folder export; added 2026-10-11). The hooks
