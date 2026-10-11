@@ -1323,6 +1323,16 @@ test("the review gate is off by default and runs nothing", () => {
   assert.deepEqual(runs(), []);
 });
 
+test("the gate reads its setting from Claude's CLAUDE_PLUGIN_DATA, not from an inherited companion export", () => {
+  const { gate, runs } = setUpGate("ok", { env: { FAKE_COPILOT_ANSWER: "ALLOW: nothing to fix" } });
+  const before = runs().length;
+
+  const result = gate({ last_assistant_message: "Edited src/app.js." }, { COPILOT_COMPANION_PLUGIN_DATA: makeTempDir() });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(runs().length, before + 1);
+});
+
 test("the gate lets Claude stop on ALLOW, with a 100 KB message on stdin, the diff in the prompt and the read-only profile", () => {
   const { gate, gateRun, dataDir, companion } = setUpGate("ok", { env: { FAKE_COPILOT_ANSWER: "ALLOW: nothing to fix" } });
   // Far past the Windows command-line limit of about 32 KB.
@@ -1710,7 +1720,7 @@ test(
   }
 );
 
-test("SessionStart writes the session id and the plugin data folder to CLAUDE_ENV_FILE", () => {
+test("SessionStart writes the session id and the plugin data folder to CLAUDE_ENV_FILE under the companion's own name", () => {
   const envFile = path.join(makeTempDir(), "claude-env");
 
   const result = run(process.execPath, [SESSION_HOOK, "SessionStart"], {
@@ -1721,8 +1731,49 @@ test("SessionStart writes the session id and the plugin data folder to CLAUDE_EN
   assert.equal(result.status, 0, result.stderr);
   assert.equal(
     fs.readFileSync(envFile, "utf8"),
-    "export COPILOT_COMPANION_SESSION_ID='it'\"'\"'s-1'\nexport CLAUDE_PLUGIN_DATA='/data dir'\n"
+    "export COPILOT_COMPANION_SESSION_ID='it'\"'\"'s-1'\nexport COPILOT_COMPANION_PLUGIN_DATA='/data dir'\n"
   );
+});
+
+test("SessionEnd uses Claude's CLAUDE_PLUGIN_DATA, not an inherited companion export", () => {
+  const dataDir = makeTempDir();
+  const inherited = makeTempDir();
+  const cwd = makeTempDir();
+
+  const result = run(process.execPath, [SESSION_HOOK, "SessionEnd"], {
+    cwd,
+    env: { ...process.env, CLAUDE_PLUGIN_DATA: dataDir, COPILOT_COMPANION_PLUGIN_DATA: inherited },
+    input: JSON.stringify({ session_id: "ended-session", cwd })
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(readClosedSessions(dataDir).map((entry) => entry.id), ["ended-session"]);
+  assert.equal(fs.existsSync(path.join(inherited, "state")), false);
+});
+
+test("without CLAUDE_PLUGIN_DATA the hooks use and export the fallback folder, not an inherited companion export", () => {
+  const home = makeTempDir();
+  const inherited = makeTempDir();
+  const cwd = makeTempDir();
+  const envFile = path.join(makeTempDir(), "claude-env");
+  const env = {
+    ...process.env,
+    CLAUDE_ENV_FILE: envFile,
+    CLAUDE_PLUGIN_DATA: "",
+    COPILOT_COMPANION_PLUGIN_DATA: inherited,
+    HOME: home,
+    USERPROFILE: home
+  };
+  const fallback = path.join(home, ".copilot-companion");
+
+  const start = run(process.execPath, [SESSION_HOOK, "SessionStart"], { cwd, env, input: JSON.stringify({ session_id: "s-1" }) });
+  const end = run(process.execPath, [SESSION_HOOK, "SessionEnd"], { cwd, env, input: JSON.stringify({ session_id: "s-1", cwd }) });
+
+  assert.equal(start.status, 0, start.stderr);
+  assert.equal(end.status, 0, end.stderr);
+  assert.ok(fs.readFileSync(envFile, "utf8").includes(`export COPILOT_COMPANION_PLUGIN_DATA='${fallback}'\n`));
+  assert.deepEqual(readClosedSessions(fallback).map((entry) => entry.id), ["s-1"]);
+  assert.equal(fs.existsSync(path.join(inherited, "state")), false);
 });
 
 function readClosedSessions(dataDir) {

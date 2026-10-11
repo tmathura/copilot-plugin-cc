@@ -171,6 +171,21 @@ and the optional Stop-hook review gate. Drop transfer. The first ticket chooses 
   alternatives: the full 5 s, which Claude Code would cut off; removing every job of the session,
   which loses the pids of a process that still runs; signalling the old pids of an earlier failed
   stop, which may belong to another program by now.
+- Q: Under which name does `SessionStart` pass the plugin data folder to Claude's Bash tool? → A:
+  `COPILOT_COMPANION_PLUGIN_DATA`, which the state module reads before `CLAUDE_PLUGIN_DATA`. The
+  ticket 8 manual run, with the Codex plugin also installed, showed that both plugins export
+  `CLAUDE_PLUGIN_DATA` to the same shell and the last export wins: `/copilot:setup
+  --enable-review-gate` saved the setting in the Codex plugin's folder, and turned on the Codex gate
+  instead of this one (decided 2026-10-11, ticket 8; correctness; research.md §7, data folder
+  export). The hooks set the new name from their own `CLAUDE_PLUGIN_DATA`, or drop it and use the
+  fallback when they have none, so an inherited export cannot move them (added 2026-10-11, ticket 8
+  code review and Codex round 1). Rejected alternative: upstream's export
+  of `CLAUDE_PLUGIN_DATA`.
+- Q: What does a `--write` task do where Copilot's sandbox cannot run? → A: On Windows 11 23H2
+  ("Windows sandboxing requires BaseContainer"), Copilot 1.0.94 refused to run the shell command and
+  said so; the task still edited files. Copilot's docs say it can also warn and run the command with
+  the user's full rights, and the plugin cannot tell which happens, so the README names both
+  (found 2026-10-11, ticket 8 manual run; research.md §3).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -392,7 +407,9 @@ the matching function names in it.
 **Setup**
 
 - **FR-012**: `/copilot:setup` MUST report a clear error, with the next step, when the CLI is
-  missing, its version is not supported, or the user is not logged in.
+  missing, its version is not supported, or the user is not logged in. With the user's own model
+  provider (BYOK), no GitHub login is needed, so setup runs no login check (as upstream, when its
+  provider needs no OpenAI login; wording added 2026-10-11, ticket 8 PR review).
 - **FR-013**: `/copilot:setup` MUST offer to install the CLI once when it is missing and npm is
   available.
 - **FR-014**: `/copilot:setup` MUST turn the review gate on and off.
@@ -428,8 +445,10 @@ the matching function names in it.
 
 - **FR-025**: The plugin MUST offer an optional Stop-hook review gate, off by default, that blocks a
   stop when Copilot finds a problem, and also when the review cannot give an `ALLOW:` answer (it
-  fails, times out or answers something else), as upstream does. A missing Copilot gives only a
-  note (changed 2026-10-11, ticket 7 PR review; the earlier text said "only when Copilot finds a
+  fails, times out or answers something else), as upstream does. A Copilot that setup would not
+  accept (missing, an unsupported version, or a version check that fails) gives only a note, as
+  upstream's unavailable Codex does (wording widened from "a missing Copilot" 2026-10-11, ticket 8
+  Codex review; the code did not change) (changed 2026-10-11, ticket 7 PR review; the earlier text said "only when Copilot finds a
   problem", which did not match upstream).
 - **FR-026**: The plugin MUST have session start and end hooks that do the same job as upstream.
 
@@ -490,7 +509,8 @@ the matching function names in it.
 
 ## Assumptions
 
-- The user has Node 22 or later and a GitHub account with Copilot access.
+- The user has Node 22 or later, and a GitHub account with Copilot access or their own model
+  provider (BYOK), which needs no GitHub login (added 2026-10-11, ticket 8 PR review).
 - The owner reads every upstream file line by line before it is ported. Code from other Copilot
   ports is never copied.
 - Upstream behaviour that Copilot supports (session resume, reasoning effort, `task-resume-candidate`)

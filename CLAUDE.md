@@ -17,13 +17,13 @@ This file only gives directions. The rules live in the files below.
 
 ```
 .claude-plugin/marketplace.json   marketplace entry
-plugins/copilot/                  the plugin; scripts/copilot-companion.mjs is the companion (setup so
-                                  far), scripts/lib has the shared modules and the Copilot adapter;
-                                  commands and skills hold setup; agents and hooks are planned
+plugins/copilot/                  the plugin; scripts/copilot-companion.mjs is the companion,
+                                  scripts/lib has the shared modules and the Copilot adapter; also
+                                  commands, agents, skills, hooks, prompts and schemas
 scripts/bump-version.mjs          sets and checks the version in every manifest
 tests/                            node --test suites, helpers and the fake copilot CLI
 UPSTREAM.md                       last upstream commit checked, and the status of later changes
-docs/                             conventions and development workflow
+docs/                             architecture, configuration, operations, conventions, workflow
 specs/001-copilot-plugin-port/    the port spec: transport decision, call-site map, plan, tasks
 .specify/                         Spec Kit: constitution, templates, scripts
 .claude/skills/speckit-*          Spec Kit skills (managed, do not edit)

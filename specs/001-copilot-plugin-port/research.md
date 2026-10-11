@@ -170,8 +170,10 @@ data model, the contracts, the plan and the tasks link here.
   - `--deny-tool=write,shell,memory` as a second layer. The command reference says: "For multiple
     tools, use a quoted, comma-separated list". Deny rules win over `--allow-all` and over saved
     approvals.
-  - `COPILOT_HOME` set to a plugin-owned folder: `$CLAUDE_PLUGIN_DATA/copilot-home`, or
-    `~/.copilot-companion/copilot-home` when `CLAUDE_PLUGIN_DATA` is not set. It is never in the
+  - `COPILOT_HOME` set to a plugin-owned folder: `<plugin data>/copilot-home`, or
+    `~/.copilot-companion/copilot-home` when no plugin data folder is set. `<plugin data>` is
+    `COPILOT_COMPANION_PLUGIN_DATA`, then `CLAUDE_PLUGIN_DATA` (changed 2026-10-11, ticket 8; §7,
+    data folder export; earlier: `$CLAUDE_PLUGIN_DATA/copilot-home`). It is never in the
     shared temp folder, where another user could prepare it. It has no trusted folders, so
     repository hooks and workspace MCP servers stay off. It also has no user hooks, no saved
     approvals, no user MCP servers and no user plugins.
@@ -201,7 +203,10 @@ data model, the contracts, the plan and the tasks link here.
     wider than Codex's `workspace-write`.
   - Where the host cannot run the sandbox, Copilot warns and runs shell commands with the user's
     full rights. The docs give no reliable check for this, so the plugin cannot refuse. The README
-    says so.
+    says so. Found 2026-10-11 in the ticket 8 manual run: on Windows 11 23H2 Copilot 1.0.94 refused
+    the shell command instead ("Windows sandboxing requires BaseContainer"), and the task could only
+    edit files. The README now names both outcomes. The earlier text, which named only the first,
+    is kept above.
   - Write tasks use the user's own
   `COPILOT_HOME`, so the user's settings, hooks and trusted folders apply, as they would if the user
   ran Copilot by hand.
@@ -375,7 +380,9 @@ Later tickets apply these rules. The call-site map uses them.
   from `collectReviewContext`. The text lives in a new file, `prompts/review.md`. The output stays
   free text, shown by `renderNativeReviewResult` as upstream does.
 - **Login check**: setup runs one tiny read-only prompt in a neutral folder (the plugin data folder)
-  and reads the `result` event. It costs one premium request for each `/copilot:setup`. A BYOK
+  and reads the `result` event. Each `/copilot:setup` that runs the check costs one request of the
+  user's Copilot usage (earlier text: "one premium request for each `/copilot:setup`"; changed
+  2026-10-11, ticket 8 PR review, because a BYOK setup runs no check). A BYOK
   provider (`COPILOT_PROVIDER_BASE_URL`) needs no GitHub login, so setup counts it as ready and runs
   no check, as upstream does for a provider that needs no OpenAI login (decided 2026-10-08, ticket 4).
   A failed check is "not logged in" when stderr has Copilot's "No authentication information found"
@@ -730,13 +737,35 @@ Later tickets apply these rules. The call-site map uses them.
   no lock, or with the reader's own lock, the file is missing for real. Rejected alternatives: no retry, where a job fails,
   or a worker misses its job record, when `/copilot:status` reads at the same moment; readers that
   take the state lock too, where every status read writes a lock file and waits for writers.
-  Without `CLAUDE_PLUGIN_DATA`, the state lives in `~/.copilot-companion/state`, owned by the user,
+  Without a plugin data folder (neither `COPILOT_COMPANION_PLUGIN_DATA` nor `CLAUDE_PLUGIN_DATA`;
+  earlier text named only `CLAUDE_PLUGIN_DATA`, changed 2026-10-11, ticket 8 PR review; see data
+  folder export), the state lives in `~/.copilot-companion/state`, owned by the user,
   as the plugin's Copilot home does (§3). On macOS and Linux, `~/.copilot-companion` is set to
-  owner-only (`0700`) before each state write, also when it already exists, so other users cannot
+  owner-only (`0700`) before each state write, also when it already exists or when
+  `COPILOT_COMPANION_PLUGIN_DATA` names it, so other users cannot
   read the logs or change the recorded pids (added 2026-10-08, PR review). Decided 2026-10-08, after Copilot PR review. Reason:
   security. Upstream uses `<tmp>/codex-companion`, which another local user can create first and
   fill with job records; cancel and `SessionEnd` would then signal PIDs that user chose. Rejected
   alternative: upstream's shared temp folder.
+
+- **Data folder export** (decided 2026-10-11, ticket 8 manual run; correctness): the
+  `SessionStart` hook exports the plugin data folder to `CLAUDE_ENV_FILE` as
+  `COPILOT_COMPANION_PLUGIN_DATA`, and `resolvePluginDataDir` reads that name before
+  `CLAUDE_PLUGIN_DATA`. Claude Code gives each hook its own `CLAUDE_PLUGIN_DATA`, but the Bash tool
+  gets the exports of every plugin's `SessionStart` hook, and the last export of a name wins. The
+  Codex plugin exports `CLAUDE_PLUGIN_DATA` too. In the manual run with both plugins installed,
+  `/copilot:setup --enable-review-gate` wrote the setting to the Codex plugin's folder, so the Codex
+  gate blocked the stop and this plugin's gate stayed off. The hooks set the new variable from their
+  own `CLAUDE_PLUGIN_DATA` first, so an export inherited from the shell that started Claude, for
+  example a nested `claude`, cannot point them, or the companion they start, at another folder
+  (added 2026-10-11, ticket 8 code review). A hook without `CLAUDE_PLUGIN_DATA` drops the inherited
+  variable and uses the fallback folder, and `SessionStart` exports the folder it resolved, also the
+  fallback (added 2026-10-11, ticket 8 Codex review round 1). The fallback folder is made
+  owner-only whenever it is the resolved folder, also when the new variable names it (added
+  2026-10-11, ticket 8 Codex review round 2; security). The test suite deletes the new variable,
+  so tests run from a Claude session never use the real data folder. Rejected alternative:
+  upstream's export of `CLAUDE_PLUGIN_DATA`, which also points the Codex companion at this plugin's
+  folder when this plugin's export comes last.
 
 ## 8. Effect on the ticket split
 

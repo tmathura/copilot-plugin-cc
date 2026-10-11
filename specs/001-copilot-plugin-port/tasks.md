@@ -539,21 +539,28 @@ and to `BLOCK`.
 
 **Purpose**: Docs, the manual run, and version 1.0.0.
 
-- [ ] T080 [P] [US6] Write the full `README.md`: install, every command with its flags, requirements,
+- [X] T080 [P] [US6] Write the full `README.md`: install, every command with its flags, requirements,
   and the complete "Differences from the Codex plugin" section, checked against
   specs/001-copilot-plugin-port/call-site-map.md
-- [ ] T081 [P] [US6] Write `docs/architecture.md` from the real code: modules, the prompt-mode run as a
+- [X] T081 [P] [US6] Write `docs/architecture.md` from the real code: modules, the prompt-mode run as a
   Mermaid sequence diagram, permission profiles, job state flow
-- [ ] T082 [US6] Update `UPSTREAM.md`: every upstream file has a status (ported or skipped with a
+- [X] T082 [US6] Update `UPSTREAM.md`: every upstream file has a status (ported or skipped with a
   reason). Check that every changed file without a change comment is listed under "Changes" in
   `NOTICE`
 - [ ] T083 Run the manual check in specs/001-copilot-plugin-port/quickstart.md with
-  `claude --plugin-dir` on a throwaway git repo; record the results in the PR
-- [ ] T084 Set version 1.0.0 with `npm run bump-version -- 1.0.0`; `npm run check-version` passes
-- [ ] T085 Give the owner the install commands:
+  `claude --plugin-dir` on a throwaway git repo; record the results in the PR. Done on Windows
+  (results in PR #24). Still open: steps 2 and 3 on macOS or Linux, and the owner's own run
+  (constitution, Principle VI)
+- [X] T083b Export the plugin data folder as `COPILOT_COMPANION_PLUGIN_DATA` and read it before
+  `CLAUDE_PLUGIN_DATA`, because the T083 run with the Codex plugin installed saved the review gate
+  setting in the Codex folder (research.md §7, data folder export; added 2026-10-11). The hooks
+  use their own `CLAUDE_PLUGIN_DATA` over an inherited export. Tests in `tests/state.test.mjs` and
+  `tests/runtime.test.mjs`
+- [X] T084 Set version 1.0.0 with `npm run bump-version -- 1.0.0`; `npm run check-version` passes
+- [X] T085 Give the owner the install commands:
   `claude plugin marketplace add tmathura/copilot-plugin-cc` and
   `claude plugin install copilot@tmathura-copilot`
-- [ ] T086 Run `claude plugin validate .`, `npm run build` and `node --test tests/*.test.mjs`; all pass
+- [X] T086 Run `claude plugin validate .`, `npm run build` and `node --test tests/*.test.mjs`; all pass
 
 ---
 

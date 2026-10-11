@@ -11,11 +11,13 @@ import assert from "node:assert/strict";
 import { makeTempDir } from "./helpers.mjs";
 import { resolveCancelableJob } from "../plugins/copilot/scripts/lib/job-control.mjs";
 import {
+  ensurePluginDataDir,
   listJobs,
   loadState,
   resolveJobFile,
   resolveJobPatchDir,
   resolveJobLogFile,
+  resolvePluginDataDir,
   resolveStateDir,
   resolveStateFile,
   updateState,
@@ -83,6 +85,42 @@ test("the fallback folder is made owner-only, also when it already exists", { sk
     process.env.HOME = previous.home;
     process.env.CLAUDE_PLUGIN_DATA = previous.pluginData;
   }
+});
+
+test("the fallback folder is made owner-only also when the companion's export names it", { skip: process.platform === "win32" }, () => {
+  const home = makeTempDir();
+  const fallbackDir = path.join(home, ".copilot-companion");
+  fs.mkdirSync(fallbackDir, { mode: 0o777 });
+  fs.chmodSync(fallbackDir, 0o755);
+  const previousHome = process.env.HOME;
+  process.env.HOME = home;
+
+  try {
+    assert.equal(ensurePluginDataDir({ COPILOT_COMPANION_PLUGIN_DATA: fallbackDir }), fallbackDir);
+    assert.equal(fs.statSync(fallbackDir).mode & 0o777, 0o700);
+  } finally {
+    process.env.HOME = previousHome;
+  }
+});
+
+test("ensurePluginDataDir leaves the fallback folder alone when only the companion's export is set", { skip: process.platform === "win32" }, () => {
+  const home = makeTempDir();
+  const dataDir = path.join(makeTempDir(), "data");
+  const previousHome = process.env.HOME;
+  process.env.HOME = home;
+
+  try {
+    assert.equal(ensurePluginDataDir({ COPILOT_COMPANION_PLUGIN_DATA: dataDir }), dataDir);
+    assert.equal(fs.existsSync(dataDir), true);
+    assert.equal(fs.existsSync(path.join(home, ".copilot-companion")), false);
+  } finally {
+    process.env.HOME = previousHome;
+  }
+});
+
+test("the companion's own data folder export wins over a CLAUDE_PLUGIN_DATA that another plugin exported", () => {
+  assert.equal(resolvePluginDataDir({ CLAUDE_PLUGIN_DATA: "codex", COPILOT_COMPANION_PLUGIN_DATA: "copilot" }), "copilot");
+  assert.equal(resolvePluginDataDir({ CLAUDE_PLUGIN_DATA: "copilot" }), "copilot");
 });
 
 test("resolveStateDir uses CLAUDE_PLUGIN_DATA when it is provided", () => {
