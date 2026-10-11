@@ -380,7 +380,9 @@ Later tickets apply these rules. The call-site map uses them.
   from `collectReviewContext`. The text lives in a new file, `prompts/review.md`. The output stays
   free text, shown by `renderNativeReviewResult` as upstream does.
 - **Login check**: setup runs one tiny read-only prompt in a neutral folder (the plugin data folder)
-  and reads the `result` event. It costs one premium request for each `/copilot:setup`. A BYOK
+  and reads the `result` event. Each `/copilot:setup` that runs the check costs one request of the
+  user's Copilot usage (earlier text: "one premium request for each `/copilot:setup`"; changed
+  2026-10-11, ticket 8 PR review, because a BYOK setup runs no check). A BYOK
   provider (`COPILOT_PROVIDER_BASE_URL`) needs no GitHub login, so setup counts it as ready and runs
   no check, as upstream does for a provider that needs no OpenAI login (decided 2026-10-08, ticket 4).
   A failed check is "not logged in" when stderr has Copilot's "No authentication information found"
@@ -735,9 +737,12 @@ Later tickets apply these rules. The call-site map uses them.
   no lock, or with the reader's own lock, the file is missing for real. Rejected alternatives: no retry, where a job fails,
   or a worker misses its job record, when `/copilot:status` reads at the same moment; readers that
   take the state lock too, where every status read writes a lock file and waits for writers.
-  Without `CLAUDE_PLUGIN_DATA`, the state lives in `~/.copilot-companion/state`, owned by the user,
+  Without a plugin data folder (neither `COPILOT_COMPANION_PLUGIN_DATA` nor `CLAUDE_PLUGIN_DATA`;
+  earlier text named only `CLAUDE_PLUGIN_DATA`, changed 2026-10-11, ticket 8 PR review; see data
+  folder export), the state lives in `~/.copilot-companion/state`, owned by the user,
   as the plugin's Copilot home does (§3). On macOS and Linux, `~/.copilot-companion` is set to
-  owner-only (`0700`) before each state write, also when it already exists, so other users cannot
+  owner-only (`0700`) before each state write, also when it already exists or when
+  `COPILOT_COMPANION_PLUGIN_DATA` names it, so other users cannot
   read the logs or change the recorded pids (added 2026-10-08, PR review). Decided 2026-10-08, after Copilot PR review. Reason:
   security. Upstream uses `<tmp>/codex-companion`, which another local user can create first and
   fill with job records; cancel and `SessionEnd` would then signal PIDs that user chose. Rejected
