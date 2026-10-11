@@ -38,7 +38,7 @@ claude --plugin-dir <path to this repo>/plugins/copilot
 | 5 | `/copilot:status` | A table with the task, `running`, then `completed` |
 | 6 | `/copilot:result` | The task output and `copilot --resume=<id>`. `git diff` shows the README change |
 | 7 | `/copilot:rescue --background --write run the shell command sleep 300 (Start-Sleep 300 on Windows) and report when it ends`, then `/copilot:cancel` while it runs | The job shows `cancelled`. No `copilot` process from the job is left (Task Manager or `ps`) |
-| 8 | `/copilot:setup --enable-review-gate`, ask Claude for a small change with an obvious bug, let it stop | The stop is blocked with a `BLOCK:` reason |
+| 8 | `/copilot:setup --enable-review-gate`, ask Claude for a small change with an obvious bug, let it stop | The stop is blocked with a `BLOCK:` reason. Claude Code labels the block "Stop hook error occurred". This is expected |
 | 9 | Fix the bug, let Claude stop | Claude stops |
 | 10 | `/copilot:setup --disable-review-gate` | `review gate: disabled` |
 
@@ -56,5 +56,5 @@ must block (added 2026-10-11, ticket 8 manual run; research.md §7, data folder 
 
 | Do | Expect |
 | --- | --- |
-| Run `/copilot:setup` with `copilot` removed from the PATH | "not installed", with the npm install command |
+| Run `/copilot:setup` with `copilot` removed from the PATH | `copilot: not found`, with the npm install command |
 | Run `/copilot:review` from a folder that is not a git repository | "This command must run inside a Git repository." |

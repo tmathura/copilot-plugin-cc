@@ -549,8 +549,9 @@ and to `BLOCK`.
   `NOTICE`
 - [ ] T083 Run the manual check in specs/001-copilot-plugin-port/quickstart.md with
   `claude --plugin-dir` on a throwaway git repo; record the results in the PR. Done on Windows
-  (results in PR #24). Still open: steps 2 and 3 on macOS or Linux, and the owner's own run
-  (constitution, Principle VI)
+  (results in PR #24). On 2026-10-11 the owner ran steps 1 to 6 with the installed 1.0.1 plugin,
+  and a full Windows run passed every step, 3b and both failure checks (step 7 with the read-only
+  task). Still open: steps 2 and 3 on macOS or Linux (constitution, Principle VI)
 - [X] T083b Export the plugin data folder as `COPILOT_COMPANION_PLUGIN_DATA` and read it before
   `CLAUDE_PLUGIN_DATA`, because the T083 run with the Codex plugin installed saved the review gate
   setting in the Codex folder (research.md §7, data folder export; added 2026-10-11). The hooks
