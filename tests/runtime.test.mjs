@@ -1420,6 +1420,16 @@ test("with git broken, the gate in a subfolder still finds its setting and block
   assert.deepEqual(readClosedSessions(dataDir).map((entry) => entry.id), ["broken-git-session"]);
 });
 
+test("a .git link whose target is gone still marks the repository root", async () => {
+  const { findGitMarkerRoot } = await import("../plugins/copilot/scripts/lib/workspace.mjs");
+  const root = fs.realpathSync.native(makeTempDir());
+  fs.mkdirSync(path.join(root, "sub"));
+  // A junction needs no extra rights on Windows.
+  fs.symlinkSync(path.join(root, "gone"), path.join(root, ".git"), process.platform === "win32" ? "junction" : "dir");
+
+  assert.equal(findGitMarkerRoot(path.join(root, "sub")), root);
+});
+
 test("outside Git, the gate runs with a note that there is no diff, and still removes stale folders", () => {
   const { gate, gateRun, dataDir } = setUpGate("ok", {
     repo: makeTempDir(),

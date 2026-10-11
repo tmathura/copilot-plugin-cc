@@ -5,6 +5,16 @@ import path from "node:path";
 
 import { ensureGitRepository } from "./git.mjs";
 
+// A .git link whose target is gone still marks a repository, a broken one; existsSync follows links.
+function hasEntry(file) {
+  try {
+    fs.lstatSync(file);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Git looks from the real path, so a repository opened through a link is found the same way.
 export function findGitMarkerRoot(cwd) {
   let start = path.resolve(cwd);
@@ -14,7 +24,7 @@ export function findGitMarkerRoot(cwd) {
     // A folder that cannot be resolved is walked as written.
   }
   for (let dir = start; ; dir = path.dirname(dir)) {
-    if (fs.existsSync(path.join(dir, ".git"))) {
+    if (hasEntry(path.join(dir, ".git"))) {
       return dir;
     }
     if (path.dirname(dir) === dir) {

@@ -560,7 +560,9 @@ Later tickets apply these rules. The call-site map uses them.
   and setup saves the gate setting under the repository root. Upstream falls back to the working
   folder, so with git broken and Claude in a subfolder, the gate read a fresh default ("off") and
   `SessionEnd` closed the session in an unrelated state file. Rejected alternative: upstream's
-  fallback. The gate's outside-Git check uses the same `findGitMarkerRoot`.
+  fallback. The gate's outside-Git check uses the same `findGitMarkerRoot`. A `.git` entry counts
+  even when it is a link whose target is gone (`lstat`, not `existsSync`, which follows links), so
+  a broken repository is never taken for a plain folder (added 2026-10-11, PR review round 6).
 - **The gate's job is never resumed** (decided 2026-10-11, ticket 7 code review; correctness): the
   gate runs as a read-only task titled "Copilot Stop Gate Review". Its session reviews Claude's
   turn, so `--resume-last`, `task-resume-candidate` and `findLatestTaskThread` skip a job with a
