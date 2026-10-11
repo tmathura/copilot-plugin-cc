@@ -73,10 +73,6 @@ function fallbackDir() {
   return path.join(os.homedir(), FALLBACK_DIR_NAME);
 }
 
-function pluginDataFromEnv(env) {
-  return env[COMPANION_PLUGIN_DATA_ENV] || env[PLUGIN_DATA_ENV];
-}
-
 // A hook gets CLAUDE_PLUGIN_DATA from Claude Code for this plugin, or none, which means the fallback.
 // A companion export inherited from the shell that started Claude must not win over either, also in
 // the companion that the hook starts.
@@ -89,7 +85,7 @@ export function useHookPluginData(env = process.env) {
 }
 
 export function resolvePluginDataDir(env = process.env) {
-  return pluginDataFromEnv(env) || fallbackDir();
+  return env[COMPANION_PLUGIN_DATA_ENV] || env[PLUGIN_DATA_ENV] || fallbackDir();
 }
 
 export function resolveStateFile(cwd) {
@@ -101,13 +97,14 @@ export function resolveJobsDir(cwd) {
 }
 
 export function ensurePluginDataDir(env = process.env) {
-  if (!pluginDataFromEnv(env) && process.platform !== "win32") {
+  const dataDir = resolvePluginDataDir(env);
+  // The SessionStart hook can export the fallback folder too, so the check is on the folder itself.
+  if (path.resolve(dataDir) === path.resolve(fallbackDir()) && process.platform !== "win32") {
     // Others must not read the logs, or change the pids that cancel signals. A folder that already
     // exists keeps its old mode unless it is changed here. A Windows profile folder is private already.
-    fs.mkdirSync(fallbackDir(), { recursive: true, mode: 0o700 });
-    fs.chmodSync(fallbackDir(), 0o700);
+    fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 });
+    fs.chmodSync(dataDir, 0o700);
   }
-  const dataDir = resolvePluginDataDir(env);
   fs.mkdirSync(dataDir, { recursive: true });
   return dataDir;
 }

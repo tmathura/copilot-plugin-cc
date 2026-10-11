@@ -87,6 +87,22 @@ test("the fallback folder is made owner-only, also when it already exists", { sk
   }
 });
 
+test("the fallback folder is made owner-only also when the companion's export names it", { skip: process.platform === "win32" }, () => {
+  const home = makeTempDir();
+  const fallbackDir = path.join(home, ".copilot-companion");
+  fs.mkdirSync(fallbackDir, { mode: 0o777 });
+  fs.chmodSync(fallbackDir, 0o755);
+  const previousHome = process.env.HOME;
+  process.env.HOME = home;
+
+  try {
+    assert.equal(ensurePluginDataDir({ COPILOT_COMPANION_PLUGIN_DATA: fallbackDir }), fallbackDir);
+    assert.equal(fs.statSync(fallbackDir).mode & 0o777, 0o700);
+  } finally {
+    process.env.HOME = previousHome;
+  }
+});
+
 test("ensurePluginDataDir leaves the fallback folder alone when only the companion's export is set", { skip: process.platform === "win32" }, () => {
   const home = makeTempDir();
   const dataDir = path.join(makeTempDir(), "data");
