@@ -13,7 +13,7 @@ import path from "node:path";
 import { resolveWorkspaceRoot } from "./workspace.mjs";
 
 const STATE_VERSION = 1;
-export const PLUGIN_DATA_ENV = "CLAUDE_PLUGIN_DATA";
+const PLUGIN_DATA_ENV = "CLAUDE_PLUGIN_DATA";
 // The SessionStart hook exports the data folder under this name for Claude's Bash tool. Another
 // plugin, such as the Codex plugin, exports CLAUDE_PLUGIN_DATA there too, and the last export wins.
 export const COMPANION_PLUGIN_DATA_ENV = "COPILOT_COMPANION_PLUGIN_DATA";
@@ -77,11 +77,14 @@ function pluginDataFromEnv(env) {
   return env[COMPANION_PLUGIN_DATA_ENV] || env[PLUGIN_DATA_ENV];
 }
 
-// A hook gets CLAUDE_PLUGIN_DATA from Claude Code for this plugin. A companion export inherited from
-// the shell that started Claude must not win over it, also in the companion that the hook starts.
+// A hook gets CLAUDE_PLUGIN_DATA from Claude Code for this plugin, or none, which means the fallback.
+// A companion export inherited from the shell that started Claude must not win over either, also in
+// the companion that the hook starts.
 export function useHookPluginData(env = process.env) {
   if (env[PLUGIN_DATA_ENV]) {
     env[COMPANION_PLUGIN_DATA_ENV] = env[PLUGIN_DATA_ENV];
+  } else {
+    delete env[COMPANION_PLUGIN_DATA_ENV];
   }
 }
 

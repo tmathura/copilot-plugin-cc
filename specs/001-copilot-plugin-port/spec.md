@@ -177,8 +177,9 @@ and the optional Stop-hook review gate. Drop transfer. The first ticket chooses 
   `CLAUDE_PLUGIN_DATA` to the same shell and the last export wins: `/copilot:setup
   --enable-review-gate` saved the setting in the Codex plugin's folder, and turned on the Codex gate
   instead of this one (decided 2026-10-11, ticket 8; correctness; research.md §7, data folder
-  export). The hooks set the new name from their own `CLAUDE_PLUGIN_DATA`, so an inherited export
-  cannot move them (added 2026-10-11, ticket 8 code review). Rejected alternative: upstream's export
+  export). The hooks set the new name from their own `CLAUDE_PLUGIN_DATA`, or drop it and use the
+  fallback when they have none, so an inherited export cannot move them (added 2026-10-11, ticket 8
+  code review and Codex round 1). Rejected alternative: upstream's export
   of `CLAUDE_PLUGIN_DATA`.
 - Q: What does a `--write` task do where Copilot's sandbox cannot run? → A: On Windows 11 23H2
   ("Windows sandboxing requires BaseContainer"), Copilot 1.0.94 refused to run the shell command and

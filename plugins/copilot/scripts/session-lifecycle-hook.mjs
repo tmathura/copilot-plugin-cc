@@ -16,9 +16,9 @@ import { terminateProcessTree } from "./lib/process.mjs";
 import {
   COMPANION_PLUGIN_DATA_ENV,
   hasPendingStop,
-  PLUGIN_DATA_ENV,
   readJobFile,
   resolveJobFile,
+  resolvePluginDataDir,
   updateState,
   useHookPluginData,
   writeJobFile
@@ -162,8 +162,9 @@ export async function cleanupSessionJobs(cwd, sessionId, options = {}) {
 
 function handleSessionStart(input) {
   appendEnvVar(SESSION_ID_ENV, input.session_id);
-  // Not CLAUDE_PLUGIN_DATA: an export of that name would point another plugin's companion here.
-  appendEnvVar(COMPANION_PLUGIN_DATA_ENV, process.env[PLUGIN_DATA_ENV]);
+  // Not CLAUDE_PLUGIN_DATA: an export of that name would point another plugin's companion here. The
+  // fallback is exported too, so the commands do not keep a folder inherited from another session.
+  appendEnvVar(COMPANION_PLUGIN_DATA_ENV, resolvePluginDataDir());
 }
 
 async function handleSessionEnd(input) {

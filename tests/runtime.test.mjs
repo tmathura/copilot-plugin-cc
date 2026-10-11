@@ -1751,6 +1751,31 @@ test("SessionEnd uses Claude's CLAUDE_PLUGIN_DATA, not an inherited companion ex
   assert.equal(fs.existsSync(path.join(inherited, "state")), false);
 });
 
+test("without CLAUDE_PLUGIN_DATA the hooks use and export the fallback folder, not an inherited companion export", () => {
+  const home = makeTempDir();
+  const inherited = makeTempDir();
+  const cwd = makeTempDir();
+  const envFile = path.join(makeTempDir(), "claude-env");
+  const env = {
+    ...process.env,
+    CLAUDE_ENV_FILE: envFile,
+    CLAUDE_PLUGIN_DATA: "",
+    COPILOT_COMPANION_PLUGIN_DATA: inherited,
+    HOME: home,
+    USERPROFILE: home
+  };
+  const fallback = path.join(home, ".copilot-companion");
+
+  const start = run(process.execPath, [SESSION_HOOK, "SessionStart"], { cwd, env, input: JSON.stringify({ session_id: "s-1" }) });
+  const end = run(process.execPath, [SESSION_HOOK, "SessionEnd"], { cwd, env, input: JSON.stringify({ session_id: "s-1", cwd }) });
+
+  assert.equal(start.status, 0, start.stderr);
+  assert.equal(end.status, 0, end.stderr);
+  assert.ok(fs.readFileSync(envFile, "utf8").includes(`export COPILOT_COMPANION_PLUGIN_DATA='${fallback}'\n`));
+  assert.deepEqual(readClosedSessions(fallback).map((entry) => entry.id), ["s-1"]);
+  assert.equal(fs.existsSync(path.join(inherited, "state")), false);
+});
+
 function readClosedSessions(dataDir) {
   try {
     const stateRoot = path.join(dataDir, "state");

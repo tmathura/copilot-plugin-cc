@@ -751,7 +751,9 @@ Later tickets apply these rules. The call-site map uses them.
   gate blocked the stop and this plugin's gate stayed off. The hooks set the new variable from their
   own `CLAUDE_PLUGIN_DATA` first, so an export inherited from the shell that started Claude, for
   example a nested `claude`, cannot point them, or the companion they start, at another folder
-  (added 2026-10-11, ticket 8 code review). The test suite deletes the new variable,
+  (added 2026-10-11, ticket 8 code review). A hook without `CLAUDE_PLUGIN_DATA` drops the inherited
+  variable and uses the fallback folder, and `SessionStart` exports the folder it resolved, also the
+  fallback (added 2026-10-11, ticket 8 Codex review round 1). The test suite deletes the new variable,
   so tests run from a Claude session never use the real data folder. Rejected alternative:
   upstream's export of `CLAUDE_PLUGIN_DATA`, which also points the Codex companion at this plugin's
   folder when this plugin's export comes last.
