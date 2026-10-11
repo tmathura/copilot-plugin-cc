@@ -482,7 +482,8 @@ and to `BLOCK`.
   Copilot (research.md §7, the gate's companion counts from the hook's start)
 - [X] T077b [US5] From the ticket 7 code review: `SessionEnd` removes only the session's finished
   jobs and the jobs whose processes all stopped; a job whose stop failed, or whose earlier stop never
-  finished, keeps its record and pids. Test with a stop that fails (research.md §7, hook time
+  finished, keeps its record and the pids whose stop failed; a pid that stopped is cleared (Codex
+  review round 3). Test with a stop that fails (research.md §7, hook time
   budgets)
 - [X] T077c [US5] From Codex review round 2: `SessionEnd` records the close also when the workspace
   has no state file yet. Test: a companion from before the close cannot create the first job

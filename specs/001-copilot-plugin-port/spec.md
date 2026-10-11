@@ -157,7 +157,8 @@ and the optional Stop-hook review gate. Drop transfer. The first ticket chooses 
 - Q: How much of its 5 s timeout does `SessionEnd` use, and which jobs does it remove? → A: 3.5 s
   from the start of its cleanup. It stops the processes of the session's queued and running jobs,
   then removes the session's finished jobs and the jobs it stopped. A job whose stop failed, and a
-  job whose earlier stop did not finish, keep their record and pids for `/copilot:cancel` (decided
+  job whose earlier stop did not finish, keep their record and the pids that may still run, for
+  `/copilot:cancel` (decided
   2026-10-11, ticket 7 and its code review; research.md §7, hook time budgets). Rejected
   alternatives: the full 5 s, which Claude Code would cut off; removing every job of the session,
   which loses the pids of a process that still runs; signalling the old pids of an earlier failed

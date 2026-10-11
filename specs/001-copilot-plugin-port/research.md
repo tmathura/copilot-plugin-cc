@@ -610,7 +610,8 @@ Later tickets apply these rules. The call-site map uses them.
     2026-10-11, ticket 7: a held lock took 4.35 s with a 4 s budget on Windows). Rejected
     alternative: the full 5 s, which Claude Code would cut off. The last step removes the session's
     finished jobs and the jobs whose processes all stopped. A job whose stop failed keeps its
-    `cancelled` record and its pids, and a cancelled or failed job that already named a pid because
+    `cancelled` record with only the pids whose stop failed, as cancel does, because a stopped pid
+    can be reused (Codex review round 3), and a cancelled or failed job that already named a pid because
     an earlier stop did not finish is left as it is, so `/copilot:cancel` can stop them later (added
     2026-10-11, ticket 7 code review; correctness). The close is recorded even when the workspace
     has no `state.json` yet, because a companion may still be preparing the first job (added

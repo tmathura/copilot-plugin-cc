@@ -1592,7 +1592,8 @@ test("SessionEnd keeps a job whose stop fails, and an older job whose stop never
       const jobs = readJobs(tasks.dataDir);
       assert.deepEqual(jobs.map((job) => job.id).sort(), ["task-old-failed", "task-running"]);
       const kept = jobs.find((job) => job.id === "task-running");
-      assert.deepEqual([kept.status, kept.copilotPid], ["cancelled", copilot.pid]);
+      // The stopped companion's pid is cleared, so a later cancel never signals it after reuse.
+      assert.deepEqual([kept.status, kept.pid, kept.copilotPid], ["cancelled", null, copilot.pid]);
       // An old pid may belong to another program by now, so only a cancel stops it.
       assert.equal(jobs.find((job) => job.id === "task-old-failed").copilotPid, oldCopilot.pid);
       assert.ok(isAlive(oldCopilot.pid));

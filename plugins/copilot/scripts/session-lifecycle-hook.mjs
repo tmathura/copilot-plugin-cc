@@ -76,23 +76,35 @@ export async function cleanupSessionJobs(cwd, sessionId, options = {}) {
   );
 
   // One shared wait, then SIGKILL, so three jobs cost no more time than one. A job whose processes
-  // could not all be stopped keeps its record and pids, so /copilot:cancel can try again.
+  // could not all be stopped keeps its record, so /copilot:cancel can try again; as in cancel, only
+  // the pids whose stop failed stay in it, because a stopped pid can be reused.
   const forceKillAfterMs = Math.min(STOP_WAIT_MS, timeLeft());
+  const stoppedPids = new Map();
   await Promise.all(
     stopping.map(async (job) => {
-      const pids = [job.pid, job.copilotPid].filter(Boolean);
-      const outcomes = await Promise.allSettled(pids.map((pid) => terminate(pid, { forceKillAfterMs })));
+      const keys = ["pid", "copilotPid"].filter((key) => job[key]);
+      const outcomes = await Promise.allSettled(keys.map((key) => terminate(job[key], { forceKillAfterMs })));
       if (outcomes.every((outcome) => outcome.status === "fulfilled")) {
         removedIds.add(job.id);
+      } else {
+        stoppedPids.set(
+          job.id,
+          keys.filter((_, index) => outcomes[index].status === "fulfilled").map((key) => [key, job[key]])
+        );
       }
     })
   );
 
-  if (removedIds.size > 0) {
+  if (removedIds.size > 0 || stoppedPids.size > 0) {
     updateState(
       workspaceRoot,
       (state) => {
-        state.jobs = state.jobs.filter((job) => !removedIds.has(job.id));
+        state.jobs = state.jobs
+          .filter((job) => !removedIds.has(job.id))
+          .map((job) => {
+            const cleared = (stoppedPids.get(job.id) ?? []).filter(([key, pid]) => job[key] === pid);
+            return { ...job, ...Object.fromEntries(cleared.map(([key]) => [key, null])) };
+          });
       },
       { lockTimeoutMs: timeLeft() }
     );
