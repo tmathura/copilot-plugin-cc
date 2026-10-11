@@ -446,16 +446,16 @@ export function getConfig(cwd) {
   return loadState(cwd).config;
 }
 
-export function writeJobFile(cwd, jobId, payload) {
+export function writeJobFile(cwd, jobId, payload, options = {}) {
   ensureStateDir(cwd);
   const jobFile = resolveJobFile(cwd, jobId);
-  writeJsonAtomic(jobFile, payload);
+  writeJsonAtomic(jobFile, payload, options.deadline);
   return jobFile;
 }
 
-export function readJobFile(jobFile) {
+export function readJobFile(jobFile, options = {}) {
   const lockFile = path.join(path.dirname(path.dirname(jobFile)), `${STATE_FILE_NAME}.lock`);
-  return JSON.parse(readTextFile(jobFile, lockFile));
+  return JSON.parse(readTextFile(jobFile, lockFile, options.deadline));
 }
 
 function removeJobFile(jobFile) {

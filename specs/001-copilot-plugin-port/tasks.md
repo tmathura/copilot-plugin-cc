@@ -405,8 +405,9 @@ cancel a second task; its process tree is gone.
 
 ## Phase 7: User Story 5, review gate and session hooks (ticket 7, #11)
 
-**Goal**: The optional Stop hook blocks only when Copilot finds a problem; session hooks set the
-session id and clean up.
+**Goal**: The optional Stop hook blocks when Copilot finds a problem or the review cannot give an
+`ALLOW:` answer (changed 2026-10-11, PR review; FR-025); session hooks set the session id and clean
+up.
 
 **Independent test**: run the hook scripts with hook input on stdin against the fake set to `ALLOW`
 and to `BLOCK`.
@@ -502,6 +503,13 @@ and to `BLOCK`.
   say when the gate blocks; `checklists/requirements.md` notes the Phase 7 decisions. Tests: the whole
   hook in a child process with a short limit, unreadable state, `--resume-last` beside a running gate
   job, a user task that quotes the gate's marker sentence, the sweep outside Git (research.md §7)
+- [X] T076j [US5] From PR review round 4: the outside-Git check walks the real path. Test: a
+  repository opened through a link (research.md §7, gate context folder)
+- [X] T077e [US5] From PR review round 4: `SessionEnd` writes the job file of each job it changes,
+  so it agrees with the state; the write is best effort, and the job files of one update share a
+  200 ms retry limit. Tests: the kept
+  job's file after a failed stop; a job file that cannot be written does not stop the close or the
+  stop (research.md §7, hook time budgets)
 - [X] T077b [US5] From the ticket 7 code review: `SessionEnd` removes only the session's finished
   jobs and the jobs whose processes all stopped; a job whose stop failed, or whose earlier stop never
   finished, keeps its record and the pids whose stop failed; a pid that stopped is cleared (Codex

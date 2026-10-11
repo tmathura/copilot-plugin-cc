@@ -293,7 +293,8 @@ it ends, and cancel a second task while it runs.
 ### User Story 5 - Review gate before Claude stops (Priority: P3)
 
 When the review gate is on, Copilot reviews Claude's last turn before Claude stops. If Copilot finds
-a problem, Claude must keep working. If not, Claude stops.
+a problem, or the review cannot give an answer, Claude must keep working. If Copilot allows the
+stop, Claude stops (changed 2026-10-11, ticket 7 PR review; see scenario 5).
 
 **Why this priority**: It is optional and off by default.
 

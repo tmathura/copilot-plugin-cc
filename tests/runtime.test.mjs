@@ -1411,6 +1411,21 @@ test("outside Git, the gate runs with a note that there is no diff, and still re
   assert.equal(fs.existsSync(ended), false);
 });
 
+test("the gate reviews a repository that Claude opened through a link", () => {
+  const { gate, gateRun, repo } = setUpGate("ok", { env: { FAKE_COPILOT_ANSWER: "ALLOW: nothing to fix" } });
+  fs.mkdirSync(path.join(repo, "src", "deep"));
+  const link = path.join(makeTempDir(), "linked-src");
+  // A junction needs no extra rights on Windows.
+  fs.symlinkSync(path.join(repo, "src"), link, process.platform === "win32" ? "junction" : "dir");
+
+  const result = gate({ cwd: link, last_assistant_message: "Edited src/app.js." });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, "");
+  assert.doesNotMatch(gateRun().prompt, /not a Git repository/);
+  assert.match(gateRun().prompt, /\+export const value = items\[0\]\.id;/);
+});
+
 test("the gate says why it did not run when the job state cannot be read", () => {
   const { gate, dataDir, runs } = setUpGate("ok");
   const before = runs().length;
@@ -1777,6 +1792,10 @@ test("SessionEnd keeps a job whose stop fails, and an older job whose stop never
       const kept = jobs.find((job) => job.id === "task-running");
       // The stopped companion's pid is cleared, so a later cancel never signals it after reuse.
       assert.deepEqual([kept.status, kept.pid, kept.copilotPid], ["cancelled", null, copilot.pid]);
+      // The job file agrees with the state.
+      const { readStoredJob } = await import("../plugins/copilot/scripts/lib/job-control.mjs");
+      const stored = readStoredJob(tasks.cwd, "task-running");
+      assert.deepEqual([stored.status, stored.pid, stored.copilotPid], ["cancelled", null, copilot.pid]);
       // An old pid may belong to another program by now, so only a cancel stops it.
       assert.equal(jobs.find((job) => job.id === "task-old-failed").copilotPid, oldCopilot.pid);
       assert.ok(isAlive(oldCopilot.pid));
@@ -1784,6 +1803,34 @@ test("SessionEnd keeps a job whose stop fails, and an older job whose stop never
       for (const child of [worker, copilot, oldCopilot]) {
         child.kill("SIGKILL");
       }
+    }
+  });
+});
+
+test("SessionEnd still closes the session and stops a job whose job file cannot be written", async () => {
+  const tasks = setUpTasks();
+  await withCompanionEnv(tasks.env, async () => {
+    const { cleanupSessionJobs } = await import(pathToFileURL(SESSION_HOOK).href);
+    const { resolveJobFile, updateState } = await import("../plugins/copilot/scripts/lib/state.mjs");
+    const worker = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+    const sessionId = "unwritable-job-file";
+    try {
+      updateState(tasks.cwd, (state) => {
+        state.jobs.unshift({ id: "task-unwritable", status: "running", jobClass: "task", sessionId, pid: worker.pid });
+      });
+      // A folder where the job file should be: no file can replace it.
+      fs.mkdirSync(path.join(resolveJobFile(tasks.cwd, "task-unwritable"), "blocker"), { recursive: true });
+
+      const started = Date.now();
+      await cleanupSessionJobs(tasks.cwd, sessionId);
+
+      // A job file that cannot be written gets only a short retry, not the state's 2 s.
+      assert.ok(Date.now() - started < 1500, `${Date.now() - started} ms`);
+      await waitFor(() => !isAlive(worker.pid));
+      assert.deepEqual(readClosedSessions(tasks.dataDir).map((entry) => entry.id), [sessionId]);
+      assert.equal(findJob(tasks.dataDir, "task-unwritable"), null);
+    } finally {
+      worker.kill("SIGKILL");
     }
   });
 });

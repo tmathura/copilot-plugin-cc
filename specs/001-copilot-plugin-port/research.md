@@ -509,7 +509,8 @@ Later tickets apply these rules. The call-site map uses them.
   PR review). Outside a Git repository the context says
   that there is no diff, and the gate still runs, as upstream's does (all decided 2026-10-11,
   ticket 7 and its code review). A folder counts as outside Git only when `GIT_DIR` is not set and
-  no folder above it holds `.git`; inside, any git failure (a broken repository, unsafe ownership,
+  no folder above its real path holds `.git` (real path added 2026-10-11, PR review round 4: git
+  looks from the real path, so a repository opened through a link must not pass as outside Git); inside, any git failure (a broken repository, unsafe ownership,
   git missing) blocks the stop, because Git's own message can be translated and so cannot tell
   these cases apart (added 2026-10-11, Codex review round 9; rejected alternative: every
   `ensureGitRepository` failure counts as outside Git, so a broken repository passes as "no diff"). Rejected alternatives: the OS temp folder, because a review writes
@@ -646,7 +647,13 @@ Later tickets apply these rules. The call-site map uses them.
     the 5 s timeout, because Node's own start and a slow machine also use that time (changed
     2026-10-11, ticket 7: a held lock took 4.35 s with a 4 s budget on Windows). Rejected
     alternative: the full 5 s, which Claude Code would cut off. The last step removes the session's
-    finished jobs and the jobs whose processes all stopped. A job whose stop failed keeps its
+    finished jobs and the jobs whose processes all stopped. Both updates also write the job file
+    (`jobs/<id>.json`) of each job they change, as cancel does, so the two records agree (added
+    2026-10-11, PR review round 4). That write is best effort, and all the job files of one update share
+    one limit of at most 200 ms, within the cleanup budget, for the Windows retries of their reads
+    and writes: the state entry is what closes the session and stops the jobs, so a job file that
+    cannot be written must not stop either (Codex check of that fix; rejected alternative: a failed
+    job-file write fails the whole update, so nothing is closed or stopped). A job whose stop failed keeps its
     `cancelled` record with only the pids whose stop failed, as cancel does, because a stopped pid
     can be reused (Codex review round 3), and a cancelled or failed job that already named a pid because
     an earlier stop did not finish is left as it is, so `/copilot:cancel` can stop them later (added

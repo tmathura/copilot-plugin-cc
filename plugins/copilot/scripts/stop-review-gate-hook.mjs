@@ -93,12 +93,19 @@ function removeStaleGateFolders(workspaceRoot) {
 }
 
 // Git's own error text can be translated, so a folder counts as outside Git only when no folder above
-// it holds .git. Any other git failure must block the stop, not pass as "no diff".
+// it holds .git. Any other git failure must block the stop, not pass as "no diff". Git looks from the
+// real path, so a repository opened through a link is found the same way.
 function isOutsideGit(cwd) {
   if (process.env.GIT_DIR) {
     return false;
   }
-  for (let dir = path.resolve(cwd); ; dir = path.dirname(dir)) {
+  let start = path.resolve(cwd);
+  try {
+    start = fs.realpathSync.native(start);
+  } catch {
+    // A folder that cannot be resolved is walked as written.
+  }
+  for (let dir = start; ; dir = path.dirname(dir)) {
     if (fs.existsSync(path.join(dir, ".git"))) {
       return false;
     }

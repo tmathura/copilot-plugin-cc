@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 
 import { readStdinSync } from "./lib/fs.mjs";
 import { terminateProcessTree } from "./lib/process.mjs";
-import { hasPendingStop, updateState } from "./lib/state.mjs";
+import { hasPendingStop, readJobFile, resolveJobFile, updateState, writeJobFile } from "./lib/state.mjs";
 import { nowIso, SESSION_ID_ENV } from "./lib/tracked-jobs.mjs";
 import { resolveWorkspaceRoot } from "./lib/workspace.mjs";
 
@@ -21,6 +21,9 @@ const SESSION_END_BUDGET_MS = 3500;
 const STOP_WAIT_MS = 2000;
 // The stop wait leaves this much for the last update, which removes the stopped jobs.
 const FINAL_UPDATE_RESERVE_MS = 500;
+// A job file is only a copy of the state entry. All job files of one update share this much Windows
+// retry time, so they can never use up the time that the state save and the stops need.
+const JOB_FILE_RETRY_MS = 200;
 
 function readHookInput() {
   const raw = readStdinSync().trim();
@@ -39,6 +42,23 @@ function appendEnvVar(name, value) {
     return;
   }
   fs.appendFileSync(process.env.CLAUDE_ENV_FILE, `export ${name}=${shellEscape(value)}\n`, "utf8");
+}
+
+// The job file should agree with the state, also for a job that is kept after a failed stop. The
+// state is what closes the session and stops the jobs, so a job file that cannot be written must not
+// stop that; the state entry still holds the outcome.
+function writeJobRecord(workspaceRoot, job, deadline) {
+  let stored = {};
+  try {
+    stored = readJobFile(resolveJobFile(workspaceRoot, job.id), { deadline });
+  } catch {
+    // A missing or broken job file is rebuilt from the state entry.
+  }
+  try {
+    writeJobFile(workspaceRoot, job.id, { ...stored, ...job }, { deadline });
+  } catch {
+    // Left as it was.
+  }
 }
 
 // Job creation, the worker claim and the Copilot start all run under the state lock and refuse a
@@ -61,6 +81,7 @@ export async function cleanupSessionJobs(cwd, sessionId, options = {}) {
   updateState(
     workspaceRoot,
     (state) => {
+      const jobFilesDeadline = Math.min(deadline, Date.now() + JOB_FILE_RETRY_MS);
       const closedAt = nowIso();
       state.closedSessions.push({ id: sessionId, closedAt });
       state.jobs = state.jobs.map((job) => {
@@ -72,7 +93,16 @@ export async function cleanupSessionJobs(cwd, sessionId, options = {}) {
           return job;
         }
         stopping.push(job);
-        return { ...job, status: "cancelled", phase: "cancelled", completedAt: closedAt, updatedAt: closedAt };
+        const cancelled = {
+          ...job,
+          status: "cancelled",
+          phase: "cancelled",
+          completedAt: closedAt,
+          errorMessage: "The Claude session ended.",
+          updatedAt: closedAt
+        };
+        writeJobRecord(workspaceRoot, cancelled, jobFilesDeadline);
+        return cancelled;
       });
     },
     { lockTimeoutMs: timeLeft(), deadline }
@@ -102,11 +132,17 @@ export async function cleanupSessionJobs(cwd, sessionId, options = {}) {
     updateState(
       workspaceRoot,
       (state) => {
+        const jobFilesDeadline = Math.min(deadline, Date.now() + JOB_FILE_RETRY_MS);
         state.jobs = state.jobs
           .filter((job) => !removedIds.has(job.id))
           .map((job) => {
             const cleared = (stoppedPids.get(job.id) ?? []).filter(([key, pid]) => job[key] === pid);
-            return { ...job, ...Object.fromEntries(cleared.map(([key]) => [key, null])) };
+            if (cleared.length === 0) {
+              return job;
+            }
+            const kept = { ...job, ...Object.fromEntries(cleared.map(([key]) => [key, null])) };
+            writeJobRecord(workspaceRoot, kept, jobFilesDeadline);
+            return kept;
           });
       },
       { lockTimeoutMs: timeLeft(), deadline }
