@@ -485,6 +485,8 @@ and to `BLOCK`.
   outright (research.md §7, gate run limit and stop)
 - [X] T076e [US5] From Codex review round 7: the gate keeps its signal handlers until its cleanup
   ends. Test: a second signal during the timeout kill wait (research.md §7, gate run limit and stop)
+- [X] T076f [US5] From Codex review round 8: with the gate on, an error in the gate run blocks the
+  stop. Test: a repository whose git index cannot be read (research.md §7, gate run limit and stop)
 - [X] T077b [US5] From the ticket 7 code review: `SessionEnd` removes only the session's finished
   jobs and the jobs whose processes all stopped; a job whose stop failed, or whose earlier stop never
   finished, keeps its record and the pids whose stop failed; a pid that stopped is cleared (Codex

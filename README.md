@@ -150,6 +150,10 @@ claude plugin install copilot@tmathura-copilot
   still clean up and answer inside Claude Code's 15-minute hook timeout. On that limit, or when the
   hook itself is stopped, it stops the companion, the Copilot process and their children, and marks
   the job cancelled. Codex stops only the companion and leaves the job marked as running.
+- When the review gate is on and its review cannot run, for example because `git` fails, the gate
+  blocks the stop and says why. Codex's hook fails with an error that Claude Code does not treat as
+  a block, so the stop goes through unreviewed. A missing Copilot still gives only a note, as in
+  Codex.
 - `/copilot:rescue --resume` never continues the review gate's session. In Codex it can.
 - If a review gate hook is killed outright, a later gate deletes the patch folder that it left.
 - When a Claude session ends, the plugin first marks the session closed and its active jobs

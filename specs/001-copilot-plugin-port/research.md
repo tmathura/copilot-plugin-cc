@@ -522,7 +522,12 @@ Later tickets apply these rules. The call-site map uses them.
   the hook also cancels its job if the record still says `running` (the companion died before its
   final status write), with the message "The stop-time review's companion ended before its job
   did.", so its Copilot, in its own process group, is stopped too (added 2026-10-11, ticket 7
-  Codex review round 5).
+  Codex review round 5). With the gate on, an error in the gate run itself (the git context, the
+  patch folder, the companion start) blocks the stop with "The stop-time Copilot review task
+  failed: <error>", as a failed companion does (added 2026-10-11, Codex review round 8). Rejected
+  alternative: upstream's exit 1, which Claude Code treats as a hook error that does not block, so
+  the stop goes through unreviewed. A missing or unsupported Copilot still gives only a note, as
+  upstream.
 - **The gate's companion counts from the hook's start** (decided 2026-10-11, ticket 7 Codex review
   round 1; correctness): a session can end while the gate hook still collects the context, and the
   companion that the hook starts after that would pass the closed-session check, which compares

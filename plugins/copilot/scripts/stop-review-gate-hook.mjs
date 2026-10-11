@@ -294,7 +294,13 @@ async function main() {
     return;
   }
 
-  const review = await runStopReview(cwd, input, { timeoutMs: STOP_REVIEW_TIMEOUT_MS - (Date.now() - startedAt) });
+  // The gate is on, so a run that cannot even start must block, not let Claude stop unreviewed.
+  const review = await runStopReview(cwd, input, { timeoutMs: STOP_REVIEW_TIMEOUT_MS - (Date.now() - startedAt) }).catch(
+    (error) => ({
+      ok: false,
+      reason: `The stop-time Copilot review task failed: ${error instanceof Error ? error.message : String(error)}`
+    })
+  );
   if (review.signal) {
     logNote(review.reason);
     process.exitCode = SIGNAL_EXIT_CODES[review.signal];

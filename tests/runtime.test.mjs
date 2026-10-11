@@ -1363,6 +1363,20 @@ test("the gate blocks on BLOCK, and on an answer that is neither ALLOW nor BLOCK
   }
 });
 
+test("the gate blocks when it cannot collect the working-tree context", () => {
+  const { gate, repo, runs } = setUpGate("ok");
+  const before = runs().length;
+  fs.writeFileSync(path.join(repo, ".git", "index"), "not an index");
+
+  const result = gate({ last_assistant_message: "Edited src/app.js." });
+
+  assert.equal(result.status, 0, result.stderr);
+  const { decision, reason } = JSON.parse(result.stdout);
+  assert.equal(decision, "block");
+  assert.match(reason, /^The stop-time Copilot review task failed: /);
+  assert.equal(runs().length, before);
+});
+
 test("the gate with no Copilot gives a setup note and lets Claude stop", () => {
   const { gate, runs } = setUpGate("ok");
   const before = runs().length;
