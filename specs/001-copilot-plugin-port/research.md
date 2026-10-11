@@ -668,7 +668,10 @@ Later tickets apply these rules. The call-site map uses them.
   one process reading `state.json` in a loop, most renames over it failed, and some reads found no
   file. So the state module retries a rename that fails with `EPERM`, `EACCES` or `EBUSY`, and a
   read that fails with one of these or with `ENOENT` while the state lock exists, for up to 2
-  seconds (decided 2026-10-09, ticket 6; correctness, platform support). Writers replace these
+  seconds (decided 2026-10-09, ticket 6; correctness, platform support). An update can take an
+  absolute `deadline`, which also ends these retries; `SessionEnd` passes the end of its budget, so
+  a held lock and a busy file together cannot push it past its 5 s timeout (added 2026-10-11,
+  ticket 7 Codex review round 4; rejected alternative: a lock wait limit only). Writers replace these
   files only under the state lock, so a missing file is retried only while another process holds
   that lock, or when the file is back by the time the reader checks (the writer has finished); with
   no lock, or with the reader's own lock, the file is missing for real. Rejected alternatives: no retry, where a job fails,

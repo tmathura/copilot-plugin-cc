@@ -3,7 +3,8 @@
 // an earlier snapshot; pruning keeps every active job and also removes a job's review patch folder;
 // state records closed Claude sessions; on Windows, a file replace or read that meets another process
 // is retried; it names the review gate's job title, so resume can skip that job; a companion that a
-// hook starts counts from the hook's start for the closed-session check.
+// hook starts counts from the hook's start for the closed-session check; a caller's deadline also
+// limits the Windows retries of an update.
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -101,7 +102,7 @@ export function ensureStateDir(cwd) {
 export function loadState(cwd, options = {}) {
   const stateFile = resolveStateFile(cwd);
   try {
-    const parsed = JSON.parse(readTextFile(stateFile, `${stateFile}.lock`));
+    const parsed = JSON.parse(readTextFile(stateFile, `${stateFile}.lock`, options.deadline));
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       throw new Error("not a JSON object");
     }
@@ -281,9 +282,10 @@ function acquireStateLock(cwd, options) {
 }
 
 // On Windows a rename cannot replace a file that another process has open, and a reader can miss the
-// file for the moment it is replaced. Each lasts about as long as one read or one rename.
-function retryOnWindows(action, isTransient) {
-  const deadline = Date.now() + WINDOWS_RETRY_MS;
+// file for the moment it is replaced. Each lasts about as long as one read or one rename. A caller with
+// its own time limit, such as a hook, passes an earlier deadline.
+function retryOnWindows(action, isTransient, callerDeadline = Infinity) {
+  const deadline = Math.min(Date.now() + WINDOWS_RETRY_MS, callerDeadline);
   for (;;) {
     try {
       return action();
@@ -307,34 +309,36 @@ function isLockHeldByOther(lockFile) {
 }
 
 // The writer may also have finished, and released the lock, by the time the reader checks.
-function readTextFile(filePath, lockFile) {
+function readTextFile(filePath, lockFile, deadline) {
   return retryOnWindows(
     () => fs.readFileSync(filePath, "utf8"),
     (error) =>
-      isBusyFileError(error) || (error?.code === "ENOENT" && (isLockHeldByOther(lockFile) || fs.existsSync(filePath)))
+      isBusyFileError(error) || (error?.code === "ENOENT" && (isLockHeldByOther(lockFile) || fs.existsSync(filePath))),
+    deadline
   );
 }
 
 // A reader must never see half a file, and a failed write must keep the old one.
-function writeJsonAtomic(filePath, value) {
+function writeJsonAtomic(filePath, value, deadline) {
   const tempFile = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
   try {
     fs.writeFileSync(tempFile, `${JSON.stringify(value, null, 2)}\n`, "utf8");
-    retryOnWindows(() => fs.renameSync(tempFile, filePath), isBusyFileError);
+    retryOnWindows(() => fs.renameSync(tempFile, filePath), isBusyFileError, deadline);
   } catch (error) {
     fs.rmSync(tempFile, { force: true });
     throw error;
   }
 }
 
-function writeStateFile(cwd, state) {
-  writeJsonAtomic(resolveStateFile(cwd), state);
+function writeStateFile(cwd, state, deadline) {
+  writeJsonAtomic(resolveStateFile(cwd), state, deadline);
 }
 
+// options.deadline, an absolute time in ms, also limits the Windows retries of the read and the save.
 export function updateState(cwd, mutate, options = {}) {
   const lock = acquireStateLock(cwd, options);
   try {
-    const state = loadState(cwd, { strict: true });
+    const state = loadState(cwd, { strict: true, deadline: options.deadline });
     const previousJobs = state.jobs.map((job) => ({ id: job.id, logFile: job.logFile }));
     mutate(state);
 
@@ -349,7 +353,7 @@ export function updateState(cwd, mutate, options = {}) {
       closedSessions: pruneClosedSessions(state.closedSessions ?? [])
     };
 
-    writeStateFile(cwd, nextState);
+    writeStateFile(cwd, nextState, options.deadline);
 
     // Only after the save: a failed save must keep the files that the old state still names.
     const retainedIds = new Set(nextJobs.map((job) => job.id));

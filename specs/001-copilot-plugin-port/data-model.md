@@ -23,7 +23,8 @@ One file per workspace, at `<state root>/<slug>-<hash>/state.json`.
 Every update holds the lock file `state.json.lock` and replaces `state.json` through a temp file
 and a rename. Job files are replaced the same way (research §7, locked state updates; job files
 added 2026-10-08). On Windows, a rename or read that meets another process is retried for up to 2
-seconds (added 2026-10-09, ticket 6).
+seconds (added 2026-10-09, ticket 6), or until the caller's deadline if that is earlier (added
+2026-10-11, ticket 7).
 
 ## Job
 

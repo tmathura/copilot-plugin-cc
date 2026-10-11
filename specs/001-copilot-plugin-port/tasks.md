@@ -485,6 +485,10 @@ and to `BLOCK`.
   finished, keeps its record and the pids whose stop failed; a pid that stopped is cleared (Codex
   review round 3). Test with a stop that fails (research.md §7, hook time
   budgets)
+- [X] T077d [US5] From Codex review round 4: `updateState` takes an absolute `deadline` that also
+  ends its Windows retries, and `SessionEnd` passes the end of its budget. Test (Windows): an update
+  with a deadline stops waiting for a reader at that deadline and changes nothing (research.md §7,
+  locked state updates)
 - [X] T077c [US5] From Codex review round 2: `SessionEnd` records the close also when the workspace
   has no state file yet. Test: a companion from before the close cannot create the first job
   (research.md §7, hook time budgets)

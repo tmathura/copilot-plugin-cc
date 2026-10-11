@@ -72,7 +72,7 @@ export async function cleanupSessionJobs(cwd, sessionId, options = {}) {
         return { ...job, status: "cancelled", phase: "cancelled", completedAt: closedAt, updatedAt: closedAt };
       });
     },
-    { lockTimeoutMs: timeLeft() }
+    { lockTimeoutMs: timeLeft(), deadline }
   );
 
   // One shared wait, then SIGKILL, so three jobs cost no more time than one. A job whose processes
@@ -106,7 +106,7 @@ export async function cleanupSessionJobs(cwd, sessionId, options = {}) {
             return { ...job, ...Object.fromEntries(cleared.map(([key]) => [key, null])) };
           });
       },
-      { lockTimeoutMs: timeLeft() }
+      { lockTimeoutMs: timeLeft(), deadline }
     );
   }
 }
