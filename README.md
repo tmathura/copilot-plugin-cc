@@ -285,8 +285,10 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
   refresh the index, so it compares the content instead.
 - A review does not read the target of an untracked symlink. The link can point outside the repo,
   for example at a key file. Codex puts the target's text in the prompt.
-- A review reads an untracked file whose name has non-ASCII letters. Codex skips it, because git
-  quotes the name.
+- A review reads an untracked file whose name has non-ASCII letters, a tab or a newline. It shows a
+  non-ASCII name as it is (`core.quotePath=false`) in the status, the file lists and the patches.
+  Codex shows git's quoted form, such as `"caf\303\251.js"`, and skips such an untracked file as
+  unreadable. The reason is correctness.
 - For a large diff, Codex runs read-only `git` commands itself. Copilot's reviews have no shell, so
   the plugin writes the exact patches to a folder in its own job storage, lets Copilot read that
   folder (`--add-dir`), and deletes the folder after the review. If the review is killed outright
