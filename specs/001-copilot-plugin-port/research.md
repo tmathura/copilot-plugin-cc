@@ -170,8 +170,10 @@ data model, the contracts, the plan and the tasks link here.
   - `--deny-tool=write,shell,memory` as a second layer. The command reference says: "For multiple
     tools, use a quoted, comma-separated list". Deny rules win over `--allow-all` and over saved
     approvals.
-  - `COPILOT_HOME` set to a plugin-owned folder: `$CLAUDE_PLUGIN_DATA/copilot-home`, or
-    `~/.copilot-companion/copilot-home` when `CLAUDE_PLUGIN_DATA` is not set. It is never in the
+  - `COPILOT_HOME` set to a plugin-owned folder: `<plugin data>/copilot-home`, or
+    `~/.copilot-companion/copilot-home` when no plugin data folder is set. `<plugin data>` is
+    `COPILOT_COMPANION_PLUGIN_DATA`, then `CLAUDE_PLUGIN_DATA` (changed 2026-10-11, ticket 8; §7,
+    data folder export; earlier: `$CLAUDE_PLUGIN_DATA/copilot-home`). It is never in the
     shared temp folder, where another user could prepare it. It has no trusted folders, so
     repository hooks and workspace MCP servers stay off. It also has no user hooks, no saved
     approvals, no user MCP servers and no user plugins.

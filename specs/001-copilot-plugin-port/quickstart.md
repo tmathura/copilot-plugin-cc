@@ -44,9 +44,9 @@ claude --plugin-dir <path to this repo>/plugins/copilot
 
 Run steps 2 and 3 on Windows and on one of macOS or Linux.
 
-Where Copilot's sandbox cannot run, a `--write` task cannot run shell commands (Copilot 1.0.94 on
-Windows 11 23H2: "Windows sandboxing requires BaseContainer"), so step 7 finishes at once. Then run
-step 7 with a read-only task (`/copilot:rescue --background explain each file in detail`) and cancel
+Where Copilot's sandbox cannot run, Copilot may refuse shell commands (Copilot 1.0.94 on Windows 11
+23H2: "Windows sandboxing requires BaseContainer") or run them with your full rights (research.md
+§3). If step 7's task reports that the command did not run, run step 7 with a read-only task (`/copilot:rescue --background explain each file in detail`) and cancel
 it as soon as `/copilot:status` shows it running (added 2026-10-11, ticket 8 manual run).
 
 With the Codex plugin installed too, also run step 8 with both plugins on. Only the Copilot gate

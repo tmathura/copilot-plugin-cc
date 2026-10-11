@@ -33,8 +33,8 @@ Copilot finds a login in one of these places:
 - A token variable. Copilot reads `COPILOT_GITHUB_TOKEN`, then `GH_TOKEN`, then `GITHUB_TOKEN`. Use a
   fine-grained token with the "Copilot Requests" permission. Classic `ghp_` tokens do not work.
 
-Setup checks the login with one small read-only prompt. Each `/copilot:setup` therefore uses one
-premium request. The check stops after 60 seconds. When a token variable is set, the report names
+Setup checks the login with one small read-only prompt. Each `/copilot:setup` therefore counts as
+one request toward your Copilot usage. The check stops after 60 seconds. When a token variable is set, the report names
 the variable, never its value. It cannot tell you that Copilot used the token: Copilot uses a stored
 login instead when the token is not valid.
 

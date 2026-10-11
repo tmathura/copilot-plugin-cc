@@ -17,8 +17,9 @@ keeps the same commands and layout, and calls the Copilot CLI instead of Codex.
 ## Requirements
 
 - Claude Code.
-- A GitHub Copilot plan that includes the Copilot CLI. Each run uses premium requests from your
-  plan. With your own model provider (BYOK, see the FAQ), Copilot needs no GitHub login.
+- A GitHub Copilot plan that includes the Copilot CLI, or your own model provider (BYOK, see the
+  FAQ). Each run counts toward your Copilot usage, or toward your provider's usage with BYOK, which
+  needs no GitHub login.
 - Node.js 22 or later. The Copilot CLI needs it.
 - The GitHub Copilot CLI 1.0.93 or later, logged in or set up for your own provider. See
   [docs/configuration.md](docs/configuration.md).
@@ -169,7 +170,7 @@ Stops an active background job.
 ### `/copilot:setup`
 
 Checks that the Copilot CLI is installed, is a supported version and is logged in. The login check
-sends one small prompt, so it uses one premium request. With your own model provider, setup skips
+sends one small prompt, so it counts as one request toward your Copilot usage. With your own model provider, setup skips
 the login check.
 
 It also turns the optional review gate on or off:
@@ -183,8 +184,8 @@ When the review gate is on, a `Stop` hook runs a read-only Copilot review of Cla
 the review finds a problem, the stop is blocked so that Claude can fix it first.
 
 > [!WARNING]
-> The review gate can start a long loop between Claude and Copilot, and can use up premium requests
-> quickly. Turn it on only when you watch the session.
+> The review gate can start a long loop between Claude and Copilot, and can use up your Copilot
+> usage quickly. Turn it on only when you watch the session.
 
 ## Typical flows
 
@@ -314,7 +315,7 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
   its provider from its config file.
 - When Copilot is not logged in, setup also suggests `!copilot login --device-code` for a blocked
   browser flow, and `COPILOT_GITHUB_TOKEN` for a system without a credential store.
-- Setup checks the login with one small read-only prompt, which uses one premium request. Copilot
+- Setup checks the login with one small read-only prompt, which counts toward your Copilot usage. Copilot
   has no other way to report a login. Codex reads the account from its app server.
 - Reviews and read-only tasks run with the plugin's own Copilot folder (`COPILOT_HOME`) and only
   Copilot's read tools. So the repo's hooks and MCP servers, and your own saved approvals, do not

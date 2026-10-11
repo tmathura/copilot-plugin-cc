@@ -40,7 +40,7 @@ flowchart LR
 | `scripts/lib/prompt-mode-protocol.d.ts` | Types for Copilot's JSON events, written by hand. `npm run build` checks them. |
 | `scripts/lib/process.mjs` | Runs commands without a shell, finds the Windows `.cmd` launchers (`resolveLauncher`) and stops process trees (`terminateProcessTree`). |
 | `scripts/lib/git.mjs` | Finds the review target and collects the diff with safe `git` options. Writes the patch files for a large review. |
-| `scripts/lib/state.mjs` | Job state and job files, under a lock, written through a temp file and a rename. |
+| `scripts/lib/state.mjs` | Job state and job files. Changes to `state.json` hold a lock. The state and the job files are each replaced through a temp file and a rename, so a reader never sees half a file. |
 | `scripts/lib/tracked-jobs.mjs` | Runs a job: marks it `running`, writes progress to its log and saves the final status. |
 | `scripts/lib/job-control.mjs` | Finds the jobs for `status`, `result` and `cancel`. |
 | `scripts/lib/render.mjs` | Turns setup reports, reviews, task results and job lists into Markdown. |
