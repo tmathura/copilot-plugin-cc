@@ -10,7 +10,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { terminateProcessTree } from "./lib/process.mjs";
-import { hasPendingStop, resolveStateFile, updateState } from "./lib/state.mjs";
+import { hasPendingStop, updateState } from "./lib/state.mjs";
 import { nowIso, SESSION_ID_ENV } from "./lib/tracked-jobs.mjs";
 import { resolveWorkspaceRoot } from "./lib/workspace.mjs";
 
@@ -49,10 +49,8 @@ export async function cleanupSessionJobs(cwd, sessionId, options = {}) {
 
   const deadline = Date.now() + SESSION_END_BUDGET_MS;
   const timeLeft = () => Math.max(0, deadline - Date.now());
+  // The close is recorded even with no state yet: a companion may still be preparing the first job.
   const workspaceRoot = resolveWorkspaceRoot(cwd);
-  if (!fs.existsSync(resolveStateFile(workspaceRoot))) {
-    return;
-  }
 
   // A job whose earlier stop did not finish keeps its record for a later cancel; its pids may be old.
   const removedIds = new Set();

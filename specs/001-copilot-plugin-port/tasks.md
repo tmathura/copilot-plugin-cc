@@ -484,6 +484,9 @@ and to `BLOCK`.
   jobs and the jobs whose processes all stopped; a job whose stop failed, or whose earlier stop never
   finished, keeps its record and pids. Test with a stop that fails (research.md §7, hook time
   budgets)
+- [X] T077c [US5] From Codex review round 2: `SessionEnd` records the close also when the workspace
+  has no state file yet. Test: a companion from before the close cannot create the first job
+  (research.md §7, hook time budgets)
 - [X] T078 [US5] Add the Phase 7 differences to the README section
 - [X] T079 [US5] Run `claude plugin validate .`, `npm run build` and `node --test tests/*.test.mjs`;
   all pass

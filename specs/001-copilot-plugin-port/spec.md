@@ -147,6 +147,10 @@ and the optional Stop-hook review gate. Drop transfer. The first ticket chooses 
   hook passes its own start time to the companion, and the closed-session check uses it (decided
   2026-10-11, ticket 7 Codex review round 1; research.md §7). Rejected alternative: a check in the
   hook before it starts the companion, which leaves a gap.
+- Q: Does `SessionEnd` record the close in a workspace that has no job state yet? → A: Yes, so a
+  companion that was still preparing the first job is refused (decided 2026-10-11, ticket 7 Codex
+  review round 2; research.md §7, hook time budgets). Rejected alternative: upstream's early return
+  when there is no state file.
 - Q: Can `/copilot:rescue --resume` continue the gate's review session? → A: No. Resume skips the
   job titled "Copilot Stop Gate Review" (decided 2026-10-11, ticket 7 code review; research.md §7).
   Rejected alternative: upstream, where it can.

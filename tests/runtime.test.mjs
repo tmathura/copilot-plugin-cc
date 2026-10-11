@@ -1632,6 +1632,38 @@ test("SessionEnd ends within its 5 s timeout and changes nothing while a live pr
   }
 });
 
+test("SessionEnd in a workspace with no state yet still refuses a companion that was preparing the first job", async () => {
+  const tasks = setUpTasks("hang");
+  const sessionId = "first-job-session";
+  await withCompanionEnv({ ...tasks.env, COPILOT_COMPANION_SESSION_ID: sessionId }, async ({ enqueueBackgroundTask }) => {
+    const { createJobRecord, runTrackedJob } = await import("../plugins/copilot/scripts/lib/tracked-jobs.mjs");
+
+    const end = run(process.execPath, [SESSION_HOOK, "SessionEnd"], {
+      cwd: tasks.cwd,
+      env: tasks.env,
+      input: JSON.stringify({ session_id: sessionId, cwd: tasks.cwd })
+    });
+
+    assert.equal(end.status, 0, end.stderr);
+    assert.deepEqual(readClosedSessions(tasks.dataDir).map((entry) => entry.id), [sessionId]);
+    // This test process started before the close, like a companion that was still reading its prompt.
+    await assert.rejects(
+      runTrackedJob(createJobRecord({ id: "task-first", jobClass: "task", workspaceRoot: tasks.cwd }), () =>
+        assert.fail("the runner must not run")
+      ),
+      /Claude session first-job-session has ended/
+    );
+    const queued = makeQueuedTask(tasks.cwd);
+    await assert.rejects(
+      enqueueBackgroundTask(tasks.cwd, { ...queued.job, sessionId }, queued.request, {
+        spawnWorkerImpl: () => assert.fail("no worker may start")
+      }),
+      /Claude session first-job-session has ended/
+    );
+    assert.deepEqual(tasks.runs(), []);
+  });
+});
+
 test("after SessionEnd, a companion from before the close cannot create, claim or start a job, while a new one can", async () => {
   const tasks = setUpTasks("hang");
   const sessionId = "closed-session";

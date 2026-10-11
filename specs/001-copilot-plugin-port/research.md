@@ -612,7 +612,11 @@ Later tickets apply these rules. The call-site map uses them.
     finished jobs and the jobs whose processes all stopped. A job whose stop failed keeps its
     `cancelled` record and its pids, and a cancelled or failed job that already named a pid because
     an earlier stop did not finish is left as it is, so `/copilot:cancel` can stop them later (added
-    2026-10-11, ticket 7 code review; correctness). Rejected alternatives: removing every captured
+    2026-10-11, ticket 7 code review; correctness). The close is recorded even when the workspace
+    has no `state.json` yet, because a companion may still be preparing the first job (added
+    2026-10-11, ticket 7 Codex review round 2; correctness; rejected alternative: upstream's early
+    return, which lets that companion start after the session ended). So every session end writes
+    a small state file in the plugin's data folder. Rejected alternatives: removing every captured
     job, which loses the only record of a process that still runs; also signalling the old pids of
     an earlier failed stop, which may belong to another program by now.
 
