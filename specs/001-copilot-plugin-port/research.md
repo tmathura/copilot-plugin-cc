@@ -503,8 +503,9 @@ Later tickets apply these rules. The call-site map uses them.
   is `jobs/stop-gate-<hook pid>-<random>.patches` in the plugin's job storage, because the hook
   writes it before the companion makes its job. The hook writes and removes it with the companion's
   `withReviewPatches`, as a review does. No job record names the folder, so pruning never removes
-  it: before it writes its own folder, the gate removes each `stop-gate-*` folder whose hook pid
-  has ended, which a hook killed outright left behind. Outside a Git repository the context says
+  it: at the start of each run, also outside Git, the gate removes each `stop-gate-*` folder whose
+  hook pid has ended, which a hook killed outright left behind (also outside Git added 2026-10-11,
+  PR review). Outside a Git repository the context says
   that there is no diff, and the gate still runs, as upstream's does (all decided 2026-10-11,
   ticket 7 and its code review). A folder counts as outside Git only when `GIT_DIR` is not set and
   no folder above it holds `.git`; inside, any git failure (a broken repository, unsafe ownership,
@@ -533,7 +534,14 @@ Later tickets apply these rules. The call-site map uses them.
   failed: <error>", as a failed companion does (added 2026-10-11, Codex review round 8). Rejected
   alternative: upstream's exit 1, which Claude Code treats as a hook error that does not block, so
   the stop goes through unreviewed. A missing or unsupported Copilot still gives only a note, as
-  upstream.
+  upstream. A job state that cannot be read also gives a note that names the file, and no block,
+  because whether the gate is on is then unknown (added 2026-10-11, PR review; rejected
+  alternatives: upstream's silent fallback to "off"; a block, which would stop every user, also
+  those who never turned the gate on). The hook finds the companion's job by its `pid` and also by
+  the gate's title and a `createdAt` no earlier than the companion's start, because a pid can be
+  reused by a later process while a stale `running` record still names it (added 2026-10-11, PR
+  review; rejected alternative: the `pid` and `running` alone, which can cancel another job).
+  `main` takes the run limit as an option, so a test can run the whole hook in a child process.
 - **The gate's companion counts from the hook's start** (decided 2026-10-11, ticket 7 Codex review
   round 1; correctness): a session can end while the gate hook still collects the context, and the
   companion that the hook starts after that would pass the closed-session check, which compares
@@ -544,13 +552,18 @@ Later tickets apply these rules. The call-site map uses them.
 - **The gate's job is never resumed** (decided 2026-10-11, ticket 7 code review; correctness): the
   gate runs as a read-only task titled "Copilot Stop Gate Review". Its session reviews Claude's
   turn, so `--resume-last`, `task-resume-candidate` and `findLatestTaskThread` skip a job with that
-  title. Rejected alternative: upstream, where the gate's job can become the task that
-  `/copilot:rescue --resume` continues.
-- **Reading a prompt from stdin** (decided 2026-10-11, ticket 7 code review; correctness):
-  `readStdinIfPiped` checks for a terminal with `tty.isatty(0)`. Upstream reads
-  `process.stdin.isTTY`, which opens `process.stdin`; on macOS and Linux that makes the pipe
-  non-blocking, and `readFileSync(0)` of a prompt larger than the pipe buffer can then fail with
-  `EAGAIN`. The gate sends its whole prompt this way.
+  title, and a running gate job does not count as a running task for `--resume-last` (added
+  2026-10-11, PR review). Rejected alternative: upstream, where the gate's job can become the task
+  that `/copilot:rescue --resume` continues.
+- **Reading a prompt from stdin** (decided 2026-10-11, ticket 7 code review and PR review;
+  correctness): `readStdinIfPiped` checks for a terminal with `tty.isatty(0)`, and reads with
+  `readStdinSync`, which waits 10 ms and reads again on `EAGAIN`. The two hooks read their input
+  the same way. Upstream reads `process.stdin.isTTY`, which opens `process.stdin`, and then
+  `readFileSync(0)`. A pipe from a Node parent can be non-blocking, on macOS also when
+  `process.stdin` was never opened (seen on macOS CI), and `readFileSync(0)` then fails with
+  `EAGAIN` when the parent has not written everything yet. The gate's prompt and its hook input
+  both hold Claude's last message, so they can be large. Rejected alternative: only the
+  `tty.isatty(0)` check, which macOS CI showed is not enough.
 - **Background start order** (decided 2026-10-08, after Copilot PR review): `enqueueBackgroundTask`
   writes the `queued` job record, with its stored request, before it starts the worker. Then it
   stores the worker's `pid` through `updateState`, only if the job is still `queued`, so it never
@@ -619,7 +632,8 @@ Later tickets apply these rules. The call-site map uses them.
     either claimed before this step or finds its job cancelled. Not covered: an outside `kill -9`
     that lands inside that block. Rejected alternative: a supervisor process that gates every
     Copilot start, which upstream does not have, for a window of a few milliseconds. Then it sends `SIGTERM` to every recorded `pid` and
-    `copilotPid`, waits once, up to 2 s in total, and sends `SIGKILL` to what is still alive. Last, it
+    `copilotPid`, waits once, up to 2 s in total, and sends `SIGKILL` to what is still alive. The
+    wait leaves 500 ms of the budget for the last update (added 2026-10-11, PR review). Last, it
     removes, through `updateState`, only job ids it captured in the first step (which ones, below),
     so a job that a resumed session starts meanwhile keeps its record. Each lock wait is limited to the time left in
     its budget. It never waits per job. The budget is 3.5 s from the start of the cleanup, inside

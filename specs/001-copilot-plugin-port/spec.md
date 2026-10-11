@@ -153,8 +153,13 @@ and the optional Stop-hook review gate. Drop transfer. The first ticket chooses 
   review round 2; research.md §7, hook time budgets). Rejected alternative: upstream's early return
   when there is no state file.
 - Q: Can `/copilot:rescue --resume` continue the gate's review session? → A: No. Resume skips the
-  job titled "Copilot Stop Gate Review" (decided 2026-10-11, ticket 7 code review; research.md §7).
-  Rejected alternative: upstream, where it can.
+  job titled "Copilot Stop Gate Review", and a running gate job does not count as a running task
+  (decided 2026-10-11, ticket 7 code review and PR review; research.md §7). Rejected alternative:
+  upstream, where it can.
+- Q: What does the gate do when the job state cannot be read? → A: It prints a note that names the
+  file and lets Claude stop, because whether the gate is on is unknown (decided 2026-10-11, ticket 7
+  PR review; research.md §7). Rejected alternative: block, which would block every stop of every
+  user, also those who never turned the gate on.
 - Q: How much of its 5 s timeout does `SessionEnd` use, and which jobs does it remove? → A: 3.5 s
   from the start of its cleanup. It stops the processes of the session's queued and running jobs,
   then removes the session's finished jobs and the jobs it stopped. A job whose stop failed, and a
@@ -300,6 +305,10 @@ leaves clean work. The first is blocked, the second is not.
    blocked and Claude gets the reason.
 3. **Given** the gate is on and Copilot finds nothing, **When** Claude stops, **Then** Claude stops.
 4. **Given** the gate is on, **When** the review runs, **Then** it is read-only, as in User Story 2.
+5. **Given** the gate is on and the review cannot give an answer (it fails, times out, or gives an
+   answer that is neither `ALLOW:` nor `BLOCK:`), **When** Claude stops, **Then** the stop is blocked
+   with the reason, as upstream does. A missing Copilot, or a job state that cannot be read, gives
+   only a note (added 2026-10-11, ticket 7 PR review).
 
 ---
 
@@ -415,7 +424,10 @@ the matching function names in it.
 **Review gate and session hooks**
 
 - **FR-025**: The plugin MUST offer an optional Stop-hook review gate, off by default, that blocks a
-  stop only when Copilot finds a problem.
+  stop when Copilot finds a problem, and also when the review cannot give an `ALLOW:` answer (it
+  fails, times out or answers something else), as upstream does. A missing Copilot gives only a
+  note (changed 2026-10-11, ticket 7 PR review; the earlier text said "only when Copilot finds a
+  problem", which did not match upstream).
 - **FR-026**: The plugin MUST have session start and end hooks that do the same job as upstream.
 
 **Safety and platform**

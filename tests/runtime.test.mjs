@@ -1394,14 +1394,84 @@ test("the gate blocks when git fails in a repository, also when git is missing",
   }
 });
 
-test("outside Git, the gate runs with a note that there is no diff", () => {
-  const { gate, gateRun } = setUpGate("ok", { repo: makeTempDir(), env: { FAKE_COPILOT_ANSWER: "ALLOW: nothing to fix" } });
+test("outside Git, the gate runs with a note that there is no diff, and still removes stale folders", () => {
+  const { gate, gateRun, dataDir } = setUpGate("ok", {
+    repo: makeTempDir(),
+    env: { FAKE_COPILOT_ANSWER: "ALLOW: nothing to fix" }
+  });
+  const jobsDir = path.join(dataDir, "state", fs.readdirSync(path.join(dataDir, "state"))[0], "jobs");
+  const ended = path.join(jobsDir, `stop-gate-${run(process.execPath, ["-e", ""]).pid}-old1.patches`);
+  fs.mkdirSync(ended);
 
   const result = gate({ last_assistant_message: "Edited notes.txt." });
 
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout, "");
   assert.match(gateRun().prompt, /<repository_context>\nThe working folder is not a Git repository, so there is no diff\.\n/);
+  assert.equal(fs.existsSync(ended), false);
+});
+
+test("the gate says why it did not run when the job state cannot be read", () => {
+  const { gate, dataDir, runs } = setUpGate("ok");
+  const before = runs().length;
+  const stateFile = path.join(dataDir, "state", fs.readdirSync(path.join(dataDir, "state"))[0], "state.json");
+  fs.writeFileSync(stateFile, "{ not json");
+
+  const result = gate({ last_assistant_message: "Edited src/app.js." });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, "");
+  assert.match(result.stderr, /^The review gate did not run\. Cannot read the job state /m);
+  assert.equal(runs().length, before);
+});
+
+test("a running gate job does not block --resume-last", () => {
+  const { companion, dataDir } = setUpTasks();
+  assert.equal(companion(["task", "first"]).status, 0);
+  const stateFile = path.join(dataDir, "state", fs.readdirSync(path.join(dataDir, "state"))[0], "state.json");
+  const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+  state.jobs.unshift({
+    id: "task-gate",
+    status: "running",
+    jobClass: "task",
+    title: GATE_TITLE,
+    threadId: "gate-session",
+    updatedAt: new Date().toISOString()
+  });
+  fs.writeFileSync(stateFile, JSON.stringify(state));
+
+  const resumed = companion(["task", "--resume-last", "next step"]);
+
+  assert.equal(resumed.status, 0, resumed.stderr);
+});
+
+test("the whole gate hook, with a short limit, prints the block decision and cleans up before its own timeout", async () => {
+  const { repo, env, dataDir, binDir } = setUpGate("hang", { repo: makeLargeRepo() });
+  const timeoutMs = 8000;
+  const script = `import(${JSON.stringify(pathToFileURL(GATE_HOOK).href)}).then((hook) => hook.main({ timeoutMs: ${timeoutMs} }))`;
+  const hook = spawn(process.execPath, ["--input-type=module", "-e", script], { cwd: repo, env });
+  let stdout = "";
+  hook.stdout.on("data", (chunk) => {
+    stdout += chunk;
+  });
+  const exited = new Promise((resolve) => hook.on("exit", (code) => resolve(code)));
+  // Stands in for Claude Code's own hook timeout, which is 60 s after the run limit.
+  const hookTimeout = setTimeout(() => hook.kill("SIGKILL"), timeoutMs + 20000);
+  hook.stdin.end(JSON.stringify({ cwd: repo, last_assistant_message: "Edited the text files." }));
+
+  const code = await exited;
+  clearTimeout(hookTimeout);
+
+  assert.equal(code, 0);
+  assert.deepEqual(JSON.parse(stdout), {
+    decision: "block",
+    reason:
+      "The stop-time Copilot review task timed out after 14 minutes. Run /copilot:review --wait manually or bypass the gate."
+  });
+  const job = findJobByTitle(dataDir, GATE_TITLE);
+  assert.equal(job.status, "cancelled");
+  await waitFor(() => readFakeChildPids(binDir).flat().every((pid) => !isAlive(pid)), 5000);
+  assert.deepEqual(findPatchDirs(dataDir), []);
 });
 
 test("the gate with no Copilot gives a setup note and lets Claude stop", () => {

@@ -14,10 +14,18 @@ import { fileURLToPath } from "node:url";
 
 import { cancelJob, withReviewPatches } from "./copilot-companion.mjs";
 import { getCopilotAvailability } from "./lib/copilot.mjs";
+import { readStdinSync } from "./lib/fs.mjs";
 import { collectReviewContext, resolveReviewTarget } from "./lib/git.mjs";
 import { terminateProcessTree } from "./lib/process.mjs";
 import { loadPromptTemplate, interpolateTemplate } from "./lib/prompts.mjs";
-import { getConfig, LAUNCHED_AT_ENV, listJobs, processStartedAtMs, resolveJobsDir } from "./lib/state.mjs";
+import {
+  LAUNCHED_AT_ENV,
+  listJobs,
+  loadState,
+  processStartedAtMs,
+  resolveJobsDir,
+  STOP_GATE_JOB_TITLE
+} from "./lib/state.mjs";
 import { sortJobsNewestFirst } from "./lib/job-control.mjs";
 import { SESSION_ID_ENV } from "./lib/tracked-jobs.mjs";
 import { resolveWorkspaceRoot } from "./lib/workspace.mjs";
@@ -30,7 +38,8 @@ const SIGNAL_EXIT_CODES = { SIGINT: 130, SIGTERM: 143 };
 const GATE_FOLDER_PATTERN = /^stop-gate-(\d+)-[a-z0-9]+\.patches$/;
 
 function readHookInput() {
-  const raw = fs.readFileSync(0, "utf8").trim();
+  // Claude's last message makes this input large.
+  const raw = readStdinSync().trim();
   if (!raw) {
     return {};
   }
@@ -108,10 +117,10 @@ function isOutsideGit(cwd) {
 // The read-only profile has no shell, so Copilot cannot run git to see the changes. Above the inline
 // limit the exact patches go to a folder in the plugin's job storage, which is removed after the run.
 async function withStopReviewContext(cwd, workspaceRoot, run) {
+  removeStaleGateFolders(workspaceRoot);
   if (isOutsideGit(cwd)) {
     return run({ reviewInput: "The working folder is not a Git repository, so there is no diff.", addDirs: [] });
   }
-  removeStaleGateFolders(workspaceRoot);
   const context = collectReviewContext(cwd, resolveReviewTarget(cwd, { scope: "working-tree" }));
   const folderId = `stop-gate-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
   return withReviewPatches(context, { workspaceRoot, jobId: folderId }, ({ reviewInput, addDirs }) =>
@@ -159,9 +168,16 @@ function parseStopReviewOutput(rawOutput) {
 
 // A companion that dies outright cannot stop its Copilot, and its record stays running, so its job is
 // cancelled, which stops the Copilot of the record. The record is read once the companion is gone,
-// when no new Copilot can start.
-async function cancelCompanionJob(workspaceRoot, pid, reason) {
-  const job = listJobs(workspaceRoot).find((entry) => entry.pid === pid && entry.status === "running");
+// when no new Copilot can start. A pid can be reused, so only a gate job made after the companion
+// started can be its job.
+async function cancelCompanionJob(workspaceRoot, pid, spawnedAt, reason) {
+  const job = listJobs(workspaceRoot).find(
+    (entry) =>
+      entry.pid === pid &&
+      entry.status === "running" &&
+      entry.title === STOP_GATE_JOB_TITLE &&
+      String(entry.createdAt ?? "") >= spawnedAt
+  );
   if (job) {
     await cancelJob(workspaceRoot, job.id, { reason });
   }
@@ -176,6 +192,7 @@ async function runCompanionTask(cwd, prompt, options) {
   if (options.contextDir) {
     args.push("--context-dir", options.contextDir);
   }
+  const spawnedAt = new Date().toISOString();
   const child = spawn(process.execPath, args, {
     cwd,
     env: options.env,
@@ -218,11 +235,16 @@ async function runCompanionTask(cwd, prompt, options) {
       const errors = [];
       const keepError = (error) => errors.push(error instanceof Error ? error.message : String(error));
       await terminate(child.pid).catch(keepError);
-      await cancelCompanionJob(options.workspaceRoot, child.pid, reason).catch(keepError);
+      await cancelCompanionJob(options.workspaceRoot, child.pid, spawnedAt, reason).catch(keepError);
       return errors.length > 0 ? { ...outcome, stopError: errors.join(" ") } : outcome;
     }
     try {
-      await cancelCompanionJob(options.workspaceRoot, child.pid, "The stop-time review's companion ended before its job did.");
+      await cancelCompanionJob(
+        options.workspaceRoot,
+        child.pid,
+        spawnedAt,
+        "The stop-time review's companion ended before its job did."
+      );
     } catch (error) {
       stderr += `\n${error instanceof Error ? error.message : String(error)}`;
     }
@@ -285,12 +307,22 @@ export async function runStopReview(cwd, input = {}, options = {}) {
   }
 }
 
-async function main() {
+// Tests pass a short limit to run the whole hook in a child process.
+export async function main(options = {}) {
   const startedAt = Date.now();
+  const timeoutMs = options.timeoutMs ?? STOP_REVIEW_TIMEOUT_MS;
   const input = readHookInput();
   const cwd = input.cwd || process.env.CLAUDE_PROJECT_DIR || process.cwd();
   const workspaceRoot = resolveWorkspaceRoot(cwd);
-  const config = getConfig(workspaceRoot);
+  // Whether the gate is on is unknown when the state cannot be read. Blocking would stop every user,
+  // also those who never turned the gate on, so the hook says why it did not run.
+  let config;
+  try {
+    config = loadState(workspaceRoot, { strict: true }).config;
+  } catch (error) {
+    logNote(`The review gate did not run. ${error instanceof Error ? error.message : String(error)}`);
+    return;
+  }
 
   const jobs = sortJobsNewestFirst(filterJobsForCurrentSession(listJobs(workspaceRoot), input));
   const runningJob = jobs.find((job) => job.status === "queued" || job.status === "running");
@@ -311,7 +343,7 @@ async function main() {
   }
 
   // The gate is on, so a run that cannot even start must block, not let Claude stop unreviewed.
-  const review = await runStopReview(cwd, input, { timeoutMs: STOP_REVIEW_TIMEOUT_MS - (Date.now() - startedAt) }).catch(
+  const review = await runStopReview(cwd, input, { timeoutMs: timeoutMs - (Date.now() - startedAt) }).catch(
     (error) => ({
       ok: false,
       reason: `The stop-time Copilot review task failed: ${error instanceof Error ? error.message : String(error)}`
@@ -333,7 +365,6 @@ async function main() {
   logNote(runningTaskNote);
 }
 
-// Tests import this module to run the gate with a short limit.
 function isMainModule() {
   try {
     return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url));

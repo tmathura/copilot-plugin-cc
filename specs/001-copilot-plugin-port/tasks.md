@@ -492,6 +492,12 @@ and to `BLOCK`.
   git missing, and a folder outside Git (research.md §7, gate context folder)
 - [X] T076h [US5] From Codex review round 10: the gate cancels the job also when the companion's own
   stop fails. Test: a stop that fails on the limit (research.md §7, gate run limit and stop)
+- [X] T076i [US5] From the PR review: stdin reads retry `EAGAIN` (companion and both hooks); the gate
+  finds its job also by title and `createdAt`; the stale-folder sweep runs also outside Git; an
+  unreadable job state gives a note; a running gate job does not block `--resume-last`; `main` takes
+  the run limit as an option; `SessionEnd` keeps 500 ms for its last update; FR-025 and User Story 5
+  say when the gate blocks. Tests: the whole hook in a child process with a short limit, unreadable
+  state, `--resume-last` beside a running gate job, the sweep outside Git (research.md §7)
 - [X] T077b [US5] From the ticket 7 code review: `SessionEnd` removes only the session's finished
   jobs and the jobs whose processes all stopped; a job whose stop failed, or whose earlier stop never
   finished, keeps its record and the pids whose stop failed; a pid that stopped is cleared (Codex

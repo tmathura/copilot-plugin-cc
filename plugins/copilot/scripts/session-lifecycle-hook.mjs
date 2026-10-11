@@ -9,6 +9,7 @@ import fs from "node:fs";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import { readStdinSync } from "./lib/fs.mjs";
 import { terminateProcessTree } from "./lib/process.mjs";
 import { hasPendingStop, updateState } from "./lib/state.mjs";
 import { nowIso, SESSION_ID_ENV } from "./lib/tracked-jobs.mjs";
@@ -18,9 +19,11 @@ const PLUGIN_DATA_ENV = "CLAUDE_PLUGIN_DATA";
 // The hook's timeout is 5 s, and Node's start and a slow machine come out of it.
 const SESSION_END_BUDGET_MS = 3500;
 const STOP_WAIT_MS = 2000;
+// The stop wait leaves this much for the last update, which removes the stopped jobs.
+const FINAL_UPDATE_RESERVE_MS = 500;
 
 function readHookInput() {
-  const raw = fs.readFileSync(0, "utf8").trim();
+  const raw = readStdinSync().trim();
   if (!raw) {
     return {};
   }
@@ -78,7 +81,7 @@ export async function cleanupSessionJobs(cwd, sessionId, options = {}) {
   // One shared wait, then SIGKILL, so three jobs cost no more time than one. A job whose processes
   // could not all be stopped keeps its record, so /copilot:cancel can try again; as in cancel, only
   // the pids whose stop failed stay in it, because a stopped pid can be reused.
-  const forceKillAfterMs = Math.min(STOP_WAIT_MS, timeLeft());
+  const forceKillAfterMs = Math.max(0, Math.min(STOP_WAIT_MS, timeLeft() - FINAL_UPDATE_RESERVE_MS));
   const stoppedPids = new Map();
   await Promise.all(
     stopping.map(async (job) => {

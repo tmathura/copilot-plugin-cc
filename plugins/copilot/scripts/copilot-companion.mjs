@@ -515,7 +515,10 @@ async function resolveLatestTrackedTaskThread(cwd, options = {}) {
   const visibleJobs = filterJobsForCurrentClaudeSession(jobs);
   // A cancelled task whose processes may still run counts too: a resume would share its session.
   const activeTask = visibleJobs.find(
-    (job) => job.jobClass === "task" && (job.status === "queued" || job.status === "running" || hasPendingStop(job))
+    (job) =>
+      job.jobClass === "task" &&
+      job.title !== STOP_GATE_JOB_TITLE &&
+      (job.status === "queued" || job.status === "running" || hasPendingStop(job))
   );
   if (activeTask) {
     throw new Error(`Task ${activeTask.id} is still running. Use /copilot:status before continuing it.`);

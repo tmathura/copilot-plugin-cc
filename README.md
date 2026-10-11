@@ -164,8 +164,11 @@ claude plugin install copilot@tmathura-copilot
   not be stopped keeps its record, so `/copilot:cancel` can try again. All of this ends inside the
   hook's 5-second timeout. Codex removes the session's jobs from an earlier copy of the state, which
   can drop a job that was added in the meantime.
-- The companion reads a prompt from stdin without opening Node's `process.stdin`. On macOS and
-  Linux that would make the pipe non-blocking, and a large prompt could fail to read.
+- The companion and the hooks read stdin in a way that waits when the pipe has no data yet. Codex
+  reads it in one call, which can fail on a non-blocking pipe, for example on macOS, when the input
+  is large.
+- When the review gate cannot read the plugin's job state, it says so and lets Claude stop. Codex
+  treats an unreadable state as "gate off" and says nothing.
 - The session start hook does not export a transcript path, because there is no `/copilot:transfer`.
 
 ## Development
