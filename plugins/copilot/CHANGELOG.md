@@ -2,6 +2,13 @@
 
 ## Copilot plugin
 
+### 1.0.0
+
+- First release. `/copilot:review`, `/copilot:adversarial-review`, `/copilot:rescue`,
+  `/copilot:status`, `/copilot:result`, `/copilot:cancel` and `/copilot:setup`, the
+  `copilot-rescue` subagent, and the optional Stop-hook review gate. The plugin runs the Copilot CLI
+  in prompt mode. The differences from the Codex plugin are in the README.
+
 ### 0.1.0
 
 - Empty `copilot` plugin: manifests, license files and the version check. No commands yet.

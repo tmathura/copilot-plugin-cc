@@ -7,7 +7,9 @@ upstream changes to them port cleanly. Only the meaning of some fields changes, 
 
 One file per workspace, at `<state root>/<slug>-<hash>/state.json`.
 
-- `<state root>` is `$CLAUDE_PLUGIN_DATA/state`, or `~/.copilot-companion/state` without it. It is never
+- `<state root>` is `<plugin data>/state`, or `~/.copilot-companion/state` without it. `<plugin data>`
+  is `$COPILOT_COMPANION_PLUGIN_DATA`, which the `SessionStart` hook exports for Claude's Bash tool,
+  or else `$CLAUDE_PLUGIN_DATA` (changed 2026-10-11, ticket 8; research.md §7, data folder export). It is never
   in the shared temp folder, where another local user could plant job records. On macOS and Linux,
   `~/.copilot-companion` is owner-only (`0700`).
 - `<slug>` is the workspace folder name with unsafe characters replaced.

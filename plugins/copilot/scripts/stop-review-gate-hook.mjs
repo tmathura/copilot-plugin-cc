@@ -4,7 +4,8 @@
 // inline limit, and reaches the companion on stdin. The run limit is 840 s from the hook's start; on
 // the limit, or when the hook itself is stopped, the hook stops the companion's process tree and
 // cancels its job, which stops the job's Copilot process; it also cancels the job of a companion that
-// ended before its job did.
+// ended before its job did. The hook uses Claude Code's own CLAUDE_PLUGIN_DATA, not an inherited
+// companion export.
 
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -19,7 +20,14 @@ import { readStdinSync } from "./lib/fs.mjs";
 import { collectReviewContext, resolveReviewTarget } from "./lib/git.mjs";
 import { terminateProcessTree } from "./lib/process.mjs";
 import { loadPromptTemplate, interpolateTemplate } from "./lib/prompts.mjs";
-import { LAUNCHED_AT_ENV, listJobs, loadState, processStartedAtMs, resolveJobsDir } from "./lib/state.mjs";
+import {
+  LAUNCHED_AT_ENV,
+  listJobs,
+  loadState,
+  processStartedAtMs,
+  resolveJobsDir,
+  useHookPluginData
+} from "./lib/state.mjs";
 import { sortJobsNewestFirst } from "./lib/job-control.mjs";
 import { SESSION_ID_ENV, STOP_GATE_RUN_ENV } from "./lib/tracked-jobs.mjs";
 import { findGitMarkerRoot, resolveWorkspaceRoot } from "./lib/workspace.mjs";
@@ -292,6 +300,7 @@ export async function runStopReview(cwd, input = {}, options = {}) {
 // Tests pass a short limit to run the whole hook in a child process.
 export async function main(options = {}) {
   const startedAt = Date.now();
+  useHookPluginData();
   const timeoutMs = options.timeoutMs ?? STOP_REVIEW_TIMEOUT_MS;
   const input = readHookInput();
   const cwd = input.cwd || process.env.CLAUDE_PROJECT_DIR || process.cwd();

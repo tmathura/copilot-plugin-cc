@@ -3,7 +3,8 @@
 // an earlier snapshot; pruning keeps every active job and also removes a job's review patch folder;
 // state records closed Claude sessions; on Windows, a file replace or read that meets another process
 // is retried; a companion that a hook starts counts from the hook's start for the closed-session check; a caller's deadline also
-// limits the Windows retries of an update.
+// limits the Windows retries of an update; the companion's own data folder export wins over
+// CLAUDE_PLUGIN_DATA.
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -12,7 +13,10 @@ import path from "node:path";
 import { resolveWorkspaceRoot } from "./workspace.mjs";
 
 const STATE_VERSION = 1;
-const PLUGIN_DATA_ENV = "CLAUDE_PLUGIN_DATA";
+export const PLUGIN_DATA_ENV = "CLAUDE_PLUGIN_DATA";
+// The SessionStart hook exports the data folder under this name for Claude's Bash tool. Another
+// plugin, such as the Codex plugin, exports CLAUDE_PLUGIN_DATA there too, and the last export wins.
+export const COMPANION_PLUGIN_DATA_ENV = "COPILOT_COMPANION_PLUGIN_DATA";
 const FALLBACK_DIR_NAME = ".copilot-companion";
 const STATE_FILE_NAME = "state.json";
 const JOBS_DIR_NAME = "jobs";
@@ -69,8 +73,20 @@ function fallbackDir() {
   return path.join(os.homedir(), FALLBACK_DIR_NAME);
 }
 
+function pluginDataFromEnv(env) {
+  return env[COMPANION_PLUGIN_DATA_ENV] || env[PLUGIN_DATA_ENV];
+}
+
+// A hook gets CLAUDE_PLUGIN_DATA from Claude Code for this plugin. A companion export inherited from
+// the shell that started Claude must not win over it, also in the companion that the hook starts.
+export function useHookPluginData(env = process.env) {
+  if (env[PLUGIN_DATA_ENV]) {
+    env[COMPANION_PLUGIN_DATA_ENV] = env[PLUGIN_DATA_ENV];
+  }
+}
+
 export function resolvePluginDataDir(env = process.env) {
-  return env[PLUGIN_DATA_ENV] || fallbackDir();
+  return pluginDataFromEnv(env) || fallbackDir();
 }
 
 export function resolveStateFile(cwd) {
@@ -82,7 +98,7 @@ export function resolveJobsDir(cwd) {
 }
 
 export function ensurePluginDataDir(env = process.env) {
-  if (!env[PLUGIN_DATA_ENV] && process.platform !== "win32") {
+  if (!pluginDataFromEnv(env) && process.platform !== "win32") {
     // Others must not read the logs, or change the pids that cancel signals. A folder that already
     // exists keeps its old mode unless it is changed here. A Windows profile folder is private already.
     fs.mkdirSync(fallbackDir(), { recursive: true, mode: 0o700 });

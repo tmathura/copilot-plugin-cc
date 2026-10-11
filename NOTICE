@@ -23,6 +23,7 @@ GitHub Copilot instead of Codex:
 
 - .claude-plugin/marketplace.json
 - .github/workflows/pull-request-ci.yml
+- README.md
 - package.json
 - package-lock.json
 - tsconfig.prompt-mode.json (from tsconfig.app-server.json)

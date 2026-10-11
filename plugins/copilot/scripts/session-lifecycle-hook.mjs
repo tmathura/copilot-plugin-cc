@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // Changed from upstream codex-plugin-cc (Apache-2.0): ported from session-lifecycle-hook.mjs for the
-// Copilot CLI, with no broker and no transcript path. SessionEnd closes the session and marks its
+// Copilot CLI, with no broker and no transcript path. SessionStart exports the data folder under the
+// companion's own name, not CLAUDE_PLUGIN_DATA, and both events use Claude Code's own
+// CLAUDE_PLUGIN_DATA over an inherited export. SessionEnd closes the session and marks its
 // active jobs cancelled in one locked update, stops their companions and Copilot processes with one
 // shared wait, and then removes the session's finished jobs and the jobs it stopped, all inside the
 // hook's 5 s timeout.
@@ -11,11 +13,19 @@ import { fileURLToPath } from "node:url";
 
 import { readStdinSync } from "./lib/fs.mjs";
 import { terminateProcessTree } from "./lib/process.mjs";
-import { hasPendingStop, readJobFile, resolveJobFile, updateState, writeJobFile } from "./lib/state.mjs";
+import {
+  COMPANION_PLUGIN_DATA_ENV,
+  hasPendingStop,
+  PLUGIN_DATA_ENV,
+  readJobFile,
+  resolveJobFile,
+  updateState,
+  useHookPluginData,
+  writeJobFile
+} from "./lib/state.mjs";
 import { nowIso, SESSION_ID_ENV } from "./lib/tracked-jobs.mjs";
 import { resolveWorkspaceRoot } from "./lib/workspace.mjs";
 
-const PLUGIN_DATA_ENV = "CLAUDE_PLUGIN_DATA";
 // The hook's timeout is 5 s, and Node's start and a slow machine come out of it.
 const SESSION_END_BUDGET_MS = 3500;
 const STOP_WAIT_MS = 2000;
@@ -152,7 +162,8 @@ export async function cleanupSessionJobs(cwd, sessionId, options = {}) {
 
 function handleSessionStart(input) {
   appendEnvVar(SESSION_ID_ENV, input.session_id);
-  appendEnvVar(PLUGIN_DATA_ENV, process.env[PLUGIN_DATA_ENV]);
+  // Not CLAUDE_PLUGIN_DATA: an export of that name would point another plugin's companion here.
+  appendEnvVar(COMPANION_PLUGIN_DATA_ENV, process.env[PLUGIN_DATA_ENV]);
 }
 
 async function handleSessionEnd(input) {
@@ -161,6 +172,7 @@ async function handleSessionEnd(input) {
 }
 
 async function main() {
+  useHookPluginData();
   const input = readHookInput();
   const eventName = process.argv[2] ?? input.hook_event_name ?? "";
 

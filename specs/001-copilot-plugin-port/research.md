@@ -201,7 +201,10 @@ data model, the contracts, the plan and the tasks link here.
     wider than Codex's `workspace-write`.
   - Where the host cannot run the sandbox, Copilot warns and runs shell commands with the user's
     full rights. The docs give no reliable check for this, so the plugin cannot refuse. The README
-    says so.
+    says so. Found 2026-10-11 in the ticket 8 manual run: on Windows 11 23H2 Copilot 1.0.94 refused
+    the shell command instead ("Windows sandboxing requires BaseContainer"), and the task could only
+    edit files. The README now names both outcomes. The earlier text, which named only the first,
+    is kept above.
   - Write tasks use the user's own
   `COPILOT_HOME`, so the user's settings, hooks and trusted folders apply, as they would if the user
   ran Copilot by hand.
@@ -737,6 +740,21 @@ Later tickets apply these rules. The call-site map uses them.
   security. Upstream uses `<tmp>/codex-companion`, which another local user can create first and
   fill with job records; cancel and `SessionEnd` would then signal PIDs that user chose. Rejected
   alternative: upstream's shared temp folder.
+
+- **Data folder export** (decided 2026-10-11, ticket 8 manual run; correctness): the
+  `SessionStart` hook exports the plugin data folder to `CLAUDE_ENV_FILE` as
+  `COPILOT_COMPANION_PLUGIN_DATA`, and `resolvePluginDataDir` reads that name before
+  `CLAUDE_PLUGIN_DATA`. Claude Code gives each hook its own `CLAUDE_PLUGIN_DATA`, but the Bash tool
+  gets the exports of every plugin's `SessionStart` hook, and the last export of a name wins. The
+  Codex plugin exports `CLAUDE_PLUGIN_DATA` too. In the manual run with both plugins installed,
+  `/copilot:setup --enable-review-gate` wrote the setting to the Codex plugin's folder, so the Codex
+  gate blocked the stop and this plugin's gate stayed off. The hooks set the new variable from their
+  own `CLAUDE_PLUGIN_DATA` first, so an export inherited from the shell that started Claude, for
+  example a nested `claude`, cannot point them, or the companion they start, at another folder
+  (added 2026-10-11, ticket 8 code review). The test suite deletes the new variable,
+  so tests run from a Claude session never use the real data folder. Rejected alternative:
+  upstream's export of `CLAUDE_PLUGIN_DATA`, which also points the Codex companion at this plugin's
+  folder when this plugin's export comes last.
 
 ## 8. Effect on the ticket split
 

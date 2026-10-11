@@ -77,12 +77,18 @@ environment.
 
 | What | Where |
 | --- | --- |
-| Job state and logs | `$CLAUDE_PLUGIN_DATA/state`, or `~/.copilot-companion/state` without it |
-| The plugin's Copilot folder | `$CLAUDE_PLUGIN_DATA/copilot-home`, or `~/.copilot-companion/copilot-home` without it |
-| The working folder of the login check | `$CLAUDE_PLUGIN_DATA`, or `~/.copilot-companion` without it |
+| Job state and logs | `<plugin data>/state`, or `~/.copilot-companion/state` without it |
+| The plugin's Copilot folder | `<plugin data>/copilot-home`, or `~/.copilot-companion/copilot-home` without it |
+| The working folder of the login check | `<plugin data>`, or `~/.copilot-companion` without it |
 
-Claude Code sets `CLAUDE_PLUGIN_DATA` for the plugin. The fallback folders are in your home folder,
-never in the shared temp folder. On macOS and Linux, `~/.copilot-companion` is readable only by you.
+`<plugin data>` is the folder that Claude Code gives the plugin in `CLAUDE_PLUGIN_DATA`. The hooks
+read it from there. The plugin's session start hook passes it to the commands as
+`COPILOT_COMPANION_PLUGIN_DATA`, which the commands read first, because other plugins, such as the
+Codex plugin, export their own `CLAUDE_PLUGIN_DATA` to the same shell. So in a shell inside Claude
+Code, `$CLAUDE_PLUGIN_DATA` can name another plugin's folder.
+
+The fallback folders are in your home folder, never in the shared temp folder. On macOS and Linux,
+`~/.copilot-companion` is readable only by you.
 
 ## Model and effort
 

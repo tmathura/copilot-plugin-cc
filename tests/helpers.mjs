@@ -5,6 +5,9 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
+// A Claude session with this plugin exports the companion's data folder. Tests use their own folders.
+delete process.env.COPILOT_COMPANION_PLUGIN_DATA;
+
 export function makeTempDir(prefix = "copilot-plugin-test-") {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
