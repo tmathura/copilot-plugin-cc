@@ -31,7 +31,10 @@ A summary lives in `state.json`. The full record lives in `jobs/<id>.json`, and 
 `jobs/<id>.log`. A review above the inline limit also has `jobs/<id>.patches/` while it runs:
 `staged.patch`, `unstaged.patch` and `untracked.md` for a working tree, or `branch.patch` for a
 branch. The review deletes it at the end, and removing the job record deletes it too (research §2;
-added 2026-10-09, PR review).
+added 2026-10-09, PR review). The review gate writes its folder before the companion makes its job,
+so it is `jobs/stop-gate-<hook pid>-<random>.patches/`. The gate hook deletes it when it ends, and a
+later gate deletes the folder of a hook that has ended (research §7, gate context folder; added
+2026-10-11, ticket 7).
 
 | Field | Type | Notes |
 | --- | --- | --- |

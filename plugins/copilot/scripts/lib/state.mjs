@@ -2,7 +2,7 @@
 // updateState holds a lock file and writes through a rename; saveState is removed, so no writer saves
 // an earlier snapshot; pruning keeps every active job and also removes a job's review patch folder;
 // state records closed Claude sessions; on Windows, a file replace or read that meets another process
-// is retried.
+// is retried; it names the review gate's job title, so resume can skip that job.
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -133,6 +133,9 @@ export function loadState(cwd, options = {}) {
 export function hasPendingStop(job) {
   return (job.status === "cancelled" || job.status === "failed") && Boolean(job.pid || job.copilotPid);
 }
+
+// The review gate runs as a task, but its session reviews Claude's turn; it is no task to resume.
+export const STOP_GATE_JOB_TITLE = "Copilot Stop Gate Review";
 
 function isActiveJob(job) {
   return job.status === "queued" || job.status === "running" || hasPendingStop(job);

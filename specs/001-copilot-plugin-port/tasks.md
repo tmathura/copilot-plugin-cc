@@ -413,7 +413,7 @@ and to `BLOCK`.
 
 ### Tests for User Story 5
 
-- [ ] T073 [P] [US5] Add hook tests to `tests/runtime.test.mjs`: gate off does nothing; gate blocks on
+- [X] T073 [P] [US5] Add hook tests to `tests/runtime.test.mjs`: gate off does nothing; gate blocks on
   `BLOCK:`; gate lets Claude stop on `ALLOW:`; an unexpected answer blocks with upstream's message; a
   missing Copilot gives a setup note and does not block; the gate run uses the read-only profile; a
   gate run past its time limit blocks with upstream's timeout message, and the companion, the fake
@@ -439,31 +439,49 @@ and to `BLOCK`.
   with a clear error and never starts Copilot; after `SessionEnd`, a resumed session with the same
   id can start new jobs, while a companion from the old launch (started before `closedAt`) is still
   refused; a job that the resumed session starts during the `SessionEnd` kill wait keeps its record
-  and log and can still be cancelled
+  and log and can still be cancelled. Changed 2026-10-11 (ticket 7): the "pauses" are not test hooks
+  in the companion. Stand-in processes hold a queued job and a claimed job that has not started
+  Copilot; after `SessionEnd`, the test process, which started before the close, tries to create,
+  claim and start jobs, and a real worker tries to claim the queued one. The kill through
+  `copilotPid` is covered by the three-job test, where one job's companion is already dead. The
+  timeout test also checks that the job ends `cancelled`. Rejected alternative: pause points in the
+  companion, which only tests would use
 
 ### Implementation for User Story 5
 
-- [ ] T074 [P] [US5] Port `U/hooks/hooks.json` to `P/hooks/hooks.json`
-- [ ] T075 [P] [US5] Port `U/prompts/stop-review-gate.md` to `P/prompts/stop-review-gate.md`, with a
+- [X] T074 [P] [US5] Port `U/hooks/hooks.json` to `P/hooks/hooks.json`
+- [X] T075 [P] [US5] Port `U/prompts/stop-review-gate.md` to `P/prompts/stop-review-gate.md`, with a
   `{{REVIEW_INPUT}}` block for the working-tree context
-- [ ] T076 [US5] Port `U/scripts/stop-review-gate-hook.mjs` to `P/scripts/stop-review-gate-hook.mjs`:
+- [X] T076 [US5] Port `U/scripts/stop-review-gate-hook.mjs` to `P/scripts/stop-review-gate-hook.mjs`:
   collect the working-tree context with `collectReviewContext` (and the patch folder above the
   inline limit, as T053b) and put it in the prompt; pass the patch folder with the internal
   `task --context-dir <path>` option and remove it in a `finally` step; send the prompt to
   `task --json` on stdin, not as an argument; use an 840 s run limit (research.md §7, hook time
   budgets); start the companion with `detached: true` on macOS and Linux, and on the time limit kill
   its process tree with `terminateProcessTree`, then stop the `copilotPid` of the companion's job
-  record (found by the companion's `pid`; research.md §7, stopping a job)
-- [ ] T077 [US5] Port `U/scripts/session-lifecycle-hook.mjs` to `P/scripts/session-lifecycle-hook.mjs`
+  record (found by the companion's `pid`; research.md §7, stopping a job). Changed 2026-10-11: the
+  gate stops that Copilot through the companion's `cancelJob`, so the job also ends `cancelled`; the
+  patch folder is `jobs/stop-gate-<hook pid>-<random>.patches`; outside Git the context says there is
+  no diff (research.md §7)
+- [X] T076b [US5] From the ticket 7 code review: the gate writes its folder with the companion's
+  `withReviewPatches` and first removes the folders of ended hooks; its 840 s count from the hook's
+  start; a hook stopped with `SIGTERM` or `SIGINT` stops its companion and cancels the job; resume
+  skips the gate's job; `readStdinIfPiped` checks `tty.isatty(0)`. Tests: stale folders, a stopped
+  hook (macOS and Linux), no resume candidate after a gate run (research.md §7)
+- [X] T077 [US5] Port `U/scripts/session-lifecycle-hook.mjs` to `P/scripts/session-lifecycle-hook.mjs`
   (no broker, no transcript path). `SessionEnd` first, inside one `updateState`, adds the session to
   `closedSessions`, marks the session's queued and running jobs `cancelled` and reads the running
   jobs' `pid` and `copilotPid` (job creation, claim and Copilot start refuse a closed session); then
   signals them,
   waits once (up to 2 s), sends `SIGKILL` to survivors, then removes only the job ids captured in the first step
   through `updateState` on fresh state with the lock wait limited to the time left (research.md §7,
-  hook time budgets and locked state updates)
-- [ ] T078 [US5] Add the Phase 7 differences to the README section
-- [ ] T079 [US5] Run `claude plugin validate .`, `npm run build` and `node --test tests/*.test.mjs`;
+  hook time budgets and locked state updates). Changed 2026-10-11: the budget is 3.5 s
+- [X] T077b [US5] From the ticket 7 code review: `SessionEnd` removes only the session's finished
+  jobs and the jobs whose processes all stopped; a job whose stop failed, or whose earlier stop never
+  finished, keeps its record and pids. Test with a stop that fails (research.md §7, hook time
+  budgets)
+- [X] T078 [US5] Add the Phase 7 differences to the README section
+- [X] T079 [US5] Run `claude plugin validate .`, `npm run build` and `node --test tests/*.test.mjs`;
   all pass
 
 **Checkpoint**: every feature in the spec exists.

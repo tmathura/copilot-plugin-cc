@@ -124,6 +124,37 @@ and the optional Stop-hook review gate. Drop transfer. The first ticket chooses 
   `--fresh`; the companion takes the mode from the resumed job, which would ignore an explicit
   `--write`.
 
+### Session 2026-10-11
+
+- Q: What happens to the gate's job when the gate run passes its limit? → A: The gate stops the
+  companion's process tree, then cancels the job found by the companion's `pid`, as `cancel` does:
+  the job is `cancelled` with "The stop-time review timed out.", and its Copilot process is stopped
+  (decided 2026-10-11, ticket 7; correctness; research.md §7, stopping a job). Rejected
+  alternatives: upstream, which leaves the job `running`, so it blocks `--resume-last` and every
+  later stop reports it; a kill of the Copilot process that does not change the record.
+- Q: Where is the gate's patch folder, and what does the gate do outside Git? → A: In the plugin's
+  job storage, `jobs/stop-gate-<hook pid>-<random>.patches`, removed when the hook ends; a later
+  gate removes the folder of a hook that was killed outright. Outside a Git repository the prompt
+  says there is no diff, and the gate runs as upstream's does (decided 2026-10-11, ticket 7 and its
+  code review; research.md §7, gate context folder). Rejected alternatives: the OS temp folder; a
+  folder that nothing cleans up; refusing the gate outside Git.
+- Q: When does the gate's 840 s limit start, and what happens when the hook itself is stopped? → A:
+  At the hook's start. A hook stopped with `SIGTERM` or `SIGINT` stops its companion, cancels the job
+  and removes the patch folder (decided 2026-10-11, ticket 7 code review; research.md §7, gate run
+  limit and stop). Rejected alternatives: a limit from the companion's start; leaving the companion
+  running.
+- Q: Can `/copilot:rescue --resume` continue the gate's review session? → A: No. Resume skips the
+  job titled "Copilot Stop Gate Review" (decided 2026-10-11, ticket 7 code review; research.md §7).
+  Rejected alternative: upstream, where it can.
+- Q: How much of its 5 s timeout does `SessionEnd` use, and which jobs does it remove? → A: 3.5 s
+  from the start of its cleanup. It stops the processes of the session's queued and running jobs,
+  then removes the session's finished jobs and the jobs it stopped. A job whose stop failed, and a
+  job whose earlier stop did not finish, keep their record and pids for `/copilot:cancel` (decided
+  2026-10-11, ticket 7 and its code review; research.md §7, hook time budgets). Rejected
+  alternatives: the full 5 s, which Claude Code would cut off; removing every job of the session,
+  which loses the pids of a process that still runs; signalling the old pids of an earlier failed
+  stop, which may belong to another program by now.
+
 ## User Scenarios & Testing *(mandatory)*
 
 The user is a developer who works in Claude Code and has the GitHub Copilot CLI. The owner is the
@@ -288,7 +319,7 @@ the matching function names in it.
   error lines, and does not guess.
 - Copilot exits with a non-zero code. The plugin reports the failure and stops.
 - A run keeps going for a long time. Like upstream, there is no general deadline: the user cancels
-  it, and the review gate stops after 14 minutes (840 s). A process that sends its final event but does not
+  it, and the review gate stops 14 minutes (840 s) after its hook starts. A process that sends its final event but does not
   exit is killed after a short grace period.
 - The user cancels a job whose process has already ended. Cancel reports the true state.
 - There is nothing to review. The command says so only when the chosen scope is really empty,

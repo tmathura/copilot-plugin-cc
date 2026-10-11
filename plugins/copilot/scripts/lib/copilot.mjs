@@ -1,7 +1,8 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): ported from codex.mjs for the Copilot CLI in
 // prompt mode. This module alone builds Copilot arguments and decides permissions. It has no broker,
-// no session transfer and no thread list, so the latest task comes from the plugin's job state; the
-// login check is one tiny read-only prompt, and a caller can start Copilot inside its own locked step.
+// no session transfer and no thread list, so the latest task comes from the plugin's job state, never
+// a review gate job; the login check is one tiny read-only prompt, and a caller can start Copilot
+// inside its own locked step.
 /**
  * @typedef {import("./prompt-mode-protocol").PromptModeEvent} PromptModeEvent
  * @typedef {import("./prompt-mode-protocol").ResultEvent} ResultEvent
@@ -28,7 +29,7 @@ import process from "node:process";
 import { readJsonFile } from "./fs.mjs";
 import { CopilotPromptModeClient, runShortCommand } from "./prompt-mode.mjs";
 import { resolveLauncher } from "./process.mjs";
-import { ensurePluginDataDir, hasPendingStop, listJobs, resolvePluginDataDir } from "./state.mjs";
+import { ensurePluginDataDir, hasPendingStop, listJobs, resolvePluginDataDir, STOP_GATE_JOB_TITLE } from "./state.mjs";
 
 const TASK_THREAD_PREFIX = "Copilot Companion Task";
 const DEFAULT_CONTINUE_PROMPT =
@@ -651,6 +652,7 @@ export function findLatestTaskThread(cwd, options = {}) {
     .find(
       (entry) =>
         entry.jobClass === "task" &&
+        entry.title !== STOP_GATE_JOB_TITLE &&
         entry.threadId &&
         Boolean(entry.write) === write &&
         entry.status !== "queued" &&

@@ -489,9 +489,44 @@ Later tickets apply these rules. The call-site map uses them.
     also stop the `copilotPid` of its job record itself. Never rely only on the companion's `SIGTERM`
     handler, because the companion can be killed before the handler finishes. The gate finds the
     record by the companion's `pid`.
+  - The gate on its limit first stops the companion's process tree, so no new Copilot can start.
+    Then it finds the job record by the companion's `pid` and cancels that job as `cancel` does:
+    the job becomes `cancelled` with the message "The stop-time review timed out.", its `copilotPid`
+    is stopped, and each pid is cleared when its stop is done (decided 2026-10-11, ticket 7;
+    correctness). Reason: the timed-out companion never writes its final status, so its record stays
+    `running`. It would block every later `--resume-last`, and each later `Stop` would report it as a
+    running task. Rejected alternatives: upstream, which leaves the record `running`; a plain kill of
+    `copilotPid` that does not change the record.
 - **Gate context folder**: the gate hook writes the patch folder (§2) and passes it to the companion
   with the internal `task` option `--context-dir <path>`. The adapter turns it into `--add-dir`. The
-  hook removes the folder in a `finally` step, after success, failure or a timeout kill.
+  hook removes the folder in a `finally` step, after success, failure or a timeout kill. The folder
+  is `jobs/stop-gate-<hook pid>-<random>.patches` in the plugin's job storage, because the hook
+  writes it before the companion makes its job. The hook writes and removes it with the companion's
+  `withReviewPatches`, as a review does. No job record names the folder, so pruning never removes
+  it: before it writes its own folder, the gate removes each `stop-gate-*` folder whose hook pid
+  has ended, which a hook killed outright left behind. Outside a Git repository the context says
+  that there is no diff, and the gate still runs, as upstream's does (all decided 2026-10-11,
+  ticket 7 and its code review). Rejected alternatives: the OS temp folder, because a review writes
+  only the plugin's own job files (constitution IV); a folder named by time only, which nothing
+  could ever clean up; refusing the gate outside Git, which upstream does not do.
+- **Gate run limit and stop** (decided 2026-10-11, ticket 7 code review; correctness): the 840 s
+  count from the hook's start, so the version check and the context collection come out of them
+  too. The companion leads its own process group on macOS and Linux, so a signal to the hook's
+  group does not reach it. The hook therefore handles `SIGTERM` and `SIGINT` while the companion
+  runs: it stops the companion and cancels its job, as on the limit, with the message "The
+  stop-time review was stopped.", removes the patch folder, and exits with 143 or 130. Rejected
+  alternatives: a limit that starts when the companion starts, which can pass the 900 s timeout;
+  no handler, which leaves the companion and Copilot running.
+- **The gate's job is never resumed** (decided 2026-10-11, ticket 7 code review; correctness): the
+  gate runs as a read-only task titled "Copilot Stop Gate Review". Its session reviews Claude's
+  turn, so `--resume-last`, `task-resume-candidate` and `findLatestTaskThread` skip a job with that
+  title. Rejected alternative: upstream, where the gate's job can become the task that
+  `/copilot:rescue --resume` continues.
+- **Reading a prompt from stdin** (decided 2026-10-11, ticket 7 code review; correctness):
+  `readStdinIfPiped` checks for a terminal with `tty.isatty(0)`. Upstream reads
+  `process.stdin.isTTY`, which opens `process.stdin`; on macOS and Linux that makes the pipe
+  non-blocking, and `readFileSync(0)` of a prompt larger than the pipe buffer can then fail with
+  `EAGAIN`. The gate sends its whole prompt this way.
 - **Background start order** (decided 2026-10-08, after Copilot PR review): `enqueueBackgroundTask`
   writes the `queued` job record, with its stored request, before it starts the worker. Then it
   stores the worker's `pid` through `updateState`, only if the job is still `queued`, so it never
@@ -532,8 +567,10 @@ Later tickets apply these rules. The call-site map uses them.
 - **Hook time budgets**: Claude Code stops a hook at its `hooks.json` timeout (`Stop` 900 s,
   `SessionEnd` 5 s, as upstream), and then no cleanup runs. So each hook does its work inside a
   smaller budget.
-  - `Stop`: the gate's run limit is 840 s (upstream: 900 s). The other 60 s cover collecting the
-    context, the kill wait, removing the patch folder and printing the decision.
+  - `Stop`: the gate's run limit is 840 s (upstream: 900 s). The other 60 s cover the kill wait,
+    removing the patch folder and printing the decision. The 840 s count from the hook's start, so
+    the version check and collecting the context come out of them (changed 2026-10-11, ticket 7
+    code review; rejected alternative: count from the companion's start).
   - `SessionEnd`: first, inside one `updateState`, it adds the session id to `closedSessions`,
     marks all the session's queued and running jobs `cancelled`, and reads the `pid` and
     `copilotPid` of the running ones. Creating a job, claiming one and starting Copilot all happen
@@ -559,9 +596,18 @@ Later tickets apply these rules. The call-site map uses them.
     that lands inside that block. Rejected alternative: a supervisor process that gates every
     Copilot start, which upstream does not have, for a window of a few milliseconds. Then it sends `SIGTERM` to every recorded `pid` and
     `copilotPid`, waits once, up to 2 s in total, and sends `SIGKILL` to what is still alive. Last, it
-    removes, through `updateState`, only the job ids it captured in the first step, so a job that a
-    resumed session starts meanwhile keeps its record. Each lock wait is limited to the time left in
-    its 5 s budget. It never waits per job.
+    removes, through `updateState`, only job ids it captured in the first step (which ones, below),
+    so a job that a resumed session starts meanwhile keeps its record. Each lock wait is limited to the time left in
+    its budget. It never waits per job. The budget is 3.5 s from the start of the cleanup, inside
+    the 5 s timeout, because Node's own start and a slow machine also use that time (changed
+    2026-10-11, ticket 7: a held lock took 4.35 s with a 4 s budget on Windows). Rejected
+    alternative: the full 5 s, which Claude Code would cut off. The last step removes the session's
+    finished jobs and the jobs whose processes all stopped. A job whose stop failed keeps its
+    `cancelled` record and its pids, and a cancelled or failed job that already named a pid because
+    an earlier stop did not finish is left as it is, so `/copilot:cancel` can stop them later (added
+    2026-10-11, ticket 7 code review; correctness). Rejected alternatives: removing every captured
+    job, which loses the only record of a process that still runs; also signalling the old pids of
+    an earlier failed stop, which may belong to another program by now.
 
 - **Locked state updates** (decided 2026-10-08, after Copilot PR review): `updateState` holds a lock
   file, `state.json.lock`, for the whole read, change, save and prune. It creates the lock with an

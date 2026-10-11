@@ -15,13 +15,18 @@ stateDiagram-v2
   running --> completed: Copilot reports success
   running --> failed: Copilot fails, stops early or starts a tool that the run does not allow
   queued --> failed: the worker cannot start
-  queued --> cancelled: /copilot:cancel
-  running --> cancelled: /copilot:cancel
+  queued --> cancelled: /copilot:cancel or the Claude session ends
+  running --> cancelled: /copilot:cancel, the Claude session ends, or the review gate's time limit
 ```
 
 - A background task is written as `queued` before its worker starts. The worker then marks it
   `running`.
 - A job that is cancelled, or whose Claude session has ended, never starts again.
+- When a Claude session ends, the plugin stops that session's jobs and removes them. A job whose
+  processes could not be stopped stays, so you can cancel it again.
+- The review gate runs as a task job titled "Copilot Stop Gate Review". If it is still running 14
+  minutes after the hook started, or the hook is stopped, the gate stops it and marks it
+  `cancelled`. `/copilot:rescue --resume` never continues it.
 
 ## Logs and state
 

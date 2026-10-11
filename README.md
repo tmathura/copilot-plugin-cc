@@ -141,6 +141,28 @@ claude plugin install copilot@tmathura-copilot
   never sees half a file. Codex writes over the file. On Windows a rename fails while another
   process reads the file, and a reader can miss the file during a rename, so the plugin retries both
   for up to 2 seconds.
+- The review gate puts the working-tree diff in its prompt, because Copilot's reviews have no shell
+  to run `git`. Above the inline limit it writes the exact patches to a folder in the plugin's job
+  storage, lets Copilot read that folder, and deletes it when the hook ends. Codex runs `git` itself.
+- The review gate sends its prompt to the companion on stdin. Claude's last message can be longer
+  than the Windows command-line limit. Codex passes the prompt as an argument.
+- The review gate stops its review 14 minutes after the hook starts, not 15, so that the hook can
+  still clean up and answer inside Claude Code's 15-minute hook timeout. On that limit, or when the
+  hook itself is stopped, it stops the companion, the Copilot process and their children, and marks
+  the job cancelled. Codex stops only the companion and leaves the job marked as running.
+- `/copilot:rescue --resume` never continues the review gate's session. In Codex it can.
+- If a review gate hook is killed outright, a later gate deletes the patch folder that it left.
+- When a Claude session ends, the plugin first marks the session closed and its active jobs
+  cancelled, in one step. A companion that started before the session ended cannot start a job for
+  it. Then the plugin stops the jobs' processes, with one shared wait of up to 2 seconds, and
+  removes the session's finished jobs and the jobs it stopped. A job that another session, or the
+  same session after `claude --resume`, starts in the meantime stays. A job whose processes could
+  not be stopped keeps its record, so `/copilot:cancel` can try again. All of this ends inside the
+  hook's 5-second timeout. Codex removes the session's jobs from an earlier copy of the state, which
+  can drop a job that was added in the meantime.
+- The companion reads a prompt from stdin without opening Node's `process.stdin`. On macOS and
+  Linux that would make the pipe non-blocking, and a large prompt could fail to read.
+- The session start hook does not export a transcript path, because there is no `/copilot:transfer`.
 
 ## Development
 
