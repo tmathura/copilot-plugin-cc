@@ -139,14 +139,14 @@ export function getCurrentBranch(cwd) {
 // whose cached stat data is stale. --numstat compares the content, and quotes paths as --name-only does.
 function listUnstagedFiles(cwd) {
   return gitChecked(cwd, ["diff", "--numstat", "--no-renames"])
-    .stdout.trim()
-    .split("\n")
+    .stdout.split("\n")
     .filter(Boolean)
     .map((line) => line.split("\t").slice(2).join("\t"));
 }
 
 export function getWorkingTreeState(cwd) {
-  const staged = gitChecked(cwd, ["diff", "--cached", "--name-only"]).stdout.trim().split("\n").filter(Boolean);
+  // No trim() in the name lists: an unquoted name can end with a no-break space (U+00A0).
+  const staged = gitChecked(cwd, ["diff", "--cached", "--name-only"]).stdout.split("\n").filter(Boolean);
   const unstaged = listUnstagedFiles(cwd);
   // -z gives the real names: without it git quotes a name with a tab, a newline, a quote or a
   // backslash, and the file cannot be read.
@@ -297,7 +297,7 @@ function collectBranchContext(cwd, baseRef, options = {}) {
   const includeDiff = options.includeDiff !== false;
   const comparison = options.comparison ?? buildBranchComparison(cwd, baseRef);
   const currentBranch = getCurrentBranch(cwd);
-  const changedFiles = gitChecked(cwd, ["diff", "--name-only", comparison.commitRange]).stdout.trim().split("\n").filter(Boolean);
+  const changedFiles = gitChecked(cwd, ["diff", "--name-only", comparison.commitRange]).stdout.split("\n").filter(Boolean);
   const logOutput = gitChecked(cwd, ["log", "--oneline", "--decorate", comparison.commitRange]).stdout.trim();
   const diffStat = gitChecked(cwd, ["diff", "--stat", comparison.commitRange]).stdout.trim();
 
@@ -390,7 +390,7 @@ export function collectReviewContext(cwd, target, options = {}) {
     details = collectWorkingTreeContext(repoRoot, state, { includeDiff });
   } else {
     const comparison = buildBranchComparison(repoRoot, target.baseRef);
-    const fileCount = gitChecked(repoRoot, ["diff", "--name-only", comparison.commitRange]).stdout.trim().split("\n").filter(Boolean).length;
+    const fileCount = gitChecked(repoRoot, ["diff", "--name-only", comparison.commitRange]).stdout.split("\n").filter(Boolean).length;
     diffBytes = measureGitOutputBytes(
       repoRoot,
       ["diff", "--binary", "--no-ext-diff", "--submodule=diff", comparison.commitRange],

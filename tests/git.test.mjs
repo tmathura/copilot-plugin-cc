@@ -253,26 +253,38 @@ test("collectReviewContext reads an untracked file whose name git would quote in
   assert.match(context.content, /### café\.js\n```\nexport const value = "LIGHTWEIGHT_QUOTED_MARKER";\n```/);
 });
 
+// A trailing no-break space on the last name checks that the name lists do not trim the unquoted name.
+const QUOTED_NAMES = ["café.js", "café.js "];
+
 test("collectReviewContext lists a staged and unstaged file whose name git would quote once, by its real name", () => {
   const cwd = makeTempDir();
   initGitRepo(cwd);
-  fs.writeFileSync(path.join(cwd, "café.js"), "export const value = 1;\n");
-  run("git", ["add", "café.js"], { cwd });
+  for (const name of QUOTED_NAMES) {
+    fs.writeFileSync(path.join(cwd, name), "export const value = 1;\n");
+  }
+  run("git", ["add", ...QUOTED_NAMES], { cwd });
   run("git", ["commit", "-m", "init"], { cwd });
-  fs.writeFileSync(path.join(cwd, "café.js"), "export const value = 2;\n");
-  run("git", ["add", "café.js"], { cwd });
-  fs.writeFileSync(path.join(cwd, "café.js"), "export const value = 3;\n");
+  for (const name of QUOTED_NAMES) {
+    fs.writeFileSync(path.join(cwd, name), "export const value = 2;\n");
+  }
+  run("git", ["add", ...QUOTED_NAMES], { cwd });
+  for (const name of QUOTED_NAMES) {
+    fs.writeFileSync(path.join(cwd, name), "export const value = 3;\n");
+  }
 
   const state = getWorkingTreeState(cwd);
   const lightweight = collectReviewContext(cwd, resolveReviewTarget(cwd, {}), { includeDiff: false });
   const inline = collectReviewContext(cwd, resolveReviewTarget(cwd, {}), { includeDiff: true });
 
-  assert.deepEqual(state.staged, ["café.js"]);
-  assert.deepEqual(state.unstaged, ["café.js"]);
-  assert.equal(lightweight.fileCount, 1);
+  assert.deepEqual(state.staged.toSorted(), QUOTED_NAMES.toSorted());
+  assert.deepEqual(state.unstaged.toSorted(), QUOTED_NAMES.toSorted());
+  assert.equal(lightweight.fileCount, 2);
+  assert.deepEqual(lightweight.changedFiles, QUOTED_NAMES.toSorted());
   assert.match(lightweight.content, /## Changed Files\n\ncafé\.js\n/);
   assert.match(inline.content, /^MM café\.js$/m);
-  assert.match(inline.content, /^diff --git a\/café\.js b\/café\.js$/m);
+  for (const name of QUOTED_NAMES) {
+    assert.ok(inline.content.includes(`\ndiff --git a/${name} b/${name}\n`), name);
+  }
   assert.doesNotMatch(inline.content, /\\303/);
 });
 
@@ -298,14 +310,16 @@ test("collectReviewContext lists branch files whose names git would quote by the
   run("git", ["add", "a.js"], { cwd });
   run("git", ["commit", "-m", "init"], { cwd });
   run("git", ["checkout", "-b", "feature"], { cwd });
-  fs.writeFileSync(path.join(cwd, "café.js"), "export const value = 2;\n");
-  run("git", ["add", "café.js"], { cwd });
+  for (const name of QUOTED_NAMES) {
+    fs.writeFileSync(path.join(cwd, name), "export const value = 2;\n");
+  }
+  run("git", ["add", ...QUOTED_NAMES], { cwd });
   run("git", ["commit", "-m", "add"], { cwd });
 
   const context = collectReviewContext(cwd, resolveReviewTarget(cwd, { base: "main" }), { includeDiff: false });
 
-  assert.deepEqual(context.changedFiles, ["café.js"]);
-  assert.equal(context.fileCount, 1);
+  assert.deepEqual(context.changedFiles, QUOTED_NAMES);
+  assert.equal(context.fileCount, 2);
   assert.match(context.content, /## Changed Files\n\ncafé\.js\n/);
 });
 
