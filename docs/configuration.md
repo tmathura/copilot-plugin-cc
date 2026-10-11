@@ -34,7 +34,8 @@ Copilot finds a login in one of these places:
   fine-grained token with the "Copilot Requests" permission. Classic `ghp_` tokens do not work.
 
 Setup checks the login with one small read-only prompt. Each `/copilot:setup` therefore counts as
-one request toward your Copilot usage. The check stops after 60 seconds. When a token variable is set, the report names
+one request toward your Copilot usage, unless you use your own model provider (see below), which
+skips the check. The check stops after 60 seconds. When a token variable is set, the report names
 the variable, never its value. It cannot tell you that Copilot used the token: Copilot uses a stored
 login instead when the token is not valid.
 
@@ -92,6 +93,7 @@ The fallback folders are in your home folder, never in the shared temp folder. O
 
 ## Model and effort
 
-`/copilot:rescue` accepts `--model <model>` and `--effort <level>`. The plugin passes them to
+`/copilot:rescue` accepts `--model <model>` and `--effort <level>`. `/copilot:review` and
+`/copilot:adversarial-review` accept `--model <model>` only. The plugin passes them to
 Copilot as `--model=<model>` and `--reasoning-effort=<level>`. The levels are `none`, `minimal`,
 `low`, `medium`, `high` and `xhigh`. Without them, Copilot uses its own default.

@@ -82,6 +82,7 @@ branch against a base branch such as `main`.
 | `--scope auto\|working-tree\|branch` | Choose the target. `auto` (the default) reviews the working tree when it has changes, and the branch otherwise. |
 | `--wait` | Run in the foreground. |
 | `--background` | Run as a Claude background task. Without `--wait` or `--background`, Claude estimates the size and asks. |
+| `--model <model>`, `-m <model>` | A model name that your Copilot CLI accepts. Without it, Copilot uses its default. |
 
 It takes no focus text. Use `/copilot:adversarial-review` to steer the review.
 
