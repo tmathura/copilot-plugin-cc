@@ -459,7 +459,8 @@ and to `BLOCK`.
   `task --json` on stdin, not as an argument; use an 840 s run limit (research.md §7, hook time
   budgets); start the companion with `detached: true` on macOS and Linux, and on the time limit kill
   its process tree with `terminateProcessTree`, then stop the `copilotPid` of the companion's job
-  record (found by the companion's `pid`; research.md §7, stopping a job). Changed 2026-10-11: the
+  record (research.md §7, stopping a job). Changed 2026-10-11: the record is found by the gate's run
+  id, `stopGateRunId`, not by the companion's `pid` (T076i); the
   gate stops that Copilot through the companion's `cancelJob`, so the job also ends `cancelled`; the
   patch folder is `jobs/stop-gate-<hook pid>-<random>.patches`; outside Git the context says there is
   no diff (research.md §7)

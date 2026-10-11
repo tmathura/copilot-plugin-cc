@@ -127,7 +127,8 @@ and the optional Stop-hook review gate. Drop transfer. The first ticket chooses 
 ### Session 2026-10-11
 
 - Q: What happens to the gate's job when the gate run passes its limit? → A: The gate stops the
-  companion's process tree, then cancels the job found by the companion's `pid`, as `cancel` does:
+  companion's process tree, then cancels the job found by the gate's run id (`stopGateRunId`; the
+  companion's `pid` until PR review round 2, rejected because a pid can be reused), as `cancel` does:
   the job is `cancelled` with "The stop-time review timed out.", and its Copilot process is stopped
   (decided 2026-10-11, ticket 7; correctness; research.md §7, stopping a job). Rejected
   alternatives: upstream, which leaves the job `running`, so it blocks `--resume-last` and every

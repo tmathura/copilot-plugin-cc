@@ -488,9 +488,10 @@ Later tickets apply these rules. The call-site map uses them.
   - The rule for every stopper (cancel, `SessionEnd`, the review gate): stop the companion, and
     also stop the `copilotPid` of its job record itself. Never rely only on the companion's `SIGTERM`
     handler, because the companion can be killed before the handler finishes. The gate finds the
-    record by the companion's `pid`.
+    record by its run id, `stopGateRunId` (changed 2026-10-11, PR review round 2; rejected
+    alternative: the companion's `pid`, which can be reused; see "Gate run limit and stop").
   - The gate on its limit first stops the companion's process tree, so no new Copilot can start.
-    Then it finds the job record by the companion's `pid` and cancels that job as `cancel` does:
+    Then it finds the job record by its run id and cancels that job as `cancel` does:
     the job becomes `cancelled` with the message "The stop-time review timed out.", its `copilotPid`
     is stopped, and each pid is cleared when its stop is done (decided 2026-10-11, ticket 7;
     correctness). Reason: the timed-out companion never writes its final status, so its record stays
