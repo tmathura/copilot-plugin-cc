@@ -1,6 +1,6 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): every git call writes no index and starts no
-// fsmonitor hook or textconv program; untracked symlinks are not read; the self-collect guidance
-// points Copilot at patch files, which writeReviewPatches writes.
+// fsmonitor hook or textconv program; non-ASCII file names are not quoted; untracked symlinks are not
+// read; the self-collect guidance points Copilot at patch files, which writeReviewPatches writes.
 import fs from "node:fs";
 import path from "node:path";
 
@@ -13,12 +13,15 @@ const DEFAULT_INLINE_DIFF_MAX_BYTES = 256 * 1024;
 // Reviews run these calls before Copilot starts, so no Copilot control covers what git itself starts.
 // git diff refreshes .git/index even with --no-optional-locks unless diff.autoRefreshIndex is off.
 const SAFE_GIT_OPTIONS = ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "diff.autoRefreshIndex=false"];
+// Git then prints a non-ASCII name as it is, so the status, the file lists and the patches agree.
+// Git still quotes a name with a tab, a newline, a quote or a backslash.
+const PATH_OPTIONS = ["-c", "core.quotePath=false"];
 
 function safeGitArgs(args) {
   if (args[0] === "diff") {
-    return [...SAFE_GIT_OPTIONS, "diff", "--no-textconv", ...args.slice(1)];
+    return [...SAFE_GIT_OPTIONS, ...PATH_OPTIONS, "diff", "--no-textconv", ...args.slice(1)];
   }
-  return [...SAFE_GIT_OPTIONS, ...args];
+  return [...SAFE_GIT_OPTIONS, ...PATH_OPTIONS, ...args];
 }
 
 // Git is directly executable on Windows. Repository-derived arguments must never pass through a shell.
@@ -145,7 +148,8 @@ function listUnstagedFiles(cwd) {
 export function getWorkingTreeState(cwd) {
   const staged = gitChecked(cwd, ["diff", "--cached", "--name-only"]).stdout.trim().split("\n").filter(Boolean);
   const unstaged = listUnstagedFiles(cwd);
-  // -z gives the real names: without it git quotes a non-ASCII name, and the file cannot be read.
+  // -z gives the real names: without it git quotes a name with a tab, a newline, a quote or a
+  // backslash, and the file cannot be read.
   const untracked = gitChecked(cwd, ["ls-files", "-z", "--others", "--exclude-standard"]).stdout.split("\0").filter(Boolean);
 
   return {

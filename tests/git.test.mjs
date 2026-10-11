@@ -238,6 +238,77 @@ test("collectReviewContext reads an untracked file whose name git would quote", 
   assert.match(context.content, /### naïve café\.js\n```\nexport const value = "QUOTED_NAME_MARKER";\n```/);
 });
 
+test("collectReviewContext reads an untracked file whose name git would quote in lightweight context", () => {
+  const cwd = makeTempDir();
+  initGitRepo(cwd);
+  fs.writeFileSync(path.join(cwd, "a.js"), "export const value = 1;\n");
+  run("git", ["add", "a.js"], { cwd });
+  run("git", ["commit", "-m", "init"], { cwd });
+  fs.writeFileSync(path.join(cwd, "café.js"), 'export const value = "LIGHTWEIGHT_QUOTED_MARKER";\n');
+
+  const context = collectReviewContext(cwd, resolveReviewTarget(cwd, {}), { maxInlineFiles: 0 });
+
+  assert.equal(context.inputMode, "self-collect");
+  assert.deepEqual(context.changedFiles, ["café.js"]);
+  assert.match(context.content, /### café\.js\n```\nexport const value = "LIGHTWEIGHT_QUOTED_MARKER";\n```/);
+});
+
+test("collectReviewContext lists a staged and unstaged file whose name git would quote once, by its real name", () => {
+  const cwd = makeTempDir();
+  initGitRepo(cwd);
+  fs.writeFileSync(path.join(cwd, "café.js"), "export const value = 1;\n");
+  run("git", ["add", "café.js"], { cwd });
+  run("git", ["commit", "-m", "init"], { cwd });
+  fs.writeFileSync(path.join(cwd, "café.js"), "export const value = 2;\n");
+  run("git", ["add", "café.js"], { cwd });
+  fs.writeFileSync(path.join(cwd, "café.js"), "export const value = 3;\n");
+
+  const state = getWorkingTreeState(cwd);
+  const lightweight = collectReviewContext(cwd, resolveReviewTarget(cwd, {}), { includeDiff: false });
+  const inline = collectReviewContext(cwd, resolveReviewTarget(cwd, {}), { includeDiff: true });
+
+  assert.deepEqual(state.staged, ["café.js"]);
+  assert.deepEqual(state.unstaged, ["café.js"]);
+  assert.equal(lightweight.fileCount, 1);
+  assert.match(lightweight.content, /## Changed Files\n\ncafé\.js\n/);
+  assert.match(inline.content, /^MM café\.js$/m);
+  assert.match(inline.content, /^diff --git a\/café\.js b\/café\.js$/m);
+  assert.doesNotMatch(inline.content, /\\303/);
+});
+
+test("collectReviewContext reads an untracked file with a tab in its name", { skip: process.platform === "win32" }, () => {
+  const cwd = makeTempDir();
+  initGitRepo(cwd);
+  fs.writeFileSync(path.join(cwd, "a.js"), "export const value = 1;\n");
+  run("git", ["add", "a.js"], { cwd });
+  run("git", ["commit", "-m", "init"], { cwd });
+  fs.writeFileSync(path.join(cwd, "tab\tname.js"), 'export const value = "TAB_NAME_MARKER";\n');
+
+  const state = getWorkingTreeState(cwd);
+  const context = collectReviewContext(cwd, resolveReviewTarget(cwd, {}));
+
+  assert.deepEqual(state.untracked, ["tab\tname.js"]);
+  assert.match(context.content, /TAB_NAME_MARKER/);
+});
+
+test("collectReviewContext lists branch files whose names git would quote by their real names", () => {
+  const cwd = makeTempDir();
+  initGitRepo(cwd);
+  fs.writeFileSync(path.join(cwd, "a.js"), "export const value = 1;\n");
+  run("git", ["add", "a.js"], { cwd });
+  run("git", ["commit", "-m", "init"], { cwd });
+  run("git", ["checkout", "-b", "feature"], { cwd });
+  fs.writeFileSync(path.join(cwd, "café.js"), "export const value = 2;\n");
+  run("git", ["add", "café.js"], { cwd });
+  run("git", ["commit", "-m", "add"], { cwd });
+
+  const context = collectReviewContext(cwd, resolveReviewTarget(cwd, { base: "main" }), { includeDiff: false });
+
+  assert.deepEqual(context.changedFiles, ["café.js"]);
+  assert.equal(context.fileCount, 1);
+  assert.match(context.content, /## Changed Files\n\ncafé\.js\n/);
+});
+
 test("collectReviewContext never reads the target of an untracked symlink", () => {
   const secretDir = makeTempDir("copilot plugin secret ");
   const secretFile = path.join(secretDir, "id_key");

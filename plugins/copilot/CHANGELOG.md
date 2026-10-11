@@ -2,6 +2,11 @@
 
 ## Copilot plugin
 
+### 1.0.1
+
+- A review shows a file name with non-ASCII letters as it is, in the status, the file lists and the
+  patches. Before, it showed git's quoted form, such as `"caf\303\251.js"`.
+
 ### 1.0.0
 
 - First release. `/copilot:review`, `/copilot:adversarial-review`, `/copilot:rescue`,
