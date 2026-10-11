@@ -407,7 +407,9 @@ the matching function names in it.
 **Setup**
 
 - **FR-012**: `/copilot:setup` MUST report a clear error, with the next step, when the CLI is
-  missing, its version is not supported, or the user is not logged in.
+  missing, its version is not supported, or the user is not logged in. With the user's own model
+  provider (BYOK), no GitHub login is needed, so setup runs no login check (as upstream, when its
+  provider needs no OpenAI login; wording added 2026-10-11, ticket 8 PR review).
 - **FR-013**: `/copilot:setup` MUST offer to install the CLI once when it is missing and npm is
   available.
 - **FR-014**: `/copilot:setup` MUST turn the review gate on and off.

@@ -34,9 +34,9 @@ claude plugin install copilot@tmathura-copilot
 ```
 
 Inside Claude Code you can use `/plugin marketplace add tmathura/copilot-plugin-cc` and
-`/plugin install copilot@tmathura-copilot` instead, then `/reload-plugins`. Start a new session
-before you use the review gate or background jobs: the plugin's session start hook tells the
-commands where the plugin keeps its state, and it runs only when a session starts.
+`/plugin install copilot@tmathura-copilot` instead, then `/reload-plugins`. Then start a new
+session before you run any `/copilot:*` command: the plugin's session start hook tells the commands
+where the plugin keeps its state, and it runs only when a session starts.
 
 Then run:
 
