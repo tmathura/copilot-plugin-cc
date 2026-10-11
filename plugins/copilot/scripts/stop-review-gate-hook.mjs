@@ -171,6 +171,7 @@ async function cancelCompanionJob(workspaceRoot, pid, reason) {
 // macOS and Linux the companion leads its own process group, so a stop reaches all it started. That
 // group gets no signal sent to the hook's group, so the hook stops it itself.
 async function runCompanionTask(cwd, prompt, options) {
+  const terminate = options.terminateImpl ?? terminateProcessTree;
   const args = [path.join(SCRIPT_DIR, "copilot-companion.mjs"), "task", "--json"];
   if (options.contextDir) {
     args.push("--context-dir", options.contextDir);
@@ -212,13 +213,13 @@ async function runCompanionTask(cwd, prompt, options) {
 
     if (outcome.timedOut || outcome.signal) {
       const reason = outcome.signal ? "The stop-time review was stopped." : "The stop-time review timed out.";
-      try {
-        await terminateProcessTree(child.pid);
-        await cancelCompanionJob(options.workspaceRoot, child.pid, reason);
-      } catch (error) {
-        return { ...outcome, stopError: error instanceof Error ? error.message : String(error) };
-      }
-      return outcome;
+      // A companion that could not be stopped says nothing about its Copilot, so the job is cancelled
+      // either way; the cancel stops the companion again too.
+      const errors = [];
+      const keepError = (error) => errors.push(error instanceof Error ? error.message : String(error));
+      await terminate(child.pid).catch(keepError);
+      await cancelCompanionJob(options.workspaceRoot, child.pid, reason).catch(keepError);
+      return errors.length > 0 ? { ...outcome, stopError: errors.join(" ") } : outcome;
     }
     try {
       await cancelCompanionJob(options.workspaceRoot, child.pid, "The stop-time review's companion ended before its job did.");
@@ -245,7 +246,8 @@ export async function runStopReview(cwd, input = {}, options = {}) {
       contextDir: addDirs[0],
       env: childEnv,
       timeoutMs: Math.max(0, deadline - Date.now()),
-      workspaceRoot
+      workspaceRoot,
+      terminateImpl: options.terminateImpl
     })
   );
 

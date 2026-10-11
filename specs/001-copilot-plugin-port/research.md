@@ -520,7 +520,9 @@ Later tickets apply these rules. The call-site map uses them.
   runs: it stops the companion and cancels its job, as on the limit, with the message "The
   stop-time review was stopped.", removes the patch folder, and exits with 143 or 130. The handlers
   stay until that cleanup ends, so a second signal during the kill wait changes nothing (added
-  2026-10-11, ticket 7 Codex review round 7). Rejected
+  2026-10-11, ticket 7 Codex review round 7). The job is cancelled also when the companion's own
+  stop fails, because that failure says nothing about Copilot; the reason then names both errors
+  (added 2026-10-11, Codex review round 10). Rejected
   alternatives: a limit that starts when the companion starts, which can pass the 900 s timeout;
   no handler, which leaves the companion and Copilot running. When the companion ends on its own,
   the hook also cancels its job if the record still says `running` (the companion died before its

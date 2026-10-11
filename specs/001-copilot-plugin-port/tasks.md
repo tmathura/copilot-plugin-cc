@@ -490,6 +490,8 @@ and to `BLOCK`.
 - [X] T076g [US5] From Codex review round 9: a folder counts as outside Git only when no folder above
   it holds `.git`; inside, a git failure blocks. Tests: a broken repository, a broken `.git` link,
   git missing, and a folder outside Git (research.md §7, gate context folder)
+- [X] T076h [US5] From Codex review round 10: the gate cancels the job also when the companion's own
+  stop fails. Test: a stop that fails on the limit (research.md §7, gate run limit and stop)
 - [X] T077b [US5] From the ticket 7 code review: `SessionEnd` removes only the session's finished
   jobs and the jobs whose processes all stopped; a job whose stop failed, or whose earlier stop never
   finished, keeps its record and the pids whose stop failed; a pid that stopped is cleared (Codex

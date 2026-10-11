@@ -1497,6 +1497,34 @@ test("a gate run past its limit blocks, stops the companion, Copilot and its chi
   }
 });
 
+test("a gate run past its limit still cancels its job and stops Copilot when the companion's own stop fails", async () => {
+  const tasks = setUpTasks("hang", { cwd: makeRepo() });
+  await withCompanionEnv(tasks.env, async () => {
+    const { runStopReview } = await import(pathToFileURL(GATE_HOOK).href);
+    const timeoutMs = 8000;
+
+    const pending = runStopReview(tasks.cwd, { last_assistant_message: "Edited." }, {
+      timeoutMs,
+      terminateImpl: async () => {
+        throw new Error("taskkill failed");
+      }
+    });
+    let job = null;
+    await waitFor(() => {
+      job = findJobByTitle(tasks.dataDir, GATE_TITLE);
+      return job?.copilotPid && readFakeChildPids(tasks.binDir).length > 0;
+    }, timeoutMs);
+    const [[copilotPid, childPid]] = readFakeChildPids(tasks.binDir);
+    const review = await pending;
+
+    assert.equal(review.ok, false);
+    assert.match(review.reason, /timed out after 14 minutes\. taskkill failed Run \/copilot:review/);
+    await waitFor(() => [job.pid, copilotPid, childPid].every((pid) => !isAlive(pid)), 10000);
+    const stopped = findJob(tasks.dataDir, job.id);
+    assert.deepEqual([stopped.status, stopped.pid, stopped.copilotPid], ["cancelled", null, null]);
+  });
+});
+
 test("a gate whose companion is killed outright cancels its job, stops Copilot and its child, and blocks", async () => {
   const repo = makeLargeRepo();
   const tasks = setUpTasks("hang", { cwd: repo });
