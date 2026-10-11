@@ -1394,6 +1394,32 @@ test("the gate blocks when git fails in a repository, also when git is missing",
   }
 });
 
+test("with git broken, the gate in a subfolder still finds its setting and blocks, and SessionEnd still closes the session", () => {
+  const { gate, repo, runs, env, dataDir } = setUpGate("ok");
+  const before = runs().length;
+  fs.rmSync(path.join(repo, ".git"), { recursive: true, force: true });
+  fs.writeFileSync(path.join(repo, ".git"), "gitdir: missing-folder\n");
+  const subfolder = path.join(repo, "src");
+
+  const result = gate({ cwd: subfolder, last_assistant_message: "Edited src/app.js." });
+
+  assert.equal(result.status, 0, result.stderr);
+  const { decision, reason } = JSON.parse(result.stdout);
+  assert.equal(decision, "block");
+  assert.match(reason, /^The stop-time Copilot review task failed: /);
+  assert.equal(runs().length, before);
+
+  const end = run(process.execPath, [SESSION_HOOK, "SessionEnd"], {
+    cwd: subfolder,
+    env,
+    input: JSON.stringify({ session_id: "broken-git-session", cwd: subfolder })
+  });
+  assert.equal(end.status, 0, end.stderr);
+  // One workspace folder: the one that setup made for the repository root.
+  assert.equal(fs.readdirSync(path.join(dataDir, "state")).length, 1);
+  assert.deepEqual(readClosedSessions(dataDir).map((entry) => entry.id), ["broken-git-session"]);
+});
+
 test("outside Git, the gate runs with a note that there is no diff, and still removes stale folders", () => {
   const { gate, gateRun, dataDir } = setUpGate("ok", {
     repo: makeTempDir(),

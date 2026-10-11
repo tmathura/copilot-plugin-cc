@@ -554,6 +554,13 @@ Later tickets apply these rules. The call-site map uses them.
   `COPILOT_COMPANION_LAUNCHED_AT`, and the check uses the earlier of the two times. Rejected
   alternative: the hook reads `closedSessions` before it starts the companion, which leaves a gap
   between the read and the companion's job creation.
+- **Workspace when git fails** (decided 2026-10-11, ticket 7 PR review round 5; correctness):
+  `resolveWorkspaceRoot` falls back to the nearest folder above the real path that holds `.git`
+  when git fails, and only then to the working folder. The state folder is keyed by the workspace,
+  and setup saves the gate setting under the repository root. Upstream falls back to the working
+  folder, so with git broken and Claude in a subfolder, the gate read a fresh default ("off") and
+  `SessionEnd` closed the session in an unrelated state file. Rejected alternative: upstream's
+  fallback. The gate's outside-Git check uses the same `findGitMarkerRoot`.
 - **The gate's job is never resumed** (decided 2026-10-11, ticket 7 code review; correctness): the
   gate runs as a read-only task titled "Copilot Stop Gate Review". Its session reviews Claude's
   turn, so `--resume-last`, `task-resume-candidate` and `findLatestTaskThread` skip a job with a

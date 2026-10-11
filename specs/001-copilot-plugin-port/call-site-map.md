@@ -135,7 +135,8 @@ repo root.
 | same → `resolveCancelableJob` | Matches an explicit reference only among active jobs | Matches it against all jobs first, then refuses a job that is not queued or running, unless a stop of its processes did not finish (§7, stopping a job; correctness; added 2026-10-09) | 6 |
 | `scripts/lib/render.mjs` → `formatCodexResumeCommand` and the result renderers | `codex resume <threadId>`, "Codex session ID" | `copilot --resume=<sessionId>` and "Copilot session ID" for write tasks. Read-only jobs show only the session id, with no command: an interactive command would put trust in the plugin home (§7), and the companion's `--resume` means "the newest task", not this session | 3 |
 | same → titles and hints | "# Codex Setup", `- codex:`, `/codex:*` | Rename only | 3 |
-| `scripts/lib/args.mjs`, `scripts/lib/prompts.mjs`, `scripts/lib/workspace.mjs` | No Codex calls | Copied unchanged | 3 |
+| `scripts/lib/args.mjs`, `scripts/lib/prompts.mjs` | No Codex calls | Copied unchanged | 3 |
+| `scripts/lib/workspace.mjs` → `resolveWorkspaceRoot` | Git's top folder, or the working folder when git fails | Copied unchanged in ticket 3. When git fails, it now falls back to the nearest folder above the real path that holds `.git` (`findGitMarkerRoot`), and only then to the working folder, so the hooks find the state saved under the repository root (§7, workspace when git fails; added 2026-10-11) | 3, 7 |
 | `scripts/lib/claude-session-transfer.mjs` | Finds the Claude transcript for `transfer` | Dropped | 3 |
 
 ## Prompts, schema, commands, agent and skills

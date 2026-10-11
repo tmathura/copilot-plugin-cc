@@ -22,7 +22,7 @@ import { loadPromptTemplate, interpolateTemplate } from "./lib/prompts.mjs";
 import { LAUNCHED_AT_ENV, listJobs, loadState, processStartedAtMs, resolveJobsDir } from "./lib/state.mjs";
 import { sortJobsNewestFirst } from "./lib/job-control.mjs";
 import { SESSION_ID_ENV, STOP_GATE_RUN_ENV } from "./lib/tracked-jobs.mjs";
-import { resolveWorkspaceRoot } from "./lib/workspace.mjs";
+import { findGitMarkerRoot, resolveWorkspaceRoot } from "./lib/workspace.mjs";
 
 // The hook's own timeout is 900 s. The rest is for the stop, the cleanup and the answer.
 const STOP_REVIEW_TIMEOUT_MS = 14 * 60 * 1000;
@@ -93,26 +93,9 @@ function removeStaleGateFolders(workspaceRoot) {
 }
 
 // Git's own error text can be translated, so a folder counts as outside Git only when no folder above
-// it holds .git. Any other git failure must block the stop, not pass as "no diff". Git looks from the
-// real path, so a repository opened through a link is found the same way.
+// it holds .git. Any other git failure must block the stop, not pass as "no diff".
 function isOutsideGit(cwd) {
-  if (process.env.GIT_DIR) {
-    return false;
-  }
-  let start = path.resolve(cwd);
-  try {
-    start = fs.realpathSync.native(start);
-  } catch {
-    // A folder that cannot be resolved is walked as written.
-  }
-  for (let dir = start; ; dir = path.dirname(dir)) {
-    if (fs.existsSync(path.join(dir, ".git"))) {
-      return false;
-    }
-    if (path.dirname(dir) === dir) {
-      return true;
-    }
-  }
+  return !process.env.GIT_DIR && findGitMarkerRoot(cwd) === null;
 }
 
 // The read-only profile has no shell, so Copilot cannot run git to see the changes. Above the inline

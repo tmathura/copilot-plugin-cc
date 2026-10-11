@@ -510,6 +510,10 @@ and to `BLOCK`.
   200 ms retry limit. Tests: the kept
   job's file after a failed stop; a job file that cannot be written does not stop the close or the
   stop (research.md §7, hook time budgets)
+- [X] T077f [US5] From PR review round 5: `resolveWorkspaceRoot` falls back to the nearest folder
+  above the real path that holds `.git` when git fails. Test: with git broken, the gate in a
+  subfolder blocks and `SessionEnd` closes the session in the repository's state (research.md §7,
+  workspace when git fails)
 - [X] T077b [US5] From the ticket 7 code review: `SessionEnd` removes only the session's finished
   jobs and the jobs whose processes all stopped; a job whose stop failed, or whose earlier stop never
   finished, keeps its record and the pids whose stop failed; a pid that stopped is cleared (Codex

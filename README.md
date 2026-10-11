@@ -154,6 +154,9 @@ claude plugin install copilot@tmathura-copilot
   blocks the stop and says why. Codex's hook fails with an error that Claude Code does not treat as
   a block, so the stop goes through unreviewed. A missing Copilot still gives only a note, as in
   Codex.
+- When `git` fails, the plugin uses the nearest folder above that holds `.git` as the workspace,
+  not the current folder. So the hooks still find the plugin's state for that repository when
+  Claude works in a subfolder. Codex uses the current folder.
 - `/copilot:rescue --resume` never continues the review gate's session. In Codex it can.
 - If a review gate hook is killed outright, a later gate deletes the patch folder that it left.
 - When a Claude session ends, the plugin first marks the session closed and its active jobs
