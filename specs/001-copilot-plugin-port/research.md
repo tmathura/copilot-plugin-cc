@@ -517,6 +517,13 @@ Later tickets apply these rules. The call-site map uses them.
   stop-time review was stopped.", removes the patch folder, and exits with 143 or 130. Rejected
   alternatives: a limit that starts when the companion starts, which can pass the 900 s timeout;
   no handler, which leaves the companion and Copilot running.
+- **The gate's companion counts from the hook's start** (decided 2026-10-11, ticket 7 Codex review
+  round 1; correctness): a session can end while the gate hook still collects the context, and the
+  companion that the hook starts after that would pass the closed-session check, which compares
+  `closedAt` with the companion's own start. So the hook passes its own start time in
+  `COPILOT_COMPANION_LAUNCHED_AT`, and the check uses the earlier of the two times. Rejected
+  alternative: the hook reads `closedSessions` before it starts the companion, which leaves a gap
+  between the read and the companion's job creation.
 - **The gate's job is never resumed** (decided 2026-10-11, ticket 7 code review; correctness): the
   gate runs as a read-only task titled "Copilot Stop Gate Review". Its session reviews Claude's
   turn, so `--resume-last`, `task-resume-candidate` and `findLatestTaskThread` skip a job with that

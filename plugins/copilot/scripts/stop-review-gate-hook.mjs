@@ -16,7 +16,7 @@ import { getCopilotAvailability } from "./lib/copilot.mjs";
 import { collectReviewContext, ensureGitRepository, resolveReviewTarget } from "./lib/git.mjs";
 import { terminateProcessTree } from "./lib/process.mjs";
 import { loadPromptTemplate, interpolateTemplate } from "./lib/prompts.mjs";
-import { getConfig, listJobs, resolveJobsDir } from "./lib/state.mjs";
+import { getConfig, LAUNCHED_AT_ENV, listJobs, processStartedAtMs, resolveJobsDir } from "./lib/state.mjs";
 import { sortJobsNewestFirst } from "./lib/job-control.mjs";
 import { SESSION_ID_ENV } from "./lib/tracked-jobs.mjs";
 import { resolveWorkspaceRoot } from "./lib/workspace.mjs";
@@ -213,7 +213,8 @@ export async function runStopReview(cwd, input = {}, options = {}) {
   const workspaceRoot = resolveWorkspaceRoot(cwd);
   const childEnv = {
     ...process.env,
-    ...(input.session_id ? { [SESSION_ID_ENV]: input.session_id } : {})
+    ...(input.session_id ? { [SESSION_ID_ENV]: input.session_id } : {}),
+    [LAUNCHED_AT_ENV]: String(processStartedAtMs())
   };
   const result = await withStopReviewContext(cwd, workspaceRoot, ({ reviewInput, addDirs }) =>
     runCompanionTask(cwd, buildStopReviewPrompt(input, reviewInput), {

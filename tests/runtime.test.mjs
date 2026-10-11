@@ -1681,6 +1681,16 @@ test("after SessionEnd, a companion from before the close cannot create, claim o
       );
       const worker = tasks.companion(["task-worker", "--job-id", queued.job.id]);
       assert.notEqual(worker.status, 0);
+      // A gate hook that started before the close starts its companion only now; that companion
+      // counts from the hook's start.
+      const { runStopReview } = await import(pathToFileURL(GATE_HOOK).href);
+      const review = await runStopReview(
+        tasks.cwd,
+        { session_id: sessionId, last_assistant_message: "Edited." },
+        { timeoutMs: 20000 }
+      );
+      assert.equal(review.ok, false);
+      assert.match(review.reason, /Claude session closed-session has ended/);
       assert.deepEqual(tasks.runs(), []);
 
       const resumed = tasks.companion(["task", "after resume"], {

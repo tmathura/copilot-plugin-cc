@@ -154,7 +154,7 @@ claude plugin install copilot@tmathura-copilot
 - If a review gate hook is killed outright, a later gate deletes the patch folder that it left.
 - When a Claude session ends, the plugin first marks the session closed and its active jobs
   cancelled, in one step. A companion that started before the session ended cannot start a job for
-  it. Then the plugin stops the jobs' processes, with one shared wait of up to 2 seconds, and
+  it, and neither can a companion that a review gate hook from before that time starts later. Then the plugin stops the jobs' processes, with one shared wait of up to 2 seconds, and
   removes the session's finished jobs and the jobs it stopped. A job that another session, or the
   same session after `claude --resume`, starts in the meantime stays. A job whose processes could
   not be stopped keeps its record, so `/copilot:cancel` can try again. All of this ends inside the

@@ -476,6 +476,10 @@ and to `BLOCK`.
   waits once (up to 2 s), sends `SIGKILL` to survivors, then removes only the job ids captured in the first step
   through `updateState` on fresh state with the lock wait limited to the time left (research.md §7,
   hook time budgets and locked state updates). Changed 2026-10-11: the budget is 3.5 s
+- [X] T076c [US5] From Codex review round 1: the gate passes its start time in
+  `COPILOT_COMPANION_LAUNCHED_AT`, and the closed-session check uses the earlier of that and the
+  companion's start. Test: after `SessionEnd`, a gate from the old launch is refused and starts no
+  Copilot (research.md §7, the gate's companion counts from the hook's start)
 - [X] T077b [US5] From the ticket 7 code review: `SessionEnd` removes only the session's finished
   jobs and the jobs whose processes all stopped; a job whose stop failed, or whose earlier stop never
   finished, keeps its record and pids. Test with a stop that fails (research.md §7, hook time

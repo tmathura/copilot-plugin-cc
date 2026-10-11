@@ -2,7 +2,8 @@
 // updateState holds a lock file and writes through a rename; saveState is removed, so no writer saves
 // an earlier snapshot; pruning keeps every active job and also removes a job's review patch folder;
 // state records closed Claude sessions; on Windows, a file replace or read that meets another process
-// is retried; it names the review gate's job title, so resume can skip that job.
+// is retried; it names the review gate's job title, so resume can skip that job; a companion that a
+// hook starts counts from the hook's start for the closed-session check.
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -376,8 +377,14 @@ export function updateState(cwd, mutate, options = {}) {
   }
 }
 
-function processStartedAtMs() {
-  return Date.now() - process.uptime() * 1000;
+export const LAUNCHED_AT_ENV = "COPILOT_COMPANION_LAUNCHED_AT";
+
+// A companion that a hook starts counts from the hook's own start: a session that ends while the hook
+// still prepares must refuse that companion too.
+export function processStartedAtMs() {
+  const ownStart = Date.now() - process.uptime() * 1000;
+  const launchedAt = Number(process.env[LAUNCHED_AT_ENV]);
+  return launchedAt > 0 ? Math.min(ownStart, launchedAt) : ownStart;
 }
 
 // A resumed Claude session keeps its id, so only companions from before the close are refused.
