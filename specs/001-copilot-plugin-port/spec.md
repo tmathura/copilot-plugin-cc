@@ -124,6 +124,54 @@ and the optional Stop-hook review gate. Drop transfer. The first ticket chooses 
   `--fresh`; the companion takes the mode from the resumed job, which would ignore an explicit
   `--write`.
 
+### Session 2026-10-11
+
+- Q: What happens to the gate's job when the gate run passes its limit? → A: The gate stops the
+  companion's process tree, then cancels the job found by the gate's run id (`stopGateRunId`; the
+  companion's `pid` until PR review round 2, rejected because a pid can be reused), as `cancel` does:
+  the job is `cancelled` with "The stop-time review timed out.", and its Copilot process is stopped
+  (decided 2026-10-11, ticket 7; correctness; research.md §7, stopping a job). Rejected
+  alternatives: upstream, which leaves the job `running`, so it blocks `--resume-last` and every
+  later stop reports it; a kill of the Copilot process that does not change the record.
+- Q: Where is the gate's patch folder, and what does the gate do outside Git? → A: In the plugin's
+  job storage, `jobs/stop-gate-<hook pid>-<random>.patches`, removed when the hook ends; a later
+  gate removes the folder of a hook that was killed outright. Outside a Git repository the prompt
+  says there is no diff, and the gate runs as upstream's does (decided 2026-10-11, ticket 7 and its
+  code review; research.md §7, gate context folder). Rejected alternatives: the OS temp folder; a
+  folder that nothing cleans up; refusing the gate outside Git.
+- Q: When does the gate's 840 s limit start, and what happens when the hook itself is stopped? → A:
+  At the hook's start. A hook stopped with `SIGTERM` or `SIGINT` stops its companion, cancels the job
+  and removes the patch folder. If the companion itself dies before its job ends, the hook cancels
+  the job, which stops its Copilot (added 2026-10-11, Codex review round 5) (decided 2026-10-11, ticket 7 code review; research.md §7, gate run
+  limit and stop). Rejected alternatives: a limit from the companion's start; leaving the companion
+  running.
+- Q: Can the gate start Copilot when the session ends while the hook still prepares? → A: No. The
+  hook passes its own start time to the companion, and the closed-session check uses it (decided
+  2026-10-11, ticket 7 Codex review round 1; research.md §7). Rejected alternative: a check in the
+  hook before it starts the companion, which leaves a gap.
+- Q: Does `SessionEnd` record the close in a workspace that has no job state yet? → A: Yes, so a
+  companion that was still preparing the first job is refused (decided 2026-10-11, ticket 7 Codex
+  review round 2; research.md §7, hook time budgets). Rejected alternative: upstream's early return
+  when there is no state file.
+- Q: Can `/copilot:rescue --resume` continue the gate's review session? → A: No. Resume skips the
+  gate's job, which its record marks with the gate's run id (not by its title, which a user's
+  prompt can trigger), and a running gate job does not count as a running task
+  (decided 2026-10-11, ticket 7 code review and PR review; research.md §7). Rejected alternative:
+  upstream, where it can.
+- Q: What does the gate do when the job state cannot be read? → A: It prints a note that names the
+  file and lets Claude stop, because whether the gate is on is unknown (decided 2026-10-11, ticket 7
+  PR review; research.md §7). Rejected alternative: block, which would block every stop of every
+  user, also those who never turned the gate on.
+- Q: How much of its 5 s timeout does `SessionEnd` use, and which jobs does it remove? → A: 3.5 s
+  from the start of its cleanup. It stops the processes of the session's queued and running jobs,
+  then removes the session's finished jobs and the jobs it stopped. A job whose stop failed, and a
+  job whose earlier stop did not finish, keep their record and the pids that may still run, for
+  `/copilot:cancel` (decided
+  2026-10-11, ticket 7 and its code review; research.md §7, hook time budgets). Rejected
+  alternatives: the full 5 s, which Claude Code would cut off; removing every job of the session,
+  which loses the pids of a process that still runs; signalling the old pids of an earlier failed
+  stop, which may belong to another program by now.
+
 ## User Scenarios & Testing *(mandatory)*
 
 The user is a developer who works in Claude Code and has the GitHub Copilot CLI. The owner is the
@@ -245,7 +293,8 @@ it ends, and cancel a second task while it runs.
 ### User Story 5 - Review gate before Claude stops (Priority: P3)
 
 When the review gate is on, Copilot reviews Claude's last turn before Claude stops. If Copilot finds
-a problem, Claude must keep working. If not, Claude stops.
+a problem, or the review cannot give an answer, Claude must keep working. If Copilot allows the
+stop, Claude stops (changed 2026-10-11, ticket 7 PR review; see scenario 5).
 
 **Why this priority**: It is optional and off by default.
 
@@ -259,6 +308,10 @@ leaves clean work. The first is blocked, the second is not.
    blocked and Claude gets the reason.
 3. **Given** the gate is on and Copilot finds nothing, **When** Claude stops, **Then** Claude stops.
 4. **Given** the gate is on, **When** the review runs, **Then** it is read-only, as in User Story 2.
+5. **Given** the gate is on and the review cannot give an answer (it fails, times out, or gives an
+   answer that is neither `ALLOW:` nor `BLOCK:`), **When** Claude stops, **Then** the stop is blocked
+   with the reason, as upstream does. A missing Copilot, or a job state that cannot be read, gives
+   only a note (added 2026-10-11, ticket 7 PR review).
 
 ---
 
@@ -288,7 +341,7 @@ the matching function names in it.
   error lines, and does not guess.
 - Copilot exits with a non-zero code. The plugin reports the failure and stops.
 - A run keeps going for a long time. Like upstream, there is no general deadline: the user cancels
-  it, and the review gate stops after 14 minutes (840 s). A process that sends its final event but does not
+  it, and the review gate stops 14 minutes (840 s) after its hook starts. A process that sends its final event but does not
   exit is killed after a short grace period.
 - The user cancels a job whose process has already ended. Cancel reports the true state.
 - There is nothing to review. The command says so only when the chosen scope is really empty,
@@ -374,7 +427,10 @@ the matching function names in it.
 **Review gate and session hooks**
 
 - **FR-025**: The plugin MUST offer an optional Stop-hook review gate, off by default, that blocks a
-  stop only when Copilot finds a problem.
+  stop when Copilot finds a problem, and also when the review cannot give an `ALLOW:` answer (it
+  fails, times out or answers something else), as upstream does. A missing Copilot gives only a
+  note (changed 2026-10-11, ticket 7 PR review; the earlier text said "only when Copilot finds a
+  problem", which did not match upstream).
 - **FR-026**: The plugin MUST have session start and end hooks that do the same job as upstream.
 
 **Safety and platform**

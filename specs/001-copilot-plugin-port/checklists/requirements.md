@@ -42,3 +42,13 @@
 - FR-024 and SC-007 hold: cancel stops the companion and Copilot at the same time, within one 5 s
   wait and a `SIGKILL`; a process that cannot be stopped keeps its pid in the job, so cancel can run
   again (research.md §7, stopping a job, 2026-10-09).
+- FR-025 was changed to match upstream: the gate also blocks when its review cannot give an
+  `ALLOW:` answer; a missing Copilot or an unreadable job state gives only a note (research.md §7,
+  gate run limit and stop, 2026-10-11).
+- FR-026 holds: `SessionStart` exports the session id and the plugin data folder; `SessionEnd`
+  closes the session, cancels and stops its jobs inside a 3.5 s budget, and keeps a job whose stop
+  failed for a later cancel (research.md §7, hook time budgets, 2026-10-11).
+- FR-017 holds for the gate: its patch folder is in the plugin's job storage, outside the repository
+  (research.md §7, gate context folder, 2026-10-11).
+- SC-007 holds for the gate: on its limit, or when its hook is stopped, it stops the companion and
+  cancels the job, which stops Copilot (research.md §7, gate run limit and stop, 2026-10-11).

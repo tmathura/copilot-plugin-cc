@@ -31,7 +31,9 @@ GitHub Copilot instead of Codex:
 - commands/review.md
 - commands/setup.md
 - commands/status.md
+- hooks/hooks.json
 - prompts/adversarial-review.md
+- prompts/stop-review-gate.md
 - skills/copilot-cli-runtime/SKILL.md (from skills/codex-cli-runtime/SKILL.md)
 - skills/copilot-result-handling/SKILL.md (from skills/codex-result-handling/SKILL.md)
 - skills/gpt-5-4-prompting/SKILL.md

@@ -488,10 +488,98 @@ Later tickets apply these rules. The call-site map uses them.
   - The rule for every stopper (cancel, `SessionEnd`, the review gate): stop the companion, and
     also stop the `copilotPid` of its job record itself. Never rely only on the companion's `SIGTERM`
     handler, because the companion can be killed before the handler finishes. The gate finds the
-    record by the companion's `pid`.
+    record by its run id, `stopGateRunId` (changed 2026-10-11, PR review round 2; rejected
+    alternative: the companion's `pid`, which can be reused; see "Gate run limit and stop").
+  - The gate on its limit first stops the companion's process tree, so no new Copilot can start.
+    Then it finds the job record by its run id and cancels that job as `cancel` does:
+    the job becomes `cancelled` with the message "The stop-time review timed out.", its `copilotPid`
+    is stopped, and each pid is cleared when its stop is done (decided 2026-10-11, ticket 7;
+    correctness). Reason: the timed-out companion never writes its final status, so its record stays
+    `running`. It would block every later `--resume-last`, and each later `Stop` would report it as a
+    running task. Rejected alternatives: upstream, which leaves the record `running`; a plain kill of
+    `copilotPid` that does not change the record.
 - **Gate context folder**: the gate hook writes the patch folder (§2) and passes it to the companion
   with the internal `task` option `--context-dir <path>`. The adapter turns it into `--add-dir`. The
-  hook removes the folder in a `finally` step, after success, failure or a timeout kill.
+  hook removes the folder in a `finally` step, after success, failure or a timeout kill. The folder
+  is `jobs/stop-gate-<hook pid>-<random>.patches` in the plugin's job storage, because the hook
+  writes it before the companion makes its job. The hook writes and removes it with the companion's
+  `withReviewPatches`, as a review does. No job record names the folder, so pruning never removes
+  it: at the start of each run, also outside Git, the gate removes each `stop-gate-*` folder whose
+  hook pid has ended, which a hook killed outright left behind (also outside Git added 2026-10-11,
+  PR review). Outside a Git repository the context says
+  that there is no diff, and the gate still runs, as upstream's does (all decided 2026-10-11,
+  ticket 7 and its code review). A folder counts as outside Git only when `GIT_DIR` is not set and
+  no folder above its real path holds `.git` (real path added 2026-10-11, PR review round 4: git
+  looks from the real path, so a repository opened through a link must not pass as outside Git); inside, any git failure (a broken repository, unsafe ownership,
+  git missing) blocks the stop, because Git's own message can be translated and so cannot tell
+  these cases apart (added 2026-10-11, Codex review round 9; rejected alternative: every
+  `ensureGitRepository` failure counts as outside Git, so a broken repository passes as "no diff"). Rejected alternatives: the OS temp folder, because a review writes
+  only the plugin's own job files (constitution IV); a folder named by time only, which nothing
+  could ever clean up; refusing the gate outside Git, which upstream does not do.
+- **Gate run limit and stop** (decided 2026-10-11, ticket 7 code review; correctness): the 840 s
+  count from the hook's start, so the version check and the context collection come out of them
+  too. The companion leads its own process group on macOS and Linux, so a signal to the hook's
+  group does not reach it. The hook therefore handles `SIGTERM` and `SIGINT` while the companion
+  runs: it stops the companion and cancels its job, as on the limit, with the message "The
+  stop-time review was stopped.", removes the patch folder, and exits with 143 or 130. The handlers
+  stay until that cleanup ends, so a second signal during the kill wait changes nothing (added
+  2026-10-11, ticket 7 Codex review round 7). The job is cancelled also when the companion's own
+  stop fails, because that failure says nothing about Copilot; the reason then names both errors
+  (added 2026-10-11, Codex review round 10). Rejected
+  alternatives: a limit that starts when the companion starts, which can pass the 900 s timeout;
+  no handler, which leaves the companion and Copilot running. When the companion ends on its own,
+  the hook also cancels its job if the record still says `running` (the companion died before its
+  final status write), with the message "The stop-time review's companion ended before its job
+  did.", so its Copilot, in its own process group, is stopped too (added 2026-10-11, ticket 7
+  Codex review round 5). With the gate on, an error in the gate run itself (the git context, the
+  patch folder, the companion start) blocks the stop with "The stop-time Copilot review task
+  failed: <error>", as a failed companion does (added 2026-10-11, Codex review round 8). Rejected
+  alternative: upstream's exit 1, which Claude Code treats as a hook error that does not block, so
+  the stop goes through unreviewed. A missing or unsupported Copilot still gives only a note, as
+  upstream. A job state that cannot be read also gives a note that names the file, and no block,
+  because whether the gate is on is then unknown (added 2026-10-11, PR review; rejected
+  alternatives: upstream's silent fallback to "off"; a block, which would stop every user, also
+  those who never turned the gate on). Each gate run has a random run id, which the hook passes in
+  `COPILOT_COMPANION_STOP_GATE_RUN_ID`; the companion's job record keeps it as `stopGateRunId`. The
+  hook finds its job by that id, with a strict state read (changed 2026-10-11, PR review round 2;
+  rejected alternatives: the companion's `pid`, which can be reused, also with a title and
+  `createdAt` check, which a newer gate can still match; a non-strict read, which turns an
+  unreadable state into "no job"). The signal handlers are installed before the companion starts,
+  so a signal at any moment stops it (PR review round 2). `main` takes the run limit as an option,
+  so a test can run the whole hook in a child process.
+- **The gate's companion counts from the hook's start** (decided 2026-10-11, ticket 7 Codex review
+  round 1; correctness): a session can end while the gate hook still collects the context, and the
+  companion that the hook starts after that would pass the closed-session check, which compares
+  `closedAt` with the companion's own start. So the hook passes its own start time in
+  `COPILOT_COMPANION_LAUNCHED_AT`, and the check uses the earlier of the two times. Rejected
+  alternative: the hook reads `closedSessions` before it starts the companion, which leaves a gap
+  between the read and the companion's job creation.
+- **Workspace when git fails** (decided 2026-10-11, ticket 7 PR review round 5; correctness):
+  `resolveWorkspaceRoot` falls back to the nearest folder above the real path that holds `.git`
+  when git fails, and only then to the working folder. The state folder is keyed by the workspace,
+  and setup saves the gate setting under the repository root. Upstream falls back to the working
+  folder, so with git broken and Claude in a subfolder, the gate read a fresh default ("off") and
+  `SessionEnd` closed the session in an unrelated state file. Rejected alternative: upstream's
+  fallback. The gate's outside-Git check uses the same `findGitMarkerRoot`. A `.git` entry counts
+  even when it is a link whose target is gone (`lstat`, not `existsSync`, which follows links), so
+  a broken repository is never taken for a plain folder (added 2026-10-11, PR review round 6).
+- **The gate's job is never resumed** (decided 2026-10-11, ticket 7 code review; correctness): the
+  gate runs as a read-only task titled "Copilot Stop Gate Review". Its session reviews Claude's
+  turn, so `--resume-last`, `task-resume-candidate` and `findLatestTaskThread` skip a job with a
+  `stopGateRunId`, and a running gate job does not count as a running task for `--resume-last`
+  (added 2026-10-11, PR review). The title alone does not mark a gate job, because the companion
+  sets it for any prompt that holds the gate's marker sentence, which a user's own task can quote
+  (changed 2026-10-11, PR review round 2). Rejected alternative: upstream, where the gate's job can become the task
+  that `/copilot:rescue --resume` continues.
+- **Reading a prompt from stdin** (decided 2026-10-11, ticket 7 code review and PR review;
+  correctness): `readStdinIfPiped` checks for a terminal with `tty.isatty(0)`, and reads with
+  `readStdinSync`, which waits 10 ms and reads again on `EAGAIN`. The two hooks read their input
+  the same way. Upstream reads `process.stdin.isTTY`, which opens `process.stdin`, and then
+  `readFileSync(0)`. A pipe from a Node parent can be non-blocking, on macOS also when
+  `process.stdin` was never opened (seen on macOS CI), and `readFileSync(0)` then fails with
+  `EAGAIN` when the parent has not written everything yet. The gate's prompt and its hook input
+  both hold Claude's last message, so they can be large. Rejected alternative: only the
+  `tty.isatty(0)` check, which macOS CI showed is not enough.
 - **Background start order** (decided 2026-10-08, after Copilot PR review): `enqueueBackgroundTask`
   writes the `queued` job record, with its stored request, before it starts the worker. Then it
   stores the worker's `pid` through `updateState`, only if the job is still `queued`, so it never
@@ -532,8 +620,10 @@ Later tickets apply these rules. The call-site map uses them.
 - **Hook time budgets**: Claude Code stops a hook at its `hooks.json` timeout (`Stop` 900 s,
   `SessionEnd` 5 s, as upstream), and then no cleanup runs. So each hook does its work inside a
   smaller budget.
-  - `Stop`: the gate's run limit is 840 s (upstream: 900 s). The other 60 s cover collecting the
-    context, the kill wait, removing the patch folder and printing the decision.
+  - `Stop`: the gate's run limit is 840 s (upstream: 900 s). The other 60 s cover the kill wait,
+    removing the patch folder and printing the decision. The 840 s count from the hook's start, so
+    the version check and collecting the context come out of them (changed 2026-10-11, ticket 7
+    code review; rejected alternative: count from the companion's start).
   - `SessionEnd`: first, inside one `updateState`, it adds the session id to `closedSessions`,
     marks all the session's queued and running jobs `cancelled`, and reads the `pid` and
     `copilotPid` of the running ones. Creating a job, claiming one and starting Copilot all happen
@@ -558,10 +648,31 @@ Later tickets apply these rules. The call-site map uses them.
     either claimed before this step or finds its job cancelled. Not covered: an outside `kill -9`
     that lands inside that block. Rejected alternative: a supervisor process that gates every
     Copilot start, which upstream does not have, for a window of a few milliseconds. Then it sends `SIGTERM` to every recorded `pid` and
-    `copilotPid`, waits once, up to 2 s in total, and sends `SIGKILL` to what is still alive. Last, it
-    removes, through `updateState`, only the job ids it captured in the first step, so a job that a
-    resumed session starts meanwhile keeps its record. Each lock wait is limited to the time left in
-    its 5 s budget. It never waits per job.
+    `copilotPid`, waits once, up to 2 s in total, and sends `SIGKILL` to what is still alive. The
+    wait leaves 500 ms of the budget for the last update (added 2026-10-11, PR review). Last, it
+    removes, through `updateState`, only job ids it captured in the first step (which ones, below),
+    so a job that a resumed session starts meanwhile keeps its record. Each lock wait is limited to the time left in
+    its budget. It never waits per job. The budget is 3.5 s from the start of the cleanup, inside
+    the 5 s timeout, because Node's own start and a slow machine also use that time (changed
+    2026-10-11, ticket 7: a held lock took 4.35 s with a 4 s budget on Windows). Rejected
+    alternative: the full 5 s, which Claude Code would cut off. The last step removes the session's
+    finished jobs and the jobs whose processes all stopped. Both updates also write the job file
+    (`jobs/<id>.json`) of each job they change, as cancel does, so the two records agree (added
+    2026-10-11, PR review round 4). That write is best effort, and all the job files of one update share
+    one limit of at most 200 ms, within the cleanup budget, for the Windows retries of their reads
+    and writes: the state entry is what closes the session and stops the jobs, so a job file that
+    cannot be written must not stop either (Codex check of that fix; rejected alternative: a failed
+    job-file write fails the whole update, so nothing is closed or stopped). A job whose stop failed keeps its
+    `cancelled` record with only the pids whose stop failed, as cancel does, because a stopped pid
+    can be reused (Codex review round 3), and a cancelled or failed job that already named a pid because
+    an earlier stop did not finish is left as it is, so `/copilot:cancel` can stop them later (added
+    2026-10-11, ticket 7 code review; correctness). The close is recorded even when the workspace
+    has no `state.json` yet, because a companion may still be preparing the first job (added
+    2026-10-11, ticket 7 Codex review round 2; correctness; rejected alternative: upstream's early
+    return, which lets that companion start after the session ended). So every session end writes
+    a small state file in the plugin's data folder. Rejected alternatives: removing every captured
+    job, which loses the only record of a process that still runs; also signalling the old pids of
+    an earlier failed stop, which may belong to another program by now.
 
 - **Locked state updates** (decided 2026-10-08, after Copilot PR review): `updateState` holds a lock
   file, `state.json.lock`, for the whole read, change, save and prune. It creates the lock with an
@@ -610,7 +721,10 @@ Later tickets apply these rules. The call-site map uses them.
   one process reading `state.json` in a loop, most renames over it failed, and some reads found no
   file. So the state module retries a rename that fails with `EPERM`, `EACCES` or `EBUSY`, and a
   read that fails with one of these or with `ENOENT` while the state lock exists, for up to 2
-  seconds (decided 2026-10-09, ticket 6; correctness, platform support). Writers replace these
+  seconds (decided 2026-10-09, ticket 6; correctness, platform support). An update can take an
+  absolute `deadline`, which also ends these retries; `SessionEnd` passes the end of its budget, so
+  a held lock and a busy file together cannot push it past its 5 s timeout (added 2026-10-11,
+  ticket 7 Codex review round 4; rejected alternative: a lock wait limit only). Writers replace these
   files only under the state lock, so a missing file is retried only while another process holds
   that lock, or when the file is back by the time the reader checks (the writer has finished); with
   no lock, or with the reader's own lock, the file is missing for real. Rejected alternatives: no retry, where a job fails,

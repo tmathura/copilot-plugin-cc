@@ -5,7 +5,8 @@
 // adversarial review's JSON against the schema. A background task's record is written before its
 // worker starts, the worker claims the job under the state lock, every run starts Copilot under that
 // lock, and cancel marks the job cancelled under it before it stops the job's processes. Resume stays
-// in one mode, and there is no spark model alias.
+// in one mode, never into a review gate job, and there is no spark model alias. The task command takes
+// the review gate's internal --context-dir option.
 
 import { spawn } from "node:child_process";
 import fs from "node:fs";
@@ -294,7 +295,7 @@ function validateNativeReviewRequest(target, focusText) {
 
 // Copilot has no shell in a review, so above the inline limit it reads the exact patches from a folder
 // in the job's own storage. The folder is removed after the run, whatever the outcome.
-async function withReviewPatches(context, request, run) {
+export async function withReviewPatches(context, request, run) {
   if (context.inputMode !== "self-collect") {
     return run({ reviewInput: context.content, addDirs: [] });
   }
@@ -478,6 +479,7 @@ function findLatestResumableTaskJob(jobs, write = null) {
     jobs.find(
       (job) =>
         job.jobClass === "task" &&
+        !job.stopGateRunId &&
         job.threadId &&
         job.status !== "queued" &&
         job.status !== "running" &&
@@ -512,7 +514,10 @@ async function resolveLatestTrackedTaskThread(cwd, options = {}) {
   const visibleJobs = filterJobsForCurrentClaudeSession(jobs);
   // A cancelled task whose processes may still run counts too: a resume would share its session.
   const activeTask = visibleJobs.find(
-    (job) => job.jobClass === "task" && (job.status === "queued" || job.status === "running" || hasPendingStop(job))
+    (job) =>
+      job.jobClass === "task" &&
+      !job.stopGateRunId &&
+      (job.status === "queued" || job.status === "running" || hasPendingStop(job))
   );
   if (activeTask) {
     throw new Error(`Task ${activeTask.id} is still running. Use /copilot:status before continuing it.`);
@@ -563,6 +568,7 @@ async function executeTaskRun(request) {
     model: request.model,
     effort: request.effort,
     write: Boolean(request.write),
+    addDirs: request.contextDir ? [request.contextDir] : [],
     onProgress: request.onProgress,
     threadName: resumeThreadId ? null : buildPersistentTaskThreadName(request.prompt || DEFAULT_CONTINUE_PROMPT),
     guardStart: guardCopilotStart(workspaceRoot, request.jobId)
@@ -680,7 +686,7 @@ function buildTaskJob(workspaceRoot, taskMetadata, write) {
   });
 }
 
-function buildTaskRequest({ cwd, model, effort, prompt, write, resumeLast, jobId }) {
+function buildTaskRequest({ cwd, model, effort, prompt, write, resumeLast, jobId, contextDir }) {
   return {
     cwd,
     model,
@@ -688,7 +694,8 @@ function buildTaskRequest({ cwd, model, effort, prompt, write, resumeLast, jobId
     prompt,
     write,
     resumeLast,
-    jobId
+    jobId,
+    contextDir
   };
 }
 
@@ -862,7 +869,8 @@ async function handleReview(argv) {
 
 async function handleTask(argv) {
   const { options, positionals } = parseCommandInput(argv, {
-    valueOptions: ["model", "effort", "cwd", "prompt-file"],
+    // --context-dir is internal: the review gate passes its patch folder, which Copilot may then read.
+    valueOptions: ["model", "effort", "cwd", "prompt-file", "context-dir"],
     booleanOptions: ["json", "write", "resume-last", "resume", "fresh", "background"],
     aliasMap: {
       m: "model"
@@ -881,6 +889,7 @@ async function handleTask(argv) {
     throw new Error("Choose either --resume/--resume-last or --fresh.");
   }
   const write = Boolean(options.write);
+  const contextDir = options["context-dir"] ? path.resolve(cwd, options["context-dir"]) : null;
   const taskMetadata = buildTaskRunMetadata({
     prompt,
     resumeLast
@@ -898,7 +907,8 @@ async function handleTask(argv) {
       prompt,
       write,
       resumeLast,
-      jobId: job.id
+      jobId: job.id,
+      contextDir
     });
     const { payload } = await enqueueBackgroundTask(cwd, job, request);
     outputCommandResult(payload, renderQueuedTaskLaunch(payload), options.json);
@@ -917,6 +927,7 @@ async function handleTask(argv) {
         write,
         resumeLast,
         jobId: job.id,
+        contextDir,
         onProgress: progress
       }),
     { json: options.json }
@@ -1124,6 +1135,7 @@ function updateJobRecord(workspaceRoot, jobId, change) {
 // stay in the record until every signal is sent, so a cancel that fails or is stopped can run again.
 export async function cancelJob(workspaceRoot, jobId, options = {}) {
   const terminate = options.terminateImpl ?? terminateProcessTree;
+  const reason = options.reason ?? "Cancelled by user.";
   const completedAt = nowIso();
   let cancelled = null;
   updateJobRecord(workspaceRoot, jobId, (current) => {
@@ -1142,7 +1154,7 @@ export async function cancelJob(workspaceRoot, jobId, options = {}) {
           phase: "cancelled",
           completedAt,
           cancelledAt: completedAt,
-          errorMessage: "Cancelled by user."
+          errorMessage: reason
         }
       : current;
     return cancelled;
@@ -1162,7 +1174,7 @@ export async function cancelJob(workspaceRoot, jobId, options = {}) {
     })
   );
   try {
-    appendLogLine(cancelled.logFile, "Cancelled by user.");
+    appendLogLine(cancelled.logFile, reason);
   } catch {
     // The log is only a record; the processes are what matter.
   }

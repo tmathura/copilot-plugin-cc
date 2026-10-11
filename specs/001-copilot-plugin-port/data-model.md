@@ -18,12 +18,13 @@ One file per workspace, at `<state root>/<slug>-<hash>/state.json`.
 | `version` | number | `1` |
 | `config.stopReviewGate` | boolean | Default `false`. Set by `setup --enable-review-gate` or `--disable-review-gate` |
 | `jobs` | Job summary[] | Newest first. All queued and running jobs, and cancelled or failed jobs that still name a pid because a stop did not finish (added 2026-10-09), plus at most 50 finished jobs. Pruning deletes the pruned jobs' files and logs |
-| `closedSessions` | `{ id, closedAt }[]` | Claude session ids that `SessionEnd` has closed. A companion that started before `closedAt` cannot create, claim or start a job for that session; companions of a resumed session start later and are allowed. Kept for 30 days, with no count cap; a companion paused for longer than that is not covered (research §7, hook time budgets) |
+| `closedSessions` | `{ id, closedAt }[]` | Claude session ids that `SessionEnd` has closed. A companion that started before `closedAt`, or that a hook started before it (`COPILOT_COMPANION_LAUNCHED_AT`, added 2026-10-11), cannot create, claim or start a job for that session; companions of a resumed session start later and are allowed. Kept for 30 days, with no count cap; a companion paused for longer than that is not covered (research §7, hook time budgets) |
 
 Every update holds the lock file `state.json.lock` and replaces `state.json` through a temp file
 and a rename. Job files are replaced the same way (research §7, locked state updates; job files
 added 2026-10-08). On Windows, a rename or read that meets another process is retried for up to 2
-seconds (added 2026-10-09, ticket 6).
+seconds (added 2026-10-09, ticket 6), or until the caller's deadline if that is earlier (added
+2026-10-11, ticket 7).
 
 ## Job
 
@@ -31,7 +32,10 @@ A summary lives in `state.json`. The full record lives in `jobs/<id>.json`, and 
 `jobs/<id>.log`. A review above the inline limit also has `jobs/<id>.patches/` while it runs:
 `staged.patch`, `unstaged.patch` and `untracked.md` for a working tree, or `branch.patch` for a
 branch. The review deletes it at the end, and removing the job record deletes it too (research §2;
-added 2026-10-09, PR review).
+added 2026-10-09, PR review). The review gate writes its folder before the companion makes its job,
+so it is `jobs/stop-gate-<hook pid>-<random>.patches/`. The gate hook deletes it when it ends, and a
+later gate deletes the folder of a hook that has ended (research §7, gate context folder; added
+2026-10-11, ticket 7).
 
 | Field | Type | Notes |
 | --- | --- | --- |
@@ -42,6 +46,7 @@ added 2026-10-09, PR review).
 | `title`, `summary` | string | "Copilot Review", "Copilot Task", "Copilot Stop Gate Review", and so on |
 | `workspaceRoot` | string | Git top level, or the cwd outside git |
 | `sessionId` | string | Claude session id from `COPILOT_COMPANION_SESSION_ID`, when set |
+| `stopGateRunId` | string | Only on a review gate job: the gate run's id from `COPILOT_COMPANION_STOP_GATE_RUN_ID`. The hook finds its job by it, and resume skips such a job (research §7; added 2026-10-11, ticket 7) |
 | `status` | string | See the state flow below |
 | `phase` | string | `queued`, `starting`, `reviewing`, `investigating`, `running`, `verifying`, `editing`, `finalizing`, `done`, `failed`, `cancelled` |
 | `threadId` | string or null | **Copilot session id**, set with `--session-id` before the run starts (upstream: Codex thread id) |

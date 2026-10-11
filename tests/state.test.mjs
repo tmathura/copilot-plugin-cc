@@ -407,6 +407,42 @@ test(
   }
 );
 
+test(
+  "an update with a deadline stops waiting for a reader at that deadline and changes nothing",
+  { skip: process.platform !== "win32" && "only Windows refuses to replace an open file" },
+  async () => {
+    const workspace = makeTempDir();
+    updateState(workspace, (state) => {
+      state.config.stopReviewGate = false;
+    });
+    const stateFile = resolveStateFile(workspace);
+    const reader = spawn(
+      process.execPath,
+      ["-e", "const fd = require('fs').openSync(process.argv[1], 'r'); console.log('open'); setTimeout(() => require('fs').closeSync(fd), 5000);", stateFile],
+      { stdio: ["ignore", "pipe", "ignore"] }
+    );
+    try {
+      await new Promise((resolve) => reader.stdout.once("data", resolve));
+      const started = Date.now();
+
+      assert.throws(() =>
+        updateState(
+          workspace,
+          (state) => {
+            state.config.stopReviewGate = true;
+          },
+          { deadline: Date.now() + 300 }
+        )
+      );
+
+      assert.ok(Date.now() - started < 1500, `${Date.now() - started} ms`);
+      assert.equal(loadState(workspace).config.stopReviewGate, false);
+    } finally {
+      reader.kill();
+    }
+  }
+);
+
 test("a lock with no readable owner stays, and the error says how to clear it", () => {
   const workspace = makeTempDir();
   const lockFile = `${resolveStateFile(workspace)}.lock`;

@@ -1267,3 +1267,741 @@ test("a cancel that picked a queued job still stops the Copilot that its worker 
     }
   });
 });
+
+const GATE_HOOK = path.join(PLUGIN_ROOT, "scripts", "stop-review-gate-hook.mjs");
+const SESSION_HOOK = path.join(PLUGIN_ROOT, "scripts", "session-lifecycle-hook.mjs");
+const GATE_TITLE = "Copilot Stop Gate Review";
+
+function findJobByTitle(dataDir, title) {
+  try {
+    return readJobs(dataDir).find((job) => job.title === title) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// Three changed files: above the inline limit of two, so the gate writes a patch folder.
+function makeLargeRepo() {
+  const repo = makeTempDir();
+  initGitRepo(repo);
+  for (const name of ["a.txt", "b.txt", "c.txt"]) {
+    writeFile(repo, name, `${name} v1\n`);
+  }
+  git(repo, "add", ".");
+  git(repo, "commit", "-q", "-m", "init");
+  for (const name of ["a.txt", "b.txt", "c.txt"]) {
+    writeFile(repo, name, `${name} v2\n`);
+  }
+  return repo;
+}
+
+// A repo whose gate is on, unless the test says otherwise. Setup's login check is also a Copilot run,
+// with the normal fake, so the gate's run is the last one.
+function setUpGate(behavior = "ok", options = {}) {
+  const repo = options.repo ?? makeRepo();
+  const tasks = setUpTasks(behavior, { cwd: repo, env: options.env });
+  if (options.enable !== false) {
+    const setup = tasks.companion(["setup", "--enable-review-gate", "--json"], { FAKE_COPILOT_BEHAVIOR: "ok" });
+    assert.equal(setup.status, 0, setup.stderr);
+  }
+  const gate = (input = {}, extraEnv = {}) =>
+    run(process.execPath, [GATE_HOOK], {
+      cwd: repo,
+      env: { ...tasks.env, ...extraEnv },
+      input: JSON.stringify({ cwd: repo, ...input })
+    });
+  return { ...tasks, repo, gate, gateRun: () => tasks.runs().at(-1) };
+}
+
+test("the review gate is off by default and runs nothing", () => {
+  const { gate, runs } = setUpGate("ok", { enable: false });
+
+  const result = gate({ last_assistant_message: "Edited src/app.js." });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, "");
+  assert.deepEqual(runs(), []);
+});
+
+test("the gate lets Claude stop on ALLOW, with a 100 KB message on stdin, the diff in the prompt and the read-only profile", () => {
+  const { gate, gateRun, dataDir, companion } = setUpGate("ok", { env: { FAKE_COPILOT_ANSWER: "ALLOW: nothing to fix" } });
+  // Far past the Windows command-line limit of about 32 KB.
+  const message = `Edited src/app.js. ${"x".repeat(100 * 1024)} END_OF_MESSAGE`;
+
+  const result = gate({ last_assistant_message: message });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, "");
+  const copilotRun = gateRun();
+  assertReadOnlyRun(copilotRun, dataDir);
+  assert.ok(copilotRun.prompt.includes(`Previous Claude response:\n${message}\n`));
+  assert.match(copilotRun.prompt, /<repository_context>\nUse the repository context below as primary evidence\./);
+  assert.match(copilotRun.prompt, /\+export const value = items\[0\]\.id;/);
+  assert.deepEqual(addDirsOf(copilotRun), []);
+  assert.equal(readJobs(dataDir).find((job) => job.title === GATE_TITLE).status, "completed");
+  // The gate's session reviews Claude's turn; a rescue must not continue it.
+  assert.equal(JSON.parse(companion(["task-resume-candidate", "--json"]).stdout).candidate, null);
+});
+
+test("the gate blocks on BLOCK, and on an answer that is neither ALLOW nor BLOCK", () => {
+  for (const [answer, reason] of [
+    [
+      "BLOCK: the empty-list guard is missing\nMore detail.",
+      "Copilot stop-time review found issues that still need fixes before ending the session: the empty-list guard is missing"
+    ],
+    [
+      "Looks fine to me.",
+      "The stop-time Copilot review task returned an unexpected answer. Run /copilot:review --wait manually or bypass the gate."
+    ]
+  ]) {
+    const { gate } = setUpGate("ok", { env: { FAKE_COPILOT_ANSWER: answer } });
+
+    const result = gate({ last_assistant_message: "Edited src/app.js." });
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(JSON.parse(result.stdout), { decision: "block", reason });
+  }
+});
+
+test("the gate blocks when git fails in a repository, also when git is missing", () => {
+  const sep = process.platform === "win32" ? ";" : ":";
+  for (const [label, breakRepo, detail] of [
+    ["unreadable index", (repo) => fs.writeFileSync(path.join(repo, ".git", "index"), "not an index"), /failed: /],
+    [
+      "broken .git link",
+      (repo) => {
+        fs.rmSync(path.join(repo, ".git"), { recursive: true, force: true });
+        fs.writeFileSync(path.join(repo, ".git"), "gitdir: missing-folder\n");
+      },
+      /must run inside a Git repository/
+    ],
+    ["git missing", () => {}, /git is not installed/]
+  ]) {
+    const { gate, repo, runs, binDir } = setUpGate("ok");
+    const before = runs().length;
+    breakRepo(repo);
+    // Only the fake Copilot and Node stay on the path, so git cannot be found.
+    const env = label === "git missing" ? { PATH: `${binDir}${sep}${path.dirname(process.execPath)}` } : {};
+
+    const result = gate({ last_assistant_message: "Edited src/app.js." }, env);
+
+    assert.equal(result.status, 0, `${label}: ${result.stderr}`);
+    const { decision, reason } = JSON.parse(result.stdout);
+    assert.equal(decision, "block", label);
+    assert.match(reason, /^The stop-time Copilot review task failed: /, label);
+    assert.match(reason, detail, label);
+    assert.equal(runs().length, before, label);
+  }
+});
+
+test("with git broken, the gate in a subfolder still finds its setting and blocks, and SessionEnd still closes the session", () => {
+  const { gate, repo, runs, env, dataDir } = setUpGate("ok");
+  const before = runs().length;
+  fs.rmSync(path.join(repo, ".git"), { recursive: true, force: true });
+  fs.writeFileSync(path.join(repo, ".git"), "gitdir: missing-folder\n");
+  const subfolder = path.join(repo, "src");
+
+  const result = gate({ cwd: subfolder, last_assistant_message: "Edited src/app.js." });
+
+  assert.equal(result.status, 0, result.stderr);
+  const { decision, reason } = JSON.parse(result.stdout);
+  assert.equal(decision, "block");
+  assert.match(reason, /^The stop-time Copilot review task failed: /);
+  assert.equal(runs().length, before);
+
+  const end = run(process.execPath, [SESSION_HOOK, "SessionEnd"], {
+    cwd: subfolder,
+    env,
+    input: JSON.stringify({ session_id: "broken-git-session", cwd: subfolder })
+  });
+  assert.equal(end.status, 0, end.stderr);
+  // One workspace folder: the one that setup made for the repository root.
+  assert.equal(fs.readdirSync(path.join(dataDir, "state")).length, 1);
+  assert.deepEqual(readClosedSessions(dataDir).map((entry) => entry.id), ["broken-git-session"]);
+});
+
+test("a .git link whose target is gone still marks the repository root", async () => {
+  const { findGitMarkerRoot } = await import("../plugins/copilot/scripts/lib/workspace.mjs");
+  const root = fs.realpathSync.native(makeTempDir());
+  fs.mkdirSync(path.join(root, "sub"));
+  // A junction needs no extra rights on Windows.
+  fs.symlinkSync(path.join(root, "gone"), path.join(root, ".git"), process.platform === "win32" ? "junction" : "dir");
+
+  assert.equal(findGitMarkerRoot(path.join(root, "sub")), root);
+});
+
+test("outside Git, the gate runs with a note that there is no diff, and still removes stale folders", () => {
+  const { gate, gateRun, dataDir } = setUpGate("ok", {
+    repo: makeTempDir(),
+    env: { FAKE_COPILOT_ANSWER: "ALLOW: nothing to fix" }
+  });
+  const jobsDir = path.join(dataDir, "state", fs.readdirSync(path.join(dataDir, "state"))[0], "jobs");
+  const ended = path.join(jobsDir, `stop-gate-${run(process.execPath, ["-e", ""]).pid}-old1.patches`);
+  fs.mkdirSync(ended);
+
+  const result = gate({ last_assistant_message: "Edited notes.txt." });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, "");
+  assert.match(gateRun().prompt, /<repository_context>\nThe working folder is not a Git repository, so there is no diff\.\n/);
+  assert.equal(fs.existsSync(ended), false);
+});
+
+test("the gate reviews a repository that Claude opened through a link", () => {
+  const { gate, gateRun, repo } = setUpGate("ok", { env: { FAKE_COPILOT_ANSWER: "ALLOW: nothing to fix" } });
+  fs.mkdirSync(path.join(repo, "src", "deep"));
+  const link = path.join(makeTempDir(), "linked-src");
+  // A junction needs no extra rights on Windows.
+  fs.symlinkSync(path.join(repo, "src"), link, process.platform === "win32" ? "junction" : "dir");
+
+  const result = gate({ cwd: link, last_assistant_message: "Edited src/app.js." });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, "");
+  assert.doesNotMatch(gateRun().prompt, /not a Git repository/);
+  assert.match(gateRun().prompt, /\+export const value = items\[0\]\.id;/);
+});
+
+test("the gate says why it did not run when the job state cannot be read", () => {
+  const { gate, dataDir, runs } = setUpGate("ok");
+  const before = runs().length;
+  const stateFile = path.join(dataDir, "state", fs.readdirSync(path.join(dataDir, "state"))[0], "state.json");
+  fs.writeFileSync(stateFile, "{ not json");
+
+  const result = gate({ last_assistant_message: "Edited src/app.js." });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, "");
+  assert.match(result.stderr, /^The review gate did not run\. Cannot read the job state /m);
+  assert.equal(runs().length, before);
+});
+
+test("a running gate job does not block --resume-last", () => {
+  const { companion, dataDir } = setUpTasks();
+  assert.equal(companion(["task", "first"]).status, 0);
+  const stateFile = path.join(dataDir, "state", fs.readdirSync(path.join(dataDir, "state"))[0], "state.json");
+  const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+  state.jobs.unshift({
+    id: "task-gate",
+    status: "running",
+    jobClass: "task",
+    title: GATE_TITLE,
+    stopGateRunId: "gate-run",
+    threadId: "gate-session",
+    updatedAt: new Date().toISOString()
+  });
+  fs.writeFileSync(stateFile, JSON.stringify(state));
+
+  const resumed = companion(["task", "--resume-last", "next step"]);
+
+  assert.equal(resumed.status, 0, resumed.stderr);
+});
+
+test("a user task that quotes the gate's marker sentence can still be resumed", () => {
+  const { companion } = setUpTasks();
+  const prompt = "Explain this line: Run a stop-gate review of the previous Claude turn.";
+  assert.equal(companion(["task", prompt]).status, 0);
+
+  const payload = JSON.parse(companion(["task-resume-candidate", "--json"]).stdout);
+
+  assert.equal(payload.available, true);
+  assert.equal(payload.candidate.title, GATE_TITLE);
+});
+
+test("the whole gate hook, with a short limit, prints the block decision and cleans up before its own timeout", async () => {
+  const { repo, env, dataDir, binDir } = setUpGate("hang", { repo: makeLargeRepo() });
+  const timeoutMs = 8000;
+  const script = `import(${JSON.stringify(pathToFileURL(GATE_HOOK).href)}).then((hook) => hook.main({ timeoutMs: ${timeoutMs} }))`;
+  const hook = spawn(process.execPath, ["--input-type=module", "-e", script], { cwd: repo, env });
+  let stdout = "";
+  hook.stdout.on("data", (chunk) => {
+    stdout += chunk;
+  });
+  const exited = new Promise((resolve) => hook.on("exit", (code) => resolve(code)));
+  // Stands in for Claude Code's own hook timeout, which is 60 s after the run limit.
+  const hookTimeout = setTimeout(() => hook.kill("SIGKILL"), timeoutMs + 20000);
+  hook.stdin.end(JSON.stringify({ cwd: repo, last_assistant_message: "Edited the text files." }));
+
+  const code = await exited;
+  clearTimeout(hookTimeout);
+
+  assert.equal(code, 0);
+  assert.deepEqual(JSON.parse(stdout), {
+    decision: "block",
+    reason:
+      "The stop-time Copilot review task timed out after 14 minutes. Run /copilot:review --wait manually or bypass the gate."
+  });
+  const job = findJobByTitle(dataDir, GATE_TITLE);
+  assert.equal(job.status, "cancelled");
+  await waitFor(() => readFakeChildPids(binDir).flat().every((pid) => !isAlive(pid)), 5000);
+  assert.deepEqual(findPatchDirs(dataDir), []);
+});
+
+test("the gate with no Copilot gives a setup note and lets Claude stop", () => {
+  const { gate, runs } = setUpGate("ok");
+  const before = runs().length;
+
+  const result = gate({ last_assistant_message: "Edited src/app.js." }, { PATH: path.dirname(process.execPath) });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, "");
+  assert.match(result.stderr, /^Copilot is not set up for the review gate\. not found\. Run \/copilot:setup\.$/m);
+  assert.equal(runs().length, before);
+});
+
+test("above the inline limit, the gate passes the patch folder to Copilot and removes it after success and failure", () => {
+  for (const [behavior, blocked] of [
+    ["ok", false],
+    ["fail", true]
+  ]) {
+    const { gate, gateRun, dataDir } = setUpGate(behavior, {
+      repo: makeLargeRepo(),
+      env: { FAKE_COPILOT_ANSWER: "ALLOW: nothing to fix" }
+    });
+    // Left by gate hooks that were killed outright: one has ended, one still runs.
+    const jobsDir = path.join(dataDir, "state", fs.readdirSync(path.join(dataDir, "state"))[0], "jobs");
+    const endedPid = run(process.execPath, ["-e", ""]).pid;
+    const ended = path.join(jobsDir, `stop-gate-${endedPid}-old1.patches`);
+    const live = path.join(jobsDir, `stop-gate-${process.pid}-live1.patches`);
+    fs.mkdirSync(ended);
+    fs.mkdirSync(live);
+
+    const result = gate({ last_assistant_message: "Edited the text files." });
+
+    assert.equal(fs.existsSync(ended), false);
+    assert.equal(fs.existsSync(live), true);
+    fs.rmSync(live, { recursive: true });
+
+    assert.equal(result.status, 0, result.stderr);
+    if (blocked) {
+      assert.match(JSON.parse(result.stdout).reason, /^The stop-time Copilot review task failed: /);
+    } else {
+      assert.equal(result.stdout, "");
+    }
+    const copilotRun = gateRun();
+    const [patchDir] = addDirsOf(copilotRun);
+    assert.ok(patchDir.startsWith(path.join(dataDir, "state")), patchDir);
+    assert.deepEqual(Object.keys(patchesOf(copilotRun)).sort(), ["staged.patch", "unstaged.patch", "untracked.md"]);
+    assert.match(patchesOf(copilotRun)["unstaged.patch"].toString("utf8"), /\+c\.txt v2/);
+    assert.ok(copilotRun.prompt.includes(`## Patch Files\n\n- ${path.join(patchDir, "staged.patch")}\n`));
+    assert.match(copilotRun.prompt, /Read the patch files listed below with the view tool/);
+    assert.deepEqual(findPatchDirs(dataDir), [], behavior);
+  }
+});
+
+test("a gate run past its limit blocks, stops the companion, Copilot and its child, and removes the patch folder", async () => {
+  for (const behavior of ["hang", "hang-ignore-sigterm"]) {
+    const repo = makeLargeRepo();
+    const tasks = setUpTasks(behavior, { cwd: repo });
+    await withCompanionEnv(tasks.env, async () => {
+      const { runStopReview } = await import(pathToFileURL(GATE_HOOK).href);
+      const timeoutMs = 8000;
+      const started = Date.now();
+
+      const pending = runStopReview(repo, { last_assistant_message: "Edited." }, { timeoutMs });
+      let job = null;
+      await waitFor(() => {
+        job = findJobByTitle(tasks.dataDir, GATE_TITLE);
+        return job?.copilotPid && readFakeChildPids(tasks.binDir).length > 0;
+      }, timeoutMs);
+      const [[copilotPid, childPid]] = readFakeChildPids(tasks.binDir);
+      assert.equal(findPatchDirs(tasks.dataDir).length, 1);
+      if (behavior === "hang-ignore-sigterm") {
+        // A signal in the kill wait, where a Copilot that ignores SIGTERM keeps the companion alive,
+        // must not end the cleanup halfway; with no handler left, it would end this test process.
+        await waitFor(() => Date.now() - started > timeoutMs + 300, timeoutMs + 5000);
+        process.emit("SIGTERM", "SIGTERM");
+      }
+      const review = await pending;
+
+      assert.deepEqual(review, {
+        ok: false,
+        reason:
+          "The stop-time Copilot review task timed out after 14 minutes. Run /copilot:review --wait manually or bypass the gate."
+      });
+      // The hook keeps 60 s for this part; the stop and the cleanup need far less.
+      assert.ok(Date.now() - started < timeoutMs + 15000, behavior);
+      await waitFor(() => [job.pid, copilotPid, childPid].every((pid) => !isAlive(pid)), 5000);
+      const stopped = findJob(tasks.dataDir, job.id);
+      assert.deepEqual([stopped.status, stopped.pid, stopped.copilotPid], ["cancelled", null, null]);
+      assert.equal(stopped.errorMessage, "The stop-time review timed out.");
+      assert.deepEqual(findPatchDirs(tasks.dataDir), [], behavior);
+    });
+  }
+});
+
+test("a gate run past its limit still cancels its job and stops Copilot when the companion's own stop fails", async () => {
+  const tasks = setUpTasks("hang", { cwd: makeRepo() });
+  await withCompanionEnv(tasks.env, async () => {
+    const { runStopReview } = await import(pathToFileURL(GATE_HOOK).href);
+    const timeoutMs = 8000;
+
+    const pending = runStopReview(tasks.cwd, { last_assistant_message: "Edited." }, {
+      timeoutMs,
+      terminateImpl: async () => {
+        throw new Error("taskkill failed");
+      }
+    });
+    let job = null;
+    await waitFor(() => {
+      job = findJobByTitle(tasks.dataDir, GATE_TITLE);
+      return job?.copilotPid && readFakeChildPids(tasks.binDir).length > 0;
+    }, timeoutMs);
+    const [[copilotPid, childPid]] = readFakeChildPids(tasks.binDir);
+    const review = await pending;
+
+    assert.equal(review.ok, false);
+    assert.match(review.reason, /timed out after 14 minutes\. taskkill failed Run \/copilot:review/);
+    await waitFor(() => [job.pid, copilotPid, childPid].every((pid) => !isAlive(pid)), 10000);
+    const stopped = findJob(tasks.dataDir, job.id);
+    assert.deepEqual([stopped.status, stopped.pid, stopped.copilotPid], ["cancelled", null, null]);
+  });
+});
+
+test("a gate whose companion is killed outright cancels its job, stops Copilot and its child, and blocks", async () => {
+  const repo = makeLargeRepo();
+  const tasks = setUpTasks("hang", { cwd: repo });
+  await withCompanionEnv(tasks.env, async () => {
+    const { runStopReview } = await import(pathToFileURL(GATE_HOOK).href);
+
+    const pending = runStopReview(repo, { last_assistant_message: "Edited." }, { timeoutMs: 60000 });
+    let job = null;
+    await waitFor(() => {
+      job = findJobByTitle(tasks.dataDir, GATE_TITLE);
+      return job?.copilotPid && readFakeChildPids(tasks.binDir).length > 0;
+    }, 30000);
+    const [[copilotPid, childPid]] = readFakeChildPids(tasks.binDir);
+    process.kill(job.pid, "SIGKILL");
+    const review = await pending;
+
+    assert.equal(review.ok, false);
+    assert.match(review.reason, /^The stop-time Copilot review task failed/);
+    await waitFor(() => [job.pid, copilotPid, childPid].every((pid) => !isAlive(pid)), 10000);
+    const stopped = findJob(tasks.dataDir, job.id);
+    assert.deepEqual([stopped.status, stopped.copilotPid], ["cancelled", null]);
+    assert.equal(stopped.errorMessage, "The stop-time review's companion ended before its job did.");
+    assert.deepEqual(findPatchDirs(tasks.dataDir), []);
+  });
+});
+
+test(
+  "a gate hook stopped with SIGTERM stops its companion, Copilot and Copilot's child, and removes its patch folder",
+  { skip: process.platform === "win32" && "Windows has no SIGTERM that a process can handle" },
+  async () => {
+    const { repo, env, dataDir, binDir } = setUpGate("hang", { repo: makeLargeRepo() });
+    const hook = spawn(process.execPath, [GATE_HOOK], { cwd: repo, env, stdio: ["pipe", "ignore", "ignore"] });
+    const exited = new Promise((resolve) => hook.on("exit", (code) => resolve(code)));
+    hook.stdin.end(JSON.stringify({ cwd: repo, last_assistant_message: "Edited." }));
+    let job = null;
+    await waitFor(() => {
+      job = findJobByTitle(dataDir, GATE_TITLE);
+      return job?.copilotPid && readFakeChildPids(binDir).length > 0;
+    }, 30000);
+    const [[copilotPid, childPid]] = readFakeChildPids(binDir);
+    assert.equal(findPatchDirs(dataDir).length, 1);
+
+    hook.kill("SIGTERM");
+
+    assert.equal(await exited, 143);
+    await waitFor(() => [job.pid, copilotPid, childPid].every((pid) => !isAlive(pid)), 5000);
+    const stopped = findJob(dataDir, job.id);
+    assert.deepEqual([stopped.status, stopped.errorMessage], ["cancelled", "The stop-time review was stopped."]);
+    assert.deepEqual(findPatchDirs(dataDir), []);
+  }
+);
+
+test("SessionStart writes the session id and the plugin data folder to CLAUDE_ENV_FILE", () => {
+  const envFile = path.join(makeTempDir(), "claude-env");
+
+  const result = run(process.execPath, [SESSION_HOOK, "SessionStart"], {
+    env: { ...process.env, CLAUDE_ENV_FILE: envFile, CLAUDE_PLUGIN_DATA: "/data dir" },
+    input: JSON.stringify({ session_id: "it's-1" })
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(
+    fs.readFileSync(envFile, "utf8"),
+    "export COPILOT_COMPANION_SESSION_ID='it'\"'\"'s-1'\nexport CLAUDE_PLUGIN_DATA='/data dir'\n"
+  );
+});
+
+function readClosedSessions(dataDir) {
+  try {
+    const stateRoot = path.join(dataDir, "state");
+    const [workspaceDir] = fs.readdirSync(stateRoot);
+    return JSON.parse(fs.readFileSync(path.join(stateRoot, workspaceDir, "state.json"), "utf8")).closedSessions;
+  } catch {
+    return [];
+  }
+}
+
+test("SessionEnd stops three running jobs within 5 s, also a Copilot whose companion is dead, and removes only those jobs", async () => {
+  const tasks = setUpTasks("hang-ignore-sigterm");
+  const ending = { COPILOT_COMPANION_SESSION_ID: "ending-session" };
+  const jobs = [];
+  for (let index = 0; index < 3; index += 1) {
+    const launch = tasks.companion(["task", "--background", "--json", `run forever ${index}`], ending);
+    assert.equal(launch.status, 0, launch.stderr);
+    const job = await waitForCopilotStart(tasks.dataDir, tasks.binDir, JSON.parse(launch.stdout).jobId);
+    await waitFor(() => readFakeChildPids(tasks.binDir).some(([copilotPid]) => copilotPid === job.copilotPid));
+    jobs.push(job);
+  }
+  const pids = jobs.flatMap((job) => [job.pid, job.copilotPid]);
+  pids.push(...readFakeChildPids(tasks.binDir).map(([, childPid]) => childPid));
+  // The first job's companion is gone, so only its record still names its Copilot.
+  process.kill(jobs[0].pid, "SIGKILL");
+  await waitFor(() => !isAlive(jobs[0].pid));
+
+  const started = Date.now();
+  const hook = spawn(process.execPath, [SESSION_HOOK, "SessionEnd"], {
+    cwd: tasks.cwd,
+    env: tasks.env,
+    stdio: ["pipe", "ignore", "pipe"]
+  });
+  const exited = new Promise((resolve) => hook.on("exit", (code) => resolve(code)));
+  let stderr = "";
+  hook.stderr.on("data", (chunk) => {
+    stderr += chunk;
+  });
+  hook.stdin.end(JSON.stringify({ session_id: "ending-session", cwd: tasks.cwd }));
+  await waitFor(() => readClosedSessions(tasks.dataDir).some((entry) => entry.id === "ending-session"));
+  // Started after the close: the resumed session's new job and another session's job stay.
+  const resumed = tasks.companion(["task", "--background", "--json", "after resume"], ending);
+  assert.equal(resumed.status, 0, resumed.stderr);
+  const resumedId = JSON.parse(resumed.stdout).jobId;
+  const other = tasks.companion(["task", "other session"], {
+    COPILOT_COMPANION_SESSION_ID: "other-session",
+    FAKE_COPILOT_BEHAVIOR: "ok"
+  });
+  assert.equal(other.status, 0, other.stderr);
+  const code = await exited;
+
+  assert.equal(code, 0, stderr);
+  assert.ok(Date.now() - started < 5000, `${Date.now() - started} ms`);
+  await waitFor(() => pids.every((pid) => !isAlive(pid)), 2000);
+  const remaining = readJobs(tasks.dataDir);
+  for (const job of jobs) {
+    assert.equal(remaining.find((entry) => entry.id === job.id), undefined);
+    assert.equal(fs.existsSync(job.logFile), false);
+  }
+  const otherJob = remaining.find((entry) => entry.sessionId === "other-session");
+  assert.equal(otherJob.status, "completed");
+  assert.ok(fs.existsSync(otherJob.logFile));
+  const resumedJob = await waitForCopilotStart(tasks.dataDir, tasks.binDir, resumedId);
+  assert.ok(fs.existsSync(resumedJob.logFile));
+  const cancel = tasks.companion(["cancel", resumedId], ending);
+  assert.equal(cancel.status, 0, cancel.stderr);
+  assert.equal(findJob(tasks.dataDir, resumedId).status, "cancelled");
+});
+
+test("SessionEnd keeps a job whose stop fails, and an older job whose stop never finished, with their pids", async () => {
+  const tasks = setUpTasks();
+  await withCompanionEnv(tasks.env, async () => {
+    const { cleanupSessionJobs } = await import(pathToFileURL(SESSION_HOOK).href);
+    const { updateState } = await import("../plugins/copilot/scripts/lib/state.mjs");
+    const { terminateProcessTree } = await import("../plugins/copilot/scripts/lib/process.mjs");
+    const [worker, copilot, oldCopilot] = [0, 1, 2].map(() =>
+      spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" })
+    );
+    const sessionId = "failing-stop-session";
+    try {
+      updateState(tasks.cwd, (state) => {
+        state.jobs.unshift(
+          { id: "task-running", status: "running", jobClass: "task", sessionId, pid: worker.pid, copilotPid: copilot.pid },
+          { id: "task-old-failed", status: "failed", jobClass: "task", sessionId, pid: null, copilotPid: oldCopilot.pid },
+          { id: "task-done", status: "completed", jobClass: "task", sessionId }
+        );
+      });
+
+      await cleanupSessionJobs(tasks.cwd, sessionId, {
+        terminateImpl: async (pid, options) => {
+          if (pid === copilot.pid) {
+            throw new Error("taskkill failed");
+          }
+          return terminateProcessTree(pid, options);
+        }
+      });
+
+      await waitFor(() => !isAlive(worker.pid));
+      const jobs = readJobs(tasks.dataDir);
+      assert.deepEqual(jobs.map((job) => job.id).sort(), ["task-old-failed", "task-running"]);
+      const kept = jobs.find((job) => job.id === "task-running");
+      // The stopped companion's pid is cleared, so a later cancel never signals it after reuse.
+      assert.deepEqual([kept.status, kept.pid, kept.copilotPid], ["cancelled", null, copilot.pid]);
+      // The job file agrees with the state.
+      const { readStoredJob } = await import("../plugins/copilot/scripts/lib/job-control.mjs");
+      const stored = readStoredJob(tasks.cwd, "task-running");
+      assert.deepEqual([stored.status, stored.pid, stored.copilotPid], ["cancelled", null, copilot.pid]);
+      // An old pid may belong to another program by now, so only a cancel stops it.
+      assert.equal(jobs.find((job) => job.id === "task-old-failed").copilotPid, oldCopilot.pid);
+      assert.ok(isAlive(oldCopilot.pid));
+    } finally {
+      for (const child of [worker, copilot, oldCopilot]) {
+        child.kill("SIGKILL");
+      }
+    }
+  });
+});
+
+test("SessionEnd still closes the session and stops a job whose job file cannot be written", async () => {
+  const tasks = setUpTasks();
+  await withCompanionEnv(tasks.env, async () => {
+    const { cleanupSessionJobs } = await import(pathToFileURL(SESSION_HOOK).href);
+    const { resolveJobFile, updateState } = await import("../plugins/copilot/scripts/lib/state.mjs");
+    const worker = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+    const sessionId = "unwritable-job-file";
+    try {
+      updateState(tasks.cwd, (state) => {
+        state.jobs.unshift({ id: "task-unwritable", status: "running", jobClass: "task", sessionId, pid: worker.pid });
+      });
+      // A folder where the job file should be: no file can replace it.
+      fs.mkdirSync(path.join(resolveJobFile(tasks.cwd, "task-unwritable"), "blocker"), { recursive: true });
+
+      const started = Date.now();
+      await cleanupSessionJobs(tasks.cwd, sessionId);
+
+      // A job file that cannot be written gets only a short retry, not the state's 2 s.
+      assert.ok(Date.now() - started < 1500, `${Date.now() - started} ms`);
+      await waitFor(() => !isAlive(worker.pid));
+      assert.deepEqual(readClosedSessions(tasks.dataDir).map((entry) => entry.id), [sessionId]);
+      assert.equal(findJob(tasks.dataDir, "task-unwritable"), null);
+    } finally {
+      worker.kill("SIGKILL");
+    }
+  });
+});
+
+test("SessionEnd ends within its 5 s timeout and changes nothing while a live process holds the state lock", async () => {
+  const tasks = setUpTasks();
+  assert.equal(tasks.companion(["task", "first"], { COPILOT_COMPANION_SESSION_ID: "locked-session" }).status, 0);
+  const workspaceDir = path.join(tasks.dataDir, "state", fs.readdirSync(path.join(tasks.dataDir, "state"))[0]);
+  const stateFile = path.join(workspaceDir, "state.json");
+  const lockFile = `${stateFile}.lock`;
+  const before = fs.readFileSync(stateFile);
+  const holder = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+  try {
+    fs.writeFileSync(lockFile, JSON.stringify({ pid: holder.pid, token: "held-by-test" }));
+    const started = Date.now();
+
+    const result = run(process.execPath, [SESSION_HOOK, "SessionEnd"], {
+      cwd: tasks.cwd,
+      env: tasks.env,
+      input: JSON.stringify({ session_id: "locked-session", cwd: tasks.cwd })
+    });
+
+    assert.ok(Date.now() - started < 5000, `${Date.now() - started} ms`);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Timed out after \d+ ms waiting for the state lock/);
+    assert.ok(fs.readFileSync(stateFile).equals(before));
+  } finally {
+    fs.rmSync(lockFile, { force: true });
+    holder.kill("SIGKILL");
+  }
+});
+
+test("SessionEnd in a workspace with no state yet still refuses a companion that was preparing the first job", async () => {
+  const tasks = setUpTasks("hang");
+  const sessionId = "first-job-session";
+  await withCompanionEnv({ ...tasks.env, COPILOT_COMPANION_SESSION_ID: sessionId }, async ({ enqueueBackgroundTask }) => {
+    const { createJobRecord, runTrackedJob } = await import("../plugins/copilot/scripts/lib/tracked-jobs.mjs");
+
+    const end = run(process.execPath, [SESSION_HOOK, "SessionEnd"], {
+      cwd: tasks.cwd,
+      env: tasks.env,
+      input: JSON.stringify({ session_id: sessionId, cwd: tasks.cwd })
+    });
+
+    assert.equal(end.status, 0, end.stderr);
+    assert.deepEqual(readClosedSessions(tasks.dataDir).map((entry) => entry.id), [sessionId]);
+    // This test process started before the close, like a companion that was still reading its prompt.
+    await assert.rejects(
+      runTrackedJob(createJobRecord({ id: "task-first", jobClass: "task", workspaceRoot: tasks.cwd }), () =>
+        assert.fail("the runner must not run")
+      ),
+      /Claude session first-job-session has ended/
+    );
+    const queued = makeQueuedTask(tasks.cwd);
+    await assert.rejects(
+      enqueueBackgroundTask(tasks.cwd, { ...queued.job, sessionId }, queued.request, {
+        spawnWorkerImpl: () => assert.fail("no worker may start")
+      }),
+      /Claude session first-job-session has ended/
+    );
+    assert.deepEqual(tasks.runs(), []);
+  });
+});
+
+test("after SessionEnd, a companion from before the close cannot create, claim or start a job, while a new one can", async () => {
+  const tasks = setUpTasks("hang");
+  const sessionId = "closed-session";
+  await withCompanionEnv({ ...tasks.env, COPILOT_COMPANION_SESSION_ID: sessionId }, async ({ enqueueBackgroundTask }) => {
+    const { createJobRecord, guardCopilotStart, runTrackedJob } = await import("../plugins/copilot/scripts/lib/tracked-jobs.mjs");
+    const { updateState } = await import("../plugins/copilot/scripts/lib/state.mjs");
+    const { runPromptModeTurn } = await import("../plugins/copilot/scripts/lib/copilot.mjs");
+    // Stand-ins for a worker that has not claimed its job yet, and one that has claimed its job but
+    // not started Copilot yet. SessionEnd stops both.
+    const [queuedWorker, claimedWorker] = [0, 1].map(() =>
+      spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" })
+    );
+    try {
+      const queued = makeQueuedTask(tasks.cwd);
+      await enqueueBackgroundTask(tasks.cwd, { ...queued.job, sessionId }, queued.request, {
+        spawnWorkerImpl: () => queuedWorker
+      });
+      updateState(tasks.cwd, (state) => {
+        state.jobs.unshift({ id: "task-claimed", status: "running", jobClass: "task", sessionId, pid: claimedWorker.pid });
+      });
+
+      const end = run(process.execPath, [SESSION_HOOK, "SessionEnd"], {
+        cwd: tasks.cwd,
+        env: tasks.env,
+        input: JSON.stringify({ session_id: sessionId, cwd: tasks.cwd })
+      });
+
+      assert.equal(end.status, 0, end.stderr);
+      await waitFor(() => !isAlive(queuedWorker.pid) && !isAlive(claimedWorker.pid));
+      assert.deepEqual(readJobs(tasks.dataDir), []);
+      // This test process started before the close, like a companion that was still preparing a job.
+      const fresh = createJobRecord({ id: "task-fresh", jobClass: "task", workspaceRoot: tasks.cwd });
+      await assert.rejects(
+        runTrackedJob(fresh, () => assert.fail("the runner must not run")),
+        /Claude session closed-session has ended/
+      );
+      const late = makeQueuedTask(tasks.cwd);
+      await assert.rejects(
+        enqueueBackgroundTask(tasks.cwd, { ...late.job, sessionId }, late.request, {
+          spawnWorkerImpl: () => assert.fail("no worker may start")
+        }),
+        /Claude session closed-session has ended/
+      );
+      await assert.rejects(
+        runPromptModeTurn(tasks.cwd, { prompt: "x", guardStart: guardCopilotStart(tasks.cwd, "task-claimed") }),
+        /Copilot was not started/
+      );
+      const worker = tasks.companion(["task-worker", "--job-id", queued.job.id]);
+      assert.notEqual(worker.status, 0);
+      // A gate hook that started before the close starts its companion only now; that companion
+      // counts from the hook's start.
+      const { runStopReview } = await import(pathToFileURL(GATE_HOOK).href);
+      const review = await runStopReview(
+        tasks.cwd,
+        { session_id: sessionId, last_assistant_message: "Edited." },
+        { timeoutMs: 20000 }
+      );
+      assert.equal(review.ok, false);
+      assert.match(review.reason, /Claude session closed-session has ended/);
+      assert.deepEqual(tasks.runs(), []);
+
+      const resumed = tasks.companion(["task", "after resume"], {
+        COPILOT_COMPANION_SESSION_ID: sessionId,
+        FAKE_COPILOT_BEHAVIOR: "ok"
+      });
+
+      assert.equal(resumed.status, 0, resumed.stderr);
+      assert.equal(tasks.runs().length, 1);
+    } finally {
+      queuedWorker.kill("SIGKILL");
+      claimedWorker.kill("SIGKILL");
+    }
+  });
+});
