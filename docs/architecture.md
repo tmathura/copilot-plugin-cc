@@ -45,7 +45,7 @@ flowchart LR
 | `scripts/lib/job-control.mjs` | Finds the jobs for `status`, `result` and `cancel`. |
 | `scripts/lib/render.mjs` | Turns setup reports, reviews, task results and job lists into Markdown. |
 | `scripts/lib/args.mjs`, `prompts.mjs`, `fs.mjs`, `workspace.mjs` | Argument parsing, prompt templates, file helpers and the workspace folder. |
-| `scripts/session-lifecycle-hook.mjs` | `SessionStart` exports the Claude session id and the plugin data folder (`COPILOT_COMPANION_PLUGIN_DATA`) for the commands. `SessionEnd` cancels and removes the session's jobs. |
+| `scripts/session-lifecycle-hook.mjs` | `SessionStart` exports the Claude session id and the plugin data folder (`COPILOT_COMPANION_PLUGIN_DATA`) for the commands. `SessionEnd` cancels the session's jobs and removes them, except a job whose processes could not be stopped, which stays for `/copilot:cancel`. |
 | `scripts/stop-review-gate-hook.mjs` | The `Stop` hook. When the review gate is on, it runs a read-only Copilot review of the last turn and can block the stop. |
 | `prompts/*.md` | Prompt templates for the review, the adversarial review and the review gate. |
 | `schemas/review-output.schema.json` | The answer format of the adversarial review. |
@@ -149,7 +149,7 @@ sequenceDiagram
     G-->>CC: let Claude stop, or block with the reason
   end
   CC->>L: SessionEnd
-  L->>L: close the session, cancel and stop its jobs, remove them
+  L->>L: close the session, cancel and stop its jobs, remove its finished and stopped jobs
 ```
 
 - The gate's run stops 14 minutes after the hook starts. Then the hook stops the companion's process

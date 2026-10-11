@@ -13,7 +13,10 @@ per line. Copilot's own tool filters, deny rules and a plugin-owned `COPILOT_HOM
 read-only. A review above upstream's inline limit gives Copilot the exact patches in a folder of
 its own job storage (research §2). Every upstream call to Codex
 has a Copilot match or a reason to drop it in [call-site-map.md](call-site-map.md). Ticket 1 delivers
-this research, the map and this plan. Tickets 2 to 8 build the plugin in the phases below.
+this research, the map and this plan. Tickets 2 to 8 build the plugin in the phases below. The
+`SessionStart` hook passes the plugin data folder to the commands under the companion's own name,
+`COPILOT_COMPANION_PLUGIN_DATA`, so the Codex plugin's `CLAUDE_PLUGIN_DATA` export cannot redirect
+them (added 2026-10-11, ticket 8; research §7, data folder export).
 
 ## Technical Context
 
@@ -51,7 +54,7 @@ a manual run with `claude --plugin-dir` before release
 
 | Principle | Status | Planned proof |
 | --- | --- | --- |
-| I. Upstream parity | Met | Same layout, file names and command, agent, skill and hook names with the rename rules (research §7). Every change and drop in [call-site-map.md](call-site-map.md) has a reason that the principle allows: Copilot cannot do it (native reviewer, broker, protocol client, interrupt, output schema, `spark`, ephemeral sessions, transfer), security (no shell, read-only review context, plugin-owned `COPILOT_HOME`), or platform support (Windows launcher, CI on three systems). Each ticket adds its differences to the README section "Differences from the Codex plugin". |
+| I. Upstream parity | Met | Same layout, file names and command, agent, skill and hook names with the rename rules (research §7). Every change and drop in [call-site-map.md](call-site-map.md) has a reason that the principle allows: Copilot cannot do it (native reviewer, broker, protocol client, interrupt, output schema, `spark`, ephemeral sessions, transfer), security (no shell, read-only review context, plugin-owned `COPILOT_HOME`), or platform support (Windows launcher, CI on three systems), or correctness (the data folder export `COPILOT_COMPANION_PLUGIN_DATA`, added 2026-10-11, ticket 8). Each ticket adds its differences to the README section "Differences from the Codex plugin". |
 | II. Only reviewed code | Met | Code is written here or ported from upstream; the community ports were read for ideas only. No runtime dependencies. The devDependencies (`typescript`, `@types/node`) are for the type check only, as upstream. Each porting PR lists the upstream files and commit `db52e28` and says they were read line by line. |
 | III. Documented interfaces only | Met | Prompt mode with JSON output and the CLI flags and environment variables in the official docs (research sources). Only `scripts/lib/copilot.mjs` builds Copilot arguments and the child environment, and decides permissions. Only it imports the transport helper `scripts/lib/prompt-mode.mjs`, which only starts the process, writes the prompt and reads its output. The transport comparison is in research §2. Supported versions: 1.0.93 and later (research §5). Setup errors for a missing CLI, an old version and no login (spec FR-012). |
 | IV. Safe by default | Met | Reviews, the gate and read-only tasks use the read-only profile in research §3: Copilot's tool filters and deny rules, and a plugin-owned `COPILOT_HOME`, so the reviewed repository's hooks and MCP servers stay off. A review refuses to run, or stops, in the two cases of research §3. Above the inline limit, a review also writes its patch folder, a job file in the plugin's job storage (`jobs/<id>.patches`, or `jobs/stop-gate-<hook pid>-<random>.patches` for the gate, added 2026-10-11), outside the repository, which is deleted after the run (research §2). Tasks are read-only unless `--write`; the write profile is the smallest set that matches upstream `workspace-write`. No allow-all flag, and an inherited `COPILOT_ALLOW_ALL` is removed. Login stays with Copilot; the plugin stores no tokens. `process.mjs` uses `shell: false`; one launcher helper handles the npm shim (research §4); tests cover spaces and shell characters. |
@@ -112,7 +115,7 @@ plugins/copilot/
 │   └── gpt-5-4-prompting/{SKILL.md,references/*.md}
 └── scripts/
     ├── copilot-companion.mjs
-    ├── session-lifecycle-hook.mjs
+    ├── session-lifecycle-hook.mjs   # exports COPILOT_COMPANION_PLUGIN_DATA (ticket 8)
     ├── stop-review-gate-hook.mjs
     └── lib/
         ├── prompt-mode.mjs
@@ -125,7 +128,7 @@ plugins/copilot/
         ├── process.mjs
         ├── prompts.mjs
         ├── render.mjs
-        ├── state.mjs         # state.json, jobs/<id>.json, .log and .patches/
+        ├── state.mjs         # state.json, jobs/<id>.json, .log and .patches/; resolves the plugin data folder
         ├── tracked-jobs.mjs
         └── workspace.mjs
 tests/
@@ -158,7 +161,7 @@ differences to the README.
 | 5 | 5 | Review commands: `/copilot:review`, `/copilot:adversarial-review`, `prompts/review.md`, `prompts/adversarial-review.md`, the schema, `copilot-result-handling`. Above the inline limit, the patch folder `jobs/<id>.patches` (research §2). | a write blocked during a review, a review that cannot get the read-only profile, broken review JSON, the patch folder removed after the run and on a signal |
 | 6 | 6 | Rescue and background jobs: `/copilot:rescue`, the `copilot-rescue` agent, `gpt-5-4-prompting`, the `task` and `task-worker` subcommands with `--background`, `--write`, `--model`, `--effort`, `--resume`, `--fresh`, `task-resume-candidate`, `/copilot:status`, `/copilot:result`, `/copilot:cancel`, `docs/operations.md`. Cancel's exact-id match; cancel stops the companion and Copilot at the same time and keeps a pid that it could not stop, so it can run again (such a job stays out of pruning and resume); a worker that stops early marks its job failed; `/copilot:rescue` passes the mode of a continued task to the subagent; the Windows retry of a state file replace or read that meets another process (all added 2026-10-09; research §7). | cancel with the child process stopped, read-only task blocked from writing, resume with no earlier session, a state update while another process holds the file open on Windows |
 | 7 | 7 | Review gate and session hooks: `hooks/hooks.json`, `stop-review-gate-hook.mjs`, `session-lifecycle-hook.mjs`, `prompts/stop-review-gate.md`. | gate blocks a stop, gate lets Claude stop, gate with Copilot missing, gate run past its limit (the job is cancelled; added 2026-10-11), `SessionEnd` inside its 3.5 s budget (added 2026-10-11) |
-| 8 | 8 | First release: full README, `docs/architecture.md` from the real code, the manual run in [quickstart.md](quickstart.md), version 1.0.0, the install commands. | manual run (Principle VI) |
+| 8 | 8 | First release: full README, `docs/architecture.md` from the real code, the manual run in [quickstart.md](quickstart.md), version 1.0.0, the install commands. The data folder export that the manual run showed was needed (T083b; added 2026-10-11). | manual run (Principle VI); hooks and commands with another plugin's `CLAUDE_PLUGIN_DATA`, an inherited export, and no `CLAUDE_PLUGIN_DATA` (added 2026-10-11) |
 
 ## Complexity Tracking
 

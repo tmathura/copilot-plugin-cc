@@ -18,9 +18,9 @@ keeps the same commands and layout, and calls the Copilot CLI instead of Codex.
 
 - Claude Code.
 - A GitHub Copilot plan that includes the Copilot CLI. Each run uses premium requests from your
-  plan.
+  plan. With your own model provider (BYOK, see the FAQ), Copilot needs no GitHub login.
 - Node.js 22 or later. The Copilot CLI needs it.
-- The GitHub Copilot CLI 1.0.93 or later, logged in. See
+- The GitHub Copilot CLI 1.0.93 or later, logged in or set up for your own provider. See
   [docs/configuration.md](docs/configuration.md).
 
 ## Install
@@ -169,7 +169,8 @@ Stops an active background job.
 ### `/copilot:setup`
 
 Checks that the Copilot CLI is installed, is a supported version and is logged in. The login check
-sends one small prompt, so it uses one premium request.
+sends one small prompt, so it uses one premium request. With your own model provider, setup skips
+the login check.
 
 It also turns the optional review gate on or off:
 
