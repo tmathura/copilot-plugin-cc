@@ -1310,8 +1310,10 @@ test("a cancel that leaves a child whose parent exited names it and asks for a r
       ["task-orphan-twice", { 111111: orphan(), 222222: orphan() }, true, false],
       ["task-orphan-and-root", { 111111: new Error("taskkill failed"), 222222: orphan() }, true, true],
       ["task-undefined-reason", { 111111: undefined, 222222: orphan() }, true, true],
-      // The job's own Copilot pid is left after its companion exits; a new cancel signals it directly.
-      ["task-orphan-is-copilot", { 111111: orphan(222222), 222222: null }, false, true]
+      // The job's own Copilot pid is left after its companion exits. Its own stop worked, so it is gone.
+      ["task-orphan-is-stopped-copilot", { 111111: orphan(222222), 222222: null }, false, false],
+      // Its own stop failed too, so the job keeps it and a new cancel signals it directly.
+      ["task-orphan-is-kept-copilot", { 111111: orphan(222222), 222222: orphan() }, true, true]
     ];
     for (const [jobId, errors, named, retry] of cases) {
       updateState(tasks.cwd, (state) => {

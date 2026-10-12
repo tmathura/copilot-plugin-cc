@@ -1206,8 +1206,10 @@ export async function cancelJob(workspaceRoot, jobId, options = {}) {
     const parts = [
       `Job ${jobId} is ${cancelled.status}, but a process could not be stopped (${failures.map((reason) => reason?.message ?? reason).join("; ")}).`
     ];
-    // A new cancel signals the job's own pids; any other child whose parent has exited is out of its reach.
+    // A new cancel signals only the job's own pids whose stop failed; one whose own stop worked is gone,
+    // and any other child whose parent has exited is out of its reach.
     const stored = [cancelled.pid, cancelled.copilotPid];
+    const kept = stored.filter((pid, index) => pid && outcomes[index].status === "rejected");
     const left = [...new Set(failures.flatMap((reason) => (reason?.orphans ? reason.stillRunning : [])))];
     const orphans = left.filter((pid) => !stored.includes(pid));
     if (orphans.length > 0) {
@@ -1215,7 +1217,7 @@ export async function cancelJob(workspaceRoot, jobId, options = {}) {
         `The parent of ${orphans.map((pid) => `PID ${pid}`).join(", ")} has exited, so a new cancel cannot reach it. If it keeps running, end it in Task Manager.`
       );
     }
-    if (failures.some((reason) => !reason?.orphans) || orphans.length < left.length) {
+    if (failures.some((reason) => !reason?.orphans) || left.some((pid) => kept.includes(pid))) {
       parts.push(`Run /copilot:cancel ${jobId} again.`);
     }
     throw new Error(parts.join(" "));
