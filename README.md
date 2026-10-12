@@ -370,10 +370,10 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
 - `/copilot:cancel <job id>` with the full id of a finished job says that the job has finished. Codex
   can pick a different, running job whose id starts with the same text.
 - `/copilot:result <job id>` matches the id against every job, as `/copilot:cancel` does, so the full
-  id of a queued or running job says that the job is still running. Codex matches only finished
-  jobs, so it can show the result of a different job whose id starts with the same text, or say
-  that no job was found. A short prefix that fits both a finished and a running job is ambiguous
-  here. The reason is correctness.
+  id of a queued or running job says that the job is still queued or running. Codex matches only
+  finished jobs, so it can show the result of a different job whose id starts with the same text,
+  or say that no job was found. A short prefix that fits both a finished and a running job is
+  ambiguous here. The reason is correctness.
 - The rescue skill rule that defaults to `--write` repeats the exceptions for review, diagnosis and
   research without edits, and the prompt recipes run diagnosis without edits read-only. The Codex
   skill lists the exceptions in one rule but not in the other, and its recipes run diagnosis in
