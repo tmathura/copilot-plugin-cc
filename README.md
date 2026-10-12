@@ -295,8 +295,7 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
 - The Git Status section of a review shows each line as `git status --short` prints it, and no
   section loses the white space at the end of its last line. Codex removes the leading space of the
   first status line, so an unstaged change there looks staged, and cuts white space from the end of
-  a file name. The reason is correctness. One case is not fixed yet: in a large branch review, the
-  last changed file name still loses white space at its end (#40).
+  a file name. The reason is correctness.
 - For a large diff, Codex runs read-only `git` commands itself. Copilot's reviews have no shell, so
   the plugin writes the exact patches to a folder in its own job storage, lets Copilot read that
   folder (`--add-dir`), and deletes the folder after the review. If the review is killed outright
