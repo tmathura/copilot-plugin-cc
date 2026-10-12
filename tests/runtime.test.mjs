@@ -527,6 +527,17 @@ test("an adversarial review whose last turn has no answer fails with a clear err
   }
 });
 
+test("an adversarial review whose run fails with an empty last turn reports the failure", () => {
+  const { result } = runReview("adversarial-review", makeRepo(), { behavior: "truncated", args: ["--json"] });
+  const payload = JSON.parse(result.stdout);
+
+  assert.equal(result.status, 1);
+  assert.equal(payload.result, null);
+  assert.match(payload.parseError, /fake copilot: connection lost/);
+  assert.doesNotMatch(payload.parseError, /without an answer/);
+  assert.equal(payload.copilot.stdout, "");
+});
+
 test("an adversarial review whose Copilot calls a json tool is stopped with a clear error", async () => {
   const { result, runs } = runReview("adversarial-review", makeRepo(), {
     behavior: "forbidden-tool",
