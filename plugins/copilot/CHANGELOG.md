@@ -2,6 +2,12 @@
 
 ## Copilot plugin
 
+### 1.0.2
+
+- A companion that is stopped while it takes the state lock no longer leaves an empty lock file.
+  Before, every later command waited 5 seconds and then failed with "The lock has no readable
+  owner", until you deleted the file by hand.
+
 ### 1.0.1
 
 - A review shows a file name with non-ASCII letters as it is, in the status, the file lists and the
