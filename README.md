@@ -391,6 +391,11 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
   foreground run that fails at once, for example without a login, shows Copilot's error. The Codex
   subagent returns nothing, so the user gets an empty answer, and its rescue command has a
   `/codex:setup` rule that its helper can never trigger. The reason is correctness.
+- A run that fails because Copilot is not logged in adds "Run `/copilot:setup`" to Copilot's own
+  error, in a task, a review, `/copilot:result` and the review gate. Setup knows more than
+  Copilot's login steps, for example a token for a system with no credential store. The review
+  gate's message gives a failed run's reason from the task's JSON output. The task's JSON output
+  has a `failureMessage` field for this. The reason is correctness.
 - The plugin replaces the job state and job files through a temp file and a rename, so a reader
   never sees half a file. Codex writes over the file. On Windows a rename fails while another
   process reads the file, and a reader can miss the file during a rename, so the plugin retries both
