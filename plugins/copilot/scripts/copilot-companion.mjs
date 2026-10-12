@@ -360,7 +360,7 @@ async function executeReviewRun(request) {
       sourceThreadId: result.threadId,
       copilot: {
         status: result.status,
-        stderr: result.stderr,
+        stderr: describeRunFailure(result),
         stdout: result.reviewText,
         reasoning: result.reasoningSummary
       }
