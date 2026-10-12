@@ -65,6 +65,7 @@ test("result with the exact id of a running job says it is still running, not an
   assert.throws(() => resolveResultJob(workspace, "task-abc"), /Job task-abc is still running\. Check \/copilot:status/);
   assert.throws(() => resolveResultJob(workspace, "task-queued"), /Job task-queued is still queued\./);
   assert.equal(resolveResultJob(workspace, "task-abcd").job.id, "task-abcdef");
+  assert.throws(() => resolveResultJob(workspace, "task-ab"), /Job reference "task-ab" is ambiguous\./);
 });
 
 test("result with the exact id of a finished job wins over a longer id that shares its prefix", () => {
