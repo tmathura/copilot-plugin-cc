@@ -164,7 +164,7 @@ function firstMeaningfulLine(text, fallback) {
   for (const value of String(text ?? "").split(/\r?\n/)) {
     const line = value.trim();
     // Headings, rules such as "---" and code fences.
-    if (!line || /^#{1,6}(\s|$)/.test(line) || /^([-*_])\1{2,}$/.test(line) || /^(```|~~~)/.test(line)) {
+    if (!line || /^#{1,6}(\s|$)/.test(line) || /^([-*_])(\s*\1){2,}$/.test(line) || /^(```|~~~)/.test(line)) {
       continue;
     }
     // Bold, also bold-italic such as "***Findings***".
