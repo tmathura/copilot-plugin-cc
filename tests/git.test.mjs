@@ -201,6 +201,41 @@ test("collectReviewContext falls back to lightweight context for oversized singl
   assert.match(context.content, /## Changed Files/);
 });
 
+test("collectReviewContext keeps the leading status column of an unstaged first line, inline and lightweight", () => {
+  const cwd = makeTempDir();
+  initGitRepo(cwd);
+  for (const name of ["a.js", "b.js"]) {
+    fs.writeFileSync(path.join(cwd, name), `export const value = "${name}-v1";\n`);
+  }
+  run("git", ["add", "a.js", "b.js"], { cwd });
+  run("git", ["commit", "-m", "init"], { cwd });
+  fs.writeFileSync(path.join(cwd, "a.js"), 'export const value = "unstaged";\n');
+  fs.writeFileSync(path.join(cwd, "b.js"), 'export const value = "staged";\n');
+  run("git", ["add", "b.js"], { cwd });
+
+  const target = resolveReviewTarget(cwd, {});
+  for (const includeDiff of [true, false]) {
+    const { content } = collectReviewContext(cwd, target, { includeDiff });
+
+    assert.ok(content.includes("## Git Status\n\n M a.js\nM  b.js\n"), content);
+    assert.ok(content.includes("## Untracked Files\n\n(none)\n"), content);
+  }
+});
+
+test("collectReviewContext keeps trailing white space of the last name in the status and file lists", () => {
+  const cwd = makeTempDir();
+  initGitRepo(cwd);
+  fs.writeFileSync(path.join(cwd, "a.js"), "export const value = 1;\n");
+  run("git", ["add", "a.js"], { cwd });
+  run("git", ["commit", "-m", "init"], { cwd });
+  fs.writeFileSync(path.join(cwd, "z.js "), "export const value = 2;\n");
+
+  const { content } = collectReviewContext(cwd, resolveReviewTarget(cwd, {}), { includeDiff: false });
+
+  assert.ok(content.includes("## Git Status\n\n?? z.js \n\n"), content);
+  assert.ok(content.includes("## Changed Files\n\nz.js \n\n"), content);
+});
+
 test("collectReviewContext keeps untracked file content in lightweight working tree context", () => {
   const cwd = makeTempDir();
   initGitRepo(cwd);

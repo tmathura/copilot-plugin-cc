@@ -1,6 +1,7 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): every git call writes no index and starts no
 // fsmonitor hook or textconv program; non-ASCII file names are not quoted; untracked symlinks are not
-// read; the self-collect guidance points Copilot at patch files, which writeReviewPatches writes.
+// read; the self-collect guidance points Copilot at patch files, which writeReviewPatches writes; the
+// review sections remove only trailing new lines, so Git Status keeps the leading space of its first line.
 import fs from "node:fs";
 import path from "node:path";
 
@@ -218,8 +219,10 @@ export function resolveReviewTarget(cwd, options = {}) {
   };
 }
 
+// Only trailing new lines go: a leading space is the staged column of `git status --short`, and a
+// file name or a patch line can end in white space.
 function formatSection(title, body) {
-  return [`## ${title}`, "", body.trim() ? body.trim() : "(none)", ""].join("\n");
+  return [`## ${title}`, "", body.trim() ? body.replace(/\n+$/, "") : "(none)", ""].join("\n");
 }
 
 function formatUntrackedFile(cwd, relativePath) {
@@ -258,7 +261,7 @@ function formatUntrackedFile(cwd, relativePath) {
 
 function collectWorkingTreeContext(cwd, state, options = {}) {
   const includeDiff = options.includeDiff !== false;
-  const status = gitChecked(cwd, ["status", "--short", "--untracked-files=all"]).stdout.trim();
+  const status = gitChecked(cwd, ["status", "--short", "--untracked-files=all"]).stdout;
   const changedFiles = listUniqueFiles(state.staged, state.unstaged, state.untracked);
 
   let parts;
