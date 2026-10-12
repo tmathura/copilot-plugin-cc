@@ -2,6 +2,12 @@
 
 ## Copilot plugin
 
+### 1.0.4
+
+- A review's Git Status keeps the leading space of its first line. Before, an unstaged change on
+  the first line looked staged to Copilot. A review section also keeps white space at the end of
+  its last line, such as a no-break space at the end of a file name.
+
 ### 1.0.3
 
 - An option written as `--name=value` keeps every `=` in its value. Before, `--base=refs/x=y`

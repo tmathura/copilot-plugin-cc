@@ -288,7 +288,14 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
 - A review reads an untracked file whose name has non-ASCII letters, a tab or a newline. It shows a
   non-ASCII name as it is (`core.quotePath=false`) in the status, the file lists and the patches.
   Codex shows git's quoted form, such as `"caf\303\251.js"`, and skips such an untracked file as
-  unreadable. The reason is correctness.
+  unreadable. The reason is correctness. A file name can also hold hidden Unicode characters, such
+  as a right-to-left override (U+202E) or a zero-width space. The review shows them as they are and
+  does not escape them. This risk is accepted: Copilot reads each character, not the text as a
+  terminal shows it.
+- The Git Status section of a review shows each line as `git status --short` prints it, and no
+  section loses the white space at the end of its last line. Codex removes the leading space of the
+  first status line, so an unstaged change there looks staged, and cuts white space from the end of
+  a file name. The reason is correctness.
 - For a large diff, Codex runs read-only `git` commands itself. Copilot's reviews have no shell, so
   the plugin writes the exact patches to a folder in its own job storage, lets Copilot read that
   folder (`--add-dir`), and deletes the folder after the review. If the review is killed outright
