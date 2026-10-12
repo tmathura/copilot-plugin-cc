@@ -1230,7 +1230,7 @@ export async function cancelJob(workspaceRoot, jobId, options = {}) {
     .filter((reason) => !reason?.orphans || reason.retry || untracked(reason).length > 0);
   if (failures.length > 0) {
     const parts = [
-      `Job ${jobId} is ${cancelled.status}, but a process could not be stopped (${failures.map((reason) => reason?.message ?? reason).join("; ")}).`
+      `Job ${jobId} is ${cancelled.status}, but a process could not be stopped (${failures.map((reason) => reason?.message ?? String(reason ?? "no error detail")).join("; ")}).`
     ];
     const orphans = [...new Set(failures.flatMap(untracked))];
     if (orphans.length === 1) {

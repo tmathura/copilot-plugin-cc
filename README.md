@@ -373,7 +373,8 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
   `taskkill` could not stop are still alive, for up to 5 seconds. Only one that is still alive
   counts as a failed stop. When a child that the job does not track is left after its parent
   exited, a new cancel cannot reach it, so cancel names it and says to end it in Task Manager if
-  it is still a Copilot or gh process. The job then keeps no pid for that stop. Copilot starts
+  it is still a Copilot or gh process. The job then keeps no pid for that stop. When this happens
+  as a Claude session ends, the job stays, and `/copilot:result` shows the same note. Copilot starts
   short-lived `gh.exe` children that exit while `taskkill` stops the tree, and Codex reports such a
   cancel as failed. The reason is correctness.
 - A background task's record is written before its worker starts. Codex starts the worker first, and

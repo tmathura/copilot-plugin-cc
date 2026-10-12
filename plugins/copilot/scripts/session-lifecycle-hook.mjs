@@ -128,15 +128,19 @@ export async function cleanupSessionJobs(cwd, sessionId, options = {}) {
       const keys = ["pid", "copilotPid"].filter((key) => job[key]);
       const outcomes = await Promise.allSettled(keys.map((key) => terminate(job[key], { forceKillAfterMs })));
       // A stop that leaves only children of an exited pid is done with that pid: a cancel cannot reach
-      // the children, and the pid may be reused.
+      // the children, and the pid may be reused. The job then keeps a note that names those children.
       const done = outcomes.map((outcome) => outcome.status === "fulfilled" || Boolean(outcome.reason?.orphans));
-      if (done.every(Boolean)) {
+      const stored = keys.map((key) => job[key]);
+      const children = [
+        ...new Set(outcomes.flatMap((outcome) => (outcome.reason?.orphans ? outcome.reason.stillRunning : [])))
+      ].filter((pid) => !stored.includes(pid));
+      if (done.every(Boolean) && children.length === 0) {
         removedIds.add(job.id);
       } else {
-        stoppedPids.set(
-          job.id,
-          keys.filter((_, index) => done[index]).map((key) => [key, job[key]])
-        );
+        stoppedPids.set(job.id, {
+          cleared: keys.filter((_, index) => done[index]).map((key) => [key, job[key]]),
+          children
+        });
       }
     })
   );
@@ -149,11 +153,15 @@ export async function cleanupSessionJobs(cwd, sessionId, options = {}) {
         state.jobs = state.jobs
           .filter((job) => !removedIds.has(job.id))
           .map((job) => {
-            const cleared = (stoppedPids.get(job.id) ?? []).filter(([key, pid]) => job[key] === pid);
-            if (cleared.length === 0) {
+            const { cleared = [], children = [] } = stoppedPids.get(job.id) ?? {};
+            const clearedNow = cleared.filter(([key, pid]) => job[key] === pid);
+            if (clearedNow.length === 0 && children.length === 0) {
               return job;
             }
-            const kept = { ...job, ...Object.fromEntries(cleared.map(([key]) => [key, null])) };
+            const kept = { ...job, ...Object.fromEntries(clearedNow.map(([key]) => [key, null])) };
+            if (children.length > 0) {
+              kept.errorMessage = `${job.errorMessage ?? "The Claude session ended."} ${children.map((pid) => `PID ${pid}`).join(", ")} kept running after its parent exited, so a cancel cannot reach it. If Task Manager still shows it as a Copilot or gh process, end it there.`;
+            }
             writeJobRecord(workspaceRoot, kept, jobFilesDeadline);
             return kept;
           });

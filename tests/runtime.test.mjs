@@ -1340,6 +1340,7 @@ test("a cancel that leaves a child whose parent exited names it and asks for a r
           );
           assert.equal(/PID 222222/.test(error.message.replace(/^[^(]*\([^)]*\)/, "")), false, jobId);
           assert.equal(/PID 4321, PID 4321/.test(error.message), false, jobId);
+          assert.equal(/\(no error detail;/.test(error.message), errors[111111] === undefined, jobId);
           assert.equal(/Run \/copilot:cancel .* again\.$/.test(error.message), retry, jobId);
           return true;
         });
@@ -2163,7 +2164,7 @@ test("SessionEnd keeps a job whose stop fails, and an older job whose stop never
   });
 });
 
-test("SessionEnd clears a pid whose stop shows it has exited, and keeps one that can still be stopped", async () => {
+test("SessionEnd clears a pid whose stop shows it has exited, keeps one that can still be stopped, and names a child it left", async () => {
   const tasks = setUpTasks();
   await withCompanionEnv(tasks.env, async () => {
     const { cleanupSessionJobs } = await import(pathToFileURL(SESSION_HOOK).href);
@@ -2189,9 +2190,16 @@ test("SessionEnd clears a pid whose stop shows it has exited, and keeps one that
       }
     });
 
-    const jobs = readJobs(tasks.dataDir);
-    assert.deepEqual(jobs.map((job) => job.id), ["task-orphan-and-live"]);
-    assert.deepEqual([jobs[0].pid, jobs[0].copilotPid], [null, 444444]);
+    const jobs = Object.fromEntries(readJobs(tasks.dataDir).map((job) => [job.id, job]));
+    assert.deepEqual(Object.keys(jobs).sort(), ["task-orphan-and-live", "task-orphan-only"]);
+    assert.deepEqual([jobs["task-orphan-only"].pid, jobs["task-orphan-only"].copilotPid], [null, null]);
+    assert.deepEqual([jobs["task-orphan-and-live"].pid, jobs["task-orphan-and-live"].copilotPid], [null, 444444]);
+    for (const job of Object.values(jobs)) {
+      assert.match(
+        job.errorMessage,
+        /^The Claude session ended\. PID 4321 kept running after its parent exited, so a cancel cannot reach it\. If Task Manager still shows it as a Copilot or gh process, end it there\.$/
+      );
+    }
   });
 });
 
