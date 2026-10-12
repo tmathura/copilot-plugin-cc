@@ -46,5 +46,5 @@ Operating rules:
 - Leave `--effort` unset unless the user explicitly asks for a specific reasoning effort.
 - Leave the model unset unless the user explicitly asks for one.
 - Leave `--resume` and `--fresh` in the forwarded request. The subagent handles that routing when it builds the `task` command.
-- If the subagent returns the companion's error, for example that Copilot is missing or too old, or a foreground run's failure such as a missing login, return it verbatim. For a missing or too old Copilot it names `/copilot:setup` as the next step. A background run that fails later reports it in `/copilot:status`.
+- If the subagent returns the companion's error, for example that Copilot is missing or too old, or a foreground run's failure such as a missing login, return it verbatim. For a missing or too old Copilot it names `/copilot:setup` as the next step. A background run that fails later shows as failed in `/copilot:status`, and `/copilot:result` gives the reason.
 - If the user did not supply a request, ask what Copilot should investigate or fix.

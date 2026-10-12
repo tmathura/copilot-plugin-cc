@@ -813,18 +813,21 @@ test("a rescue task with a missing or too old Copilot fails with an error that n
   }
 });
 
-test("a rescue task without a Copilot login prints Copilot's login steps in the foreground, and starts in the background", () => {
-  const { companion } = setUpTasks("not-logged-in");
+test("a rescue task without a Copilot login prints Copilot's login steps, at once in the foreground and later in a background result", async () => {
+  const { companion, dataDir } = setUpTasks("not-logged-in");
   const result = companion(["task", "--write", "fix the bug"]);
 
   assert.notEqual(result.status, 0);
   assert.match(result.stdout, /No authentication information found\./);
   assert.match(result.stdout, /run the '\/login' command/);
 
-  // A background run starts first; its login failure shows later in /copilot:status.
-  const background = companion(["task", "--write", "--background", "fix the bug"]);
+  // A background run starts first; its login failure shows later in /copilot:status and /copilot:result.
+  const background = companion(["task", "--write", "--background", "--json", "fix the bug"]);
   assert.equal(background.status, 0, background.stderr);
-  assert.match(background.stdout, /started in the background/);
+  const { jobId } = JSON.parse(background.stdout);
+  await waitFor(() => findJob(dataDir, jobId)?.status === "failed", 30000);
+  assert.match(companion(["status", jobId]).stdout, new RegExp(`${jobId} \\| failed`));
+  assert.match(companion(["result", jobId]).stdout, /No authentication information found\.[\s\S]*run the '\/login' command/);
 });
 
 test("a read-only task cannot write, and a --write task gets the write profile with the sandbox", () => {
