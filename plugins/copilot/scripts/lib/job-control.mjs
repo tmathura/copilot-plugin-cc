@@ -1,5 +1,5 @@
-// Changed from upstream codex-plugin-cc (Apache-2.0): renamed for the copilot plugin; cancel matches an
-// explicit job reference against every job before it checks that the job is active; a stored job is
+// Changed from upstream codex-plugin-cc (Apache-2.0): renamed for the copilot plugin; cancel and result
+// match an explicit job reference against every job before they check the job's status; a stored job is
 // read through the state module, which retries a read that meets a file replace on Windows.
 import fs from "node:fs";
 
@@ -262,26 +262,18 @@ export function buildSingleJobSnapshot(cwd, reference, options = {}) {
 export function resolveResultJob(cwd, reference) {
   const workspaceRoot = resolveWorkspaceRoot(cwd);
   const jobs = sortJobsNewestFirst(reference ? listJobs(workspaceRoot) : filterJobsForCurrentSession(listJobs(workspaceRoot)));
-  const selected = matchJobReference(
-    jobs,
-    reference,
-    (job) => job.status === "completed" || job.status === "failed" || job.status === "cancelled"
-  );
+  const isActive = (job) => job.status === "queued" || job.status === "running";
 
-  if (selected) {
-    return { workspaceRoot, job: selected };
+  // The exact id of a running job must not select a different, finished job that it is a prefix of.
+  const selected = reference ? matchJobReference(jobs, reference) : (jobs.find((job) => !isActive(job)) ?? jobs[0]);
+
+  if (!selected) {
+    throw new Error("No finished Copilot jobs found for this repository yet.");
   }
-
-  const active = matchJobReference(jobs, reference, (job) => job.status === "queued" || job.status === "running");
-  if (active) {
-    throw new Error(`Job ${active.id} is still ${active.status}. Check /copilot:status and try again once it finishes.`);
+  if (isActive(selected)) {
+    throw new Error(`Job ${selected.id} is still ${selected.status}. Check /copilot:status and try again once it finishes.`);
   }
-
-  if (reference) {
-    throw new Error(`No finished job found for "${reference}". Run /copilot:status to inspect active jobs.`);
-  }
-
-  throw new Error("No finished Copilot jobs found for this repository yet.");
+  return { workspaceRoot, job: selected };
 }
 
 export function resolveCancelableJob(cwd, reference, options = {}) {

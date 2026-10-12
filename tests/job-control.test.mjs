@@ -55,6 +55,39 @@ test("result refuses a job that is still running", () => {
   );
 });
 
+test("result with the exact id of a running job says it is still running, not another job's result", () => {
+  const workspace = workspaceWithJobs([
+    { id: "task-abc", status: "running" },
+    { id: "task-abcdef", status: "completed" },
+    { id: "task-queued", status: "queued" }
+  ]);
+
+  assert.throws(() => resolveResultJob(workspace, "task-abc"), /Job task-abc is still running\. Check \/copilot:status/);
+  assert.throws(() => resolveResultJob(workspace, "task-queued"), /Job task-queued is still queued\./);
+  assert.equal(resolveResultJob(workspace, "task-abcd").job.id, "task-abcdef");
+});
+
+test("result with the exact id of a finished job wins over a longer id that shares its prefix", () => {
+  const workspace = workspaceWithJobs([
+    { id: "task-abc", status: "failed" },
+    { id: "task-abcdef", status: "completed" }
+  ]);
+
+  assert.equal(resolveResultJob(workspace, "task-abc").job.id, "task-abc");
+  assert.throws(() => resolveResultJob(workspace, "task-ab"), /Job reference "task-ab" is ambiguous\./);
+  assert.throws(() => resolveResultJob(workspace, "task-zzz"), /No job found for "task-zzz"\. Run \/copilot:status/);
+});
+
+test("result without a reference picks the newest finished job, not a newer running one", () => {
+  const finished = workspaceWithJobs([
+    { id: "task-old", status: "completed" },
+    { id: "task-new", status: "cancelled" },
+    { id: "task-live", status: "running" }
+  ]);
+
+  assert.equal(resolveResultJob(finished).job.id, "task-new");
+});
+
 test("result reports when no job has finished", () => {
   const workspace = workspaceWithJobs([]);
 

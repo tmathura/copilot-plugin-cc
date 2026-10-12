@@ -2,6 +2,12 @@
 
 ## Copilot plugin
 
+### 1.0.5
+
+- `/copilot:result <job id>` with the full id of a queued or running job says that the job is still
+  running. Before, it could show the result of another job whose id starts with the same text, or
+  say that no job was found.
+
 ### 1.0.4
 
 - A review's Git Status keeps the leading space of its first line. Before, an unstaged change on
