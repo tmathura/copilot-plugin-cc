@@ -30,8 +30,10 @@ export const NOT_LOGGED_IN_STDERR = [
 //   bad-json            a line that is not JSON, then exits
 //   truncated           exits 1 before the result event
 //   fail                sends FAKE_COPILOT_ANSWER if set, a result with exitCode 1, then exits 1
-//   forbidden-tool      sends FAKE_COPILOT_ANSWER if set, starts a child and the create tool, then
-//                       runs until killed
+//   forbidden-tool      sends FAKE_COPILOT_ANSWER if set, starts a child and the create tool (or
+//                       FAKE_COPILOT_TOOL), then runs until killed
+//   no-final-message    a turn with a message (FAKE_COPILOT_ANSWER if set), then a last turn with
+//                       only reasoning, a warning on stderr, and a successful result
 //   hang                starts a child, then runs until killed
 //   hang-ignore-sigterm like hang, but ignores SIGTERM
 //   hang-after-result   a full successful turn, starts a child, then runs until killed
@@ -39,7 +41,8 @@ export const NOT_LOGGED_IN_STDERR = [
 //   reject-flags        rejects its arguments and exits 1 before it reads the prompt
 // Every run records its arguments, environment, prompt, pid and the files of each --add-dir folder
 // (base64, so the bytes stay exact). Each child that a run starts is recorded with the run's pid.
-// FAKE_COPILOT_ANSWER replaces the final answer text.
+// FAKE_COPILOT_ANSWER replaces the final answer text. FAKE_COPILOT_EARLIER gives the first turn's
+// message, which comes with the view tool call.
 export function installFakeCopilot(binDir, behavior = "ok") {
   const scriptPath = path.join(binDir, "copilot");
   const recordPath = path.join(binDir, "fake-copilot-runs.jsonl");
@@ -123,7 +126,7 @@ function emitTurn() {
   process.stdout.write("null\\n");
   emit({ type: "assistant.turn_start", data: { turnId: "0" } });
   emit({ type: "assistant.reasoning", data: { content: "Looked at the request." } });
-  emit({ type: "assistant.message", data: { content: "", toolRequests: [{ toolCallId: "call-1", name: "view" }] } });
+  emit({ type: "assistant.message", data: { content: process.env.FAKE_COPILOT_EARLIER ?? "", toolRequests: [{ toolCallId: "call-1", name: "view" }] } });
   emit({ type: "tool.execution_start", data: { toolCallId: "call-1", toolName: "view", arguments: { path: "a.txt" } } });
   emit({ type: "tool.execution_complete", data: { toolCallId: "call-1", success: true } });
   emit({ type: "assistant.turn_start", data: { turnId: "1" } });
@@ -178,8 +181,17 @@ process.stdin.on("end", () => {
         emit({ type: "assistant.message", data: { content: process.env.FAKE_COPILOT_ANSWER } });
       }
       startChild();
-      emit({ type: "tool.execution_start", data: { toolCallId: "call-1", toolName: "create", arguments: { path: "x.txt" } } });
+      emit({ type: "tool.execution_start", data: { toolCallId: "call-1", toolName: process.env.FAKE_COPILOT_TOOL ?? "create", arguments: { path: "x.txt" } } });
       runForever();
+      break;
+    case "no-final-message":
+      emit({ type: "assistant.turn_start", data: { turnId: "0" } });
+      emit({ type: "assistant.message", data: { content: process.env.FAKE_COPILOT_ANSWER ?? "Need to check what setup prints." } });
+      emit({ type: "assistant.turn_start", data: { turnId: "1" } });
+      emit({ type: "assistant.reasoning", data: { content: "The change looks safe; I would approve." } });
+      process.stderr.write("fake copilot: a warning\\n");
+      emitResult(0);
+      process.exit(0);
       break;
     case "hang-ignore-sigterm":
     case "hang": {

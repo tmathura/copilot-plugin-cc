@@ -13,6 +13,7 @@
  *   turnId: string | null,
  *   result: ResultEvent | null,
  *   lastAgentMessage: string,
+ *   lastTurnMessage: string,
  *   reasoningSummary: string[],
  *   error: Error | null,
  *   stderr: string,
@@ -251,6 +252,7 @@ function createTurnCaptureState(sessionId, options = {}) {
     turnId: null,
     result: null,
     lastAgentMessage: "",
+    lastTurnMessage: "",
     reasoningSummary: [],
     error: null,
     stderr: "",
@@ -269,6 +271,7 @@ function applyTurnEvent(state, event, client) {
   switch (event.type) {
     case "assistant.turn_start":
       state.turnId = event.data?.turnId ?? state.turnId;
+      state.lastTurnMessage = "";
       emitProgress(state.onProgress, `Turn started (${state.turnId}).`, "starting", {
         threadId: state.sessionId,
         turnId: state.turnId
@@ -278,6 +281,7 @@ function applyTurnEvent(state, event, client) {
       const text = event.data?.content ?? "";
       if (text) {
         state.lastAgentMessage = text;
+        state.lastTurnMessage = text;
         emitLogEvent(state.onProgress, {
           message: `Assistant message captured: ${shorten(text, 96)}`,
           logTitle: "Assistant message",
@@ -464,6 +468,8 @@ async function runCopilotTurn(cwd, options = {}) {
       threadId: turnState.result?.sessionId ?? sessionId,
       turnId: turnState.turnId,
       finalMessage: turnState.lastAgentMessage,
+      // A turn is one model call; a run whose last turn says nothing has no final answer.
+      lastTurnMessage: turnState.lastTurnMessage,
       reasoningSummary: turnState.reasoningSummary,
       result: turnState.result,
       error: turnState.error,
