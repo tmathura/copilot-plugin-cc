@@ -164,10 +164,11 @@ function firstMeaningfulLine(text, fallback) {
   for (const value of String(text ?? "").split(/\r?\n/)) {
     const line = value.trim();
     // Headings, rules such as "---" and code fences.
-    if (!line || /^#{1,6}(\s|$)/.test(line) || /^([-*_])\1{2,}$/.test(line) || line.startsWith("```")) {
+    if (!line || /^#{1,6}(\s|$)/.test(line) || /^([-*_])\1{2,}$/.test(line) || /^(```|~~~)/.test(line)) {
       continue;
     }
-    const bold = /^(\*\*|__)((?:(?!\1).)+)\1:?$/.exec(line)?.[2].trim();
+    // Bold, also bold-italic such as "***Findings***".
+    const bold = /^(\*\*\*?|___?)((?:(?!\1).)+)\1:?$/.exec(line)?.[2].trim();
     if (bold === undefined) {
       return line;
     }

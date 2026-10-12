@@ -297,6 +297,8 @@ test("a review's job summary skips headings and bold labels, and keeps a bold se
     ["**Findings in my_module**:\n**The get_user call fails for a*b.**\n", "The get_user call fails for a*b."],
     ["**Is the empty case handled?**\n", "Is the empty case handled?"],
     ["**a** and **b** differ.\n", "**a** and **b** differ."],
+    ["***Findings***\r\n~~~markdown\r\n***The cache never expires.***\r\n", "The cache never expires."],
+    ["~~~\n~~~\n", "Review completed."],
     ["# Review\n\n### Findings\n\n**Summary**\n", "Review completed."]
   ];
   for (const [answer, summary] of cases) {
