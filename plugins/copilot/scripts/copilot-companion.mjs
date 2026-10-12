@@ -1190,10 +1190,27 @@ export async function cancelJob(workspaceRoot, jobId, options = {}) {
   const outcomes = await Promise.allSettled(
     ["pid", "copilotPid"].map(async (key) => {
       const pid = cancelled[key];
-      await terminate(pid ?? Number.NaN);
-      if (pid) {
-        updateJobRecord(workspaceRoot, jobId, (current) => (current?.[key] === pid ? { ...current, [key]: null } : null));
+      const clear = () =>
+        pid && updateJobRecord(workspaceRoot, jobId, (current) => (current?.[key] === pid ? { ...current, [key]: null } : null));
+      try {
+        await terminate(pid ?? Number.NaN);
+      } catch (error) {
+        // This pid has exited and only children it left are alive, so keeping it would only block a resume.
+        if (error?.orphans) {
+          try {
+            clear();
+          } catch (clearError) {
+            // The record keeps the pid, so a retry is needed to clear it; the children are still named.
+            throw Object.assign(new Error(`${error.message}\nThe job record could not be updated: ${clearError.message}`), {
+              orphans: true,
+              stillRunning: error.stillRunning,
+              retry: true
+            });
+          }
+        }
+        throw error;
       }
+      clear();
     })
   );
   try {
@@ -1201,11 +1218,34 @@ export async function cancelJob(workspaceRoot, jobId, options = {}) {
   } catch {
     // The log is only a record; the processes are what matter.
   }
-  const failure = outcomes.find((outcome) => outcome.status === "rejected");
-  if (failure) {
-    throw new Error(
-      `Job ${jobId} is ${cancelled.status}, but a process could not be stopped (${failure.reason?.message ?? failure.reason}). Run /copilot:cancel ${jobId} again.`
-    );
+  // A new cancel signals the job's own pids. A stored pid that is still alive fails its own stop
+  // without `orphans`, which asks for the retry below; one that is gone needs nothing. So a stop that
+  // left only the job's other pid is covered by that pid's own stop. Any other child whose parent has
+  // exited is out of a new cancel's reach.
+  const stored = [cancelled.pid, cancelled.copilotPid];
+  const untracked = (reason) => (reason?.orphans ? reason.stillRunning.filter((pid) => !stored.includes(pid)) : []);
+  const failures = outcomes
+    .filter((outcome) => outcome.status === "rejected")
+    .map((outcome) => outcome.reason)
+    .filter((reason) => !reason?.orphans || reason.retry || untracked(reason).length > 0);
+  if (failures.length > 0) {
+    const parts = [
+      `Job ${jobId} is ${cancelled.status}, but a process could not be stopped (${failures.map((reason) => reason?.message ?? String(reason ?? "no error detail")).join("; ")}).`
+    ];
+    const orphans = [...new Set(failures.flatMap(untracked))];
+    if (orphans.length === 1) {
+      parts.push(
+        `The parent of PID ${orphans[0]} has exited, so a new cancel cannot reach it. If Task Manager still shows it as a Copilot or gh process, end it there.`
+      );
+    } else if (orphans.length > 1) {
+      parts.push(
+        `The parents of ${orphans.map((pid) => `PID ${pid}`).join(", ")} have exited, so a new cancel cannot reach them. If Task Manager still shows them as Copilot or gh processes, end them there.`
+      );
+    }
+    if (failures.some((reason) => !reason?.orphans || reason.retry)) {
+      parts.push(`Run /copilot:cancel ${jobId} again.`);
+    }
+    throw new Error(parts.join(" "));
   }
   return { job: { ...cancelled, pid: null, copilotPid: null }, interrupt };
 }

@@ -5,7 +5,7 @@
 // CLAUDE_PLUGIN_DATA over an inherited export. SessionEnd closes the session and marks its
 // active jobs cancelled in one locked update, stops their companions and Copilot processes with one
 // shared wait, and then removes the session's finished jobs and the jobs it stopped, all inside the
-// hook's 5 s timeout.
+// hook's 5 s timeout. A pid whose stop shows it has exited counts as stopped.
 
 import fs from "node:fs";
 import process from "node:process";
@@ -118,22 +118,29 @@ export async function cleanupSessionJobs(cwd, sessionId, options = {}) {
     { lockTimeoutMs: timeLeft(), deadline }
   );
 
-  // One shared wait, then SIGKILL, so three jobs cost no more time than one. A job whose processes
-  // could not all be stopped keeps its record, so /copilot:cancel can try again; as in cancel, only
-  // the pids whose stop failed stay in it, because a stopped pid can be reused.
+  // One shared wait, then SIGKILL, so three jobs cost no more time than one. A job keeps its record
+  // while one of its own pids may still be alive, so /copilot:cancel can try again; as in cancel, a pid
+  // that stopped or has exited is cleared, because it can be reused.
   const forceKillAfterMs = Math.max(0, Math.min(STOP_WAIT_MS, timeLeft() - FINAL_UPDATE_RESERVE_MS));
   const stoppedPids = new Map();
   await Promise.all(
     stopping.map(async (job) => {
       const keys = ["pid", "copilotPid"].filter((key) => job[key]);
       const outcomes = await Promise.allSettled(keys.map((key) => terminate(job[key], { forceKillAfterMs })));
-      if (outcomes.every((outcome) => outcome.status === "fulfilled")) {
+      // A stop that leaves only children of an exited pid is done with that pid: a cancel cannot reach
+      // the children, and the pid may be reused. The job then keeps a note that names those children.
+      const done = outcomes.map((outcome) => outcome.status === "fulfilled" || Boolean(outcome.reason?.orphans));
+      const stored = keys.map((key) => job[key]);
+      const children = [
+        ...new Set(outcomes.flatMap((outcome) => (outcome.reason?.orphans ? outcome.reason.stillRunning : [])))
+      ].filter((pid) => !stored.includes(pid));
+      if (done.every(Boolean) && children.length === 0) {
         removedIds.add(job.id);
       } else {
-        stoppedPids.set(
-          job.id,
-          keys.filter((_, index) => outcomes[index].status === "fulfilled").map((key) => [key, job[key]])
-        );
+        stoppedPids.set(job.id, {
+          cleared: keys.filter((_, index) => done[index]).map((key) => [key, job[key]]),
+          children
+        });
       }
     })
   );
@@ -146,11 +153,19 @@ export async function cleanupSessionJobs(cwd, sessionId, options = {}) {
         state.jobs = state.jobs
           .filter((job) => !removedIds.has(job.id))
           .map((job) => {
-            const cleared = (stoppedPids.get(job.id) ?? []).filter(([key, pid]) => job[key] === pid);
-            if (cleared.length === 0) {
+            const { cleared = [], children = [] } = stoppedPids.get(job.id) ?? {};
+            const clearedNow = cleared.filter(([key, pid]) => job[key] === pid);
+            if (clearedNow.length === 0 && children.length === 0) {
               return job;
             }
-            const kept = { ...job, ...Object.fromEntries(cleared.map(([key]) => [key, null])) };
+            const kept = { ...job, ...Object.fromEntries(clearedNow.map(([key]) => [key, null])) };
+            if (children.length > 0) {
+              const note =
+                children.length === 1
+                  ? `PID ${children[0]} kept running after its parent exited, so a cancel cannot reach it. If Task Manager still shows it as a Copilot or gh process, end it there.`
+                  : `${children.map((pid) => `PID ${pid}`).join(", ")} kept running after their parents exited, so a cancel cannot reach them. If Task Manager still shows them as Copilot or gh processes, end them there.`;
+              kept.errorMessage = `${job.errorMessage ?? "The Claude session ended."} ${note}`;
+            }
             writeJobRecord(workspaceRoot, kept, jobFilesDeadline);
             return kept;
           });

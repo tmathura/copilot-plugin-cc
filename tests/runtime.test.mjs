@@ -1299,6 +1299,103 @@ test("a worker that cannot start fails the job with the spawn error", async () =
   });
 });
 
+test("a cancel that leaves a child whose parent exited names it and asks for a retry only when one can help", async () => {
+  const tasks = setUpTasks();
+  await withCompanionEnv(tasks.env, async ({ cancelJob }) => {
+    const { updateState } = await import("../plugins/copilot/scripts/lib/state.mjs");
+    const orphan = (pid = 4321) =>
+      Object.assign(new Error(`taskkill /PID 222222 /T /F: exit=128\nStill running: PID ${pid}.`), { orphans: true, stillRunning: [pid] });
+    const cases = [
+      ["task-orphan-only", { 111111: null, 222222: orphan() }, true, false],
+      ["task-orphan-twice", { 111111: orphan(), 222222: orphan() }, true, false],
+      ["task-orphan-and-root", { 111111: new Error("taskkill failed"), 222222: orphan() }, true, true],
+      ["task-undefined-reason", { 111111: undefined, 222222: orphan() }, true, true],
+      // The job's own Copilot pid is left after its companion exits. Its own stop worked, so the cancel
+      // succeeds.
+      ["task-orphan-is-stopped-copilot", { 111111: orphan(222222), 222222: null }, null, null],
+      // Its own stop left only its child, so it is gone too; only that child is named.
+      ["task-orphan-is-gone-copilot", { 111111: orphan(222222), 222222: orphan() }, true, false],
+      // Its own stop failed with Copilot still alive, so a new cancel can reach it.
+      ["task-orphan-is-live-copilot", { 111111: orphan(222222), 222222: new Error("taskkill failed") }, false, true]
+    ];
+    for (const [jobId, errors, named, retry] of cases) {
+      updateState(tasks.cwd, (state) => {
+        state.jobs.unshift({ id: jobId, status: "running", jobClass: "task", write: false, pid: 111111, copilotPid: 222222 });
+      });
+      const terminateImpl = async (pid) => {
+        if (errors[pid] !== null) {
+          throw errors[pid];
+        }
+        return { attempted: true, delivered: false, method: "taskkill" };
+      };
+
+      if (named === null) {
+        assert.equal((await cancelJob(tasks.cwd, jobId, { terminateImpl })).job.status, "cancelled", jobId);
+      } else {
+        await assert.rejects(cancelJob(tasks.cwd, jobId, { terminateImpl }), (error) => {
+          assert.equal(
+            /The parent of PID 4321 has exited, so a new cancel cannot reach it\. If Task Manager still shows it as a Copilot or gh process, end it there\./.test(error.message),
+            named,
+            jobId
+          );
+          assert.equal(/PID 222222/.test(error.message.replace(/^[^(]*\([^)]*\)/, "")), false, jobId);
+          assert.equal(/PID 4321, PID 4321/.test(error.message), false, jobId);
+          assert.equal(/\(no error detail;/.test(error.message), errors[111111] === undefined, jobId);
+          assert.equal(/Run \/copilot:cancel .* again\.$/.test(error.message), retry, jobId);
+          return true;
+        });
+      }
+      // A pid that stopped, or whose own stop shows it has exited, is cleared; any other stays for a retry.
+      const job = findJob(tasks.dataDir, jobId);
+      for (const [key, pid] of [["pid", 111111], ["copilotPid", 222222]]) {
+        assert.equal(job[key], errors[pid] === null || errors[pid]?.orphans ? null : pid, `${jobId} ${key}`);
+      }
+    }
+
+    const jobId = "task-two-orphans";
+    updateState(tasks.cwd, (state) => {
+      state.jobs.unshift({ id: jobId, status: "running", jobClass: "task", write: false, pid: 111111, copilotPid: 222222 });
+    });
+    const two = { 111111: orphan(4321), 222222: orphan(8765) };
+    await assert.rejects(
+      cancelJob(tasks.cwd, jobId, { terminateImpl: async (pid) => Promise.reject(two[pid]) }),
+      /The parents of PID 4321, PID 8765 have exited, so a new cancel cannot reach them\. If Task Manager still shows them as Copilot or gh processes, end them there\.$/
+    );
+  });
+});
+
+test("a cancel whose record cannot be cleared after an orphan-only stop names the child and asks for a retry", async (t) => {
+  const tasks = setUpTasks();
+  await withCompanionEnv(tasks.env, async ({ cancelJob }) => {
+    const { updateState } = await import("../plugins/copilot/scripts/lib/state.mjs");
+    const jobId = "task-orphan-unclearable";
+    updateState(tasks.cwd, (state) => {
+      state.jobs.unshift({ id: jobId, status: "running", jobClass: "task", write: false, pid: null, copilotPid: 222222 });
+    });
+    const renameSync = fs.renameSync;
+    const terminateImpl = async (pid) => {
+      if (pid === 222222) {
+        // From here on the state cannot be saved, so the pid cannot be cleared.
+        t.mock.method(fs, "renameSync", () => {
+          throw Object.assign(new Error("disk error"), { code: "EIO" });
+        });
+        throw Object.assign(new Error("Still running: PID 4321."), { orphans: true, stillRunning: [4321] });
+      }
+      return { attempted: false, delivered: false, method: null };
+    };
+
+    await assert.rejects(cancelJob(tasks.cwd, jobId, { terminateImpl }), (error) => {
+      assert.match(error.message, /The job record could not be updated: disk error/);
+      assert.match(error.message, /The parent of PID 4321 has exited/);
+      assert.match(error.message, /Run \/copilot:cancel task-orphan-unclearable again\.$/);
+      return true;
+    });
+    t.mock.restoreAll();
+    assert.equal(fs.renameSync, renameSync);
+    assert.equal(findJob(tasks.dataDir, jobId).copilotPid, 222222);
+  });
+});
+
 test("a cancel whose signal fails keeps that pid and blocks a resume, and a second cancel stops the process", async () => {
   const tasks = setUpTasks();
   await withCompanionEnv(tasks.env, async ({ cancelJob }) => {
@@ -2063,6 +2160,55 @@ test("SessionEnd keeps a job whose stop fails, and an older job whose stop never
       for (const child of [worker, copilot, oldCopilot]) {
         child.kill("SIGKILL");
       }
+    }
+  });
+});
+
+test("SessionEnd clears a pid whose stop shows it has exited, keeps one that can still be stopped, and names a child it left", async () => {
+  const tasks = setUpTasks();
+  await withCompanionEnv(tasks.env, async () => {
+    const { cleanupSessionJobs } = await import(pathToFileURL(SESSION_HOOK).href);
+    const { updateState } = await import("../plugins/copilot/scripts/lib/state.mjs");
+    const sessionId = "orphan-stop-session";
+    updateState(tasks.cwd, (state) => {
+      state.jobs.unshift(
+        { id: "task-orphan-only", status: "running", jobClass: "task", sessionId, pid: 111111, copilotPid: 222222 },
+        { id: "task-orphan-and-live", status: "running", jobClass: "task", sessionId, pid: 333333, copilotPid: 444444 },
+        { id: "task-two-orphans", status: "running", jobClass: "task", sessionId, pid: 555555, copilotPid: 666666 }
+      );
+    });
+    const orphan = Object.assign(new Error("Still running: PID 4321."), { orphans: true, stillRunning: [4321] });
+    const other = Object.assign(new Error("Still running: PID 8765."), { orphans: true, stillRunning: [8765] });
+
+    await cleanupSessionJobs(tasks.cwd, sessionId, {
+      terminateImpl: async (pid) => {
+        if (pid === 222222 || pid === 333333 || pid === 555555) {
+          throw orphan;
+        }
+        if (pid === 666666) {
+          throw other;
+        }
+        if (pid === 444444) {
+          throw new Error("taskkill failed");
+        }
+        return { attempted: true, delivered: true, method: "taskkill" };
+      }
+    });
+
+    const jobs = Object.fromEntries(readJobs(tasks.dataDir).map((job) => [job.id, job]));
+    assert.deepEqual(Object.keys(jobs).sort(), ["task-orphan-and-live", "task-orphan-only", "task-two-orphans"]);
+    assert.deepEqual([jobs["task-orphan-only"].pid, jobs["task-orphan-only"].copilotPid], [null, null]);
+    assert.deepEqual([jobs["task-orphan-and-live"].pid, jobs["task-orphan-and-live"].copilotPid], [null, 444444]);
+    assert.deepEqual([jobs["task-two-orphans"].pid, jobs["task-two-orphans"].copilotPid], [null, null]);
+    assert.match(
+      jobs["task-two-orphans"].errorMessage,
+      /^The Claude session ended\. PID 4321, PID 8765 kept running after their parents exited, so a cancel cannot reach them\. If Task Manager still shows them as Copilot or gh processes, end them there\.$/
+    );
+    for (const job of [jobs["task-orphan-only"], jobs["task-orphan-and-live"]]) {
+      assert.match(
+        job.errorMessage,
+        /^The Claude session ended\. PID 4321 kept running after its parent exited, so a cancel cannot reach it\. If Task Manager still shows it as a Copilot or gh process, end it there\.$/
+      );
     }
   });
 });
