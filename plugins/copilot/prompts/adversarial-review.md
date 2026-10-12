@@ -46,7 +46,8 @@ A finding should answer:
 </finding_bar>
 
 <structured_output_contract>
-Return only valid JSON matching the provided schema.
+Write your answer as plain text in your final message: only valid JSON that matches the schema in `<output_schema>`.
+Do not call a tool to return it, and do not end with a tool call or without that message.
 Keep the output compact and specific.
 Use `needs-attention` if there is any material risk worth blocking on.
 Use `approve` only if you cannot support any substantive adversarial finding from the provided context.

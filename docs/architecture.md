@@ -101,7 +101,8 @@ flowchart TD
 
 - `review` sends Copilot's `/review` command with the context.
 - `adversarial-review` puts the answer schema in the prompt. The adapter parses the answer, also
-  inside one code fence, and checks it against the schema. An answer that does not match fails the
+  inside one code fence, and checks it against the schema. Only a message in Copilot's last turn
+  counts as the answer. An answer that does not match, or no answer in the last turn, fails the
   job.
 
 ## Tasks and background jobs

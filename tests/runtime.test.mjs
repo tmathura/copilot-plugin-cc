@@ -499,6 +499,45 @@ test("a review refuses to run when Copilot is too old or rejects the read-only a
   assert.deepEqual(rejected.runs, []);
 });
 
+test("an adversarial review asks for the JSON as plain text in the final message, not through a tool", () => {
+  const { runs } = runReview("adversarial-review", makeRepo(), { env: { FAKE_COPILOT_ANSWER: REVIEW_JSON } });
+
+  assert.match(runs[0].prompt, /Write your answer as plain text in your final message: only valid JSON/);
+  assert.match(runs[0].prompt, /Do not call a tool to return it/);
+  assert.doesNotMatch(runs[0].prompt, /the provided schema/);
+});
+
+test("an adversarial review whose last turn has no answer fails with a clear error, not an earlier message", () => {
+  const approval = JSON.stringify({ verdict: "approve", summary: "Ship it.", findings: [], next_steps: [] });
+  for (const earlier of [undefined, approval]) {
+    const env = earlier ? { FAKE_COPILOT_ANSWER: earlier } : {};
+    const { result } = runReview("adversarial-review", makeRepo(), { behavior: "no-final-message", args: ["--json"], env });
+    const payload = JSON.parse(result.stdout);
+
+    assert.equal(result.status, 1);
+    assert.equal(payload.result, null);
+    assert.match(payload.parseError, /Copilot ended its last turn without an answer, so the review has no verdict\. Run the review again\./);
+    assert.equal(payload.copilot.stdout, "");
+
+    const rendered = runReview("adversarial-review", makeRepo(), { behavior: "no-final-message", env });
+    assert.equal(rendered.result.status, 1);
+    assert.doesNotMatch(rendered.result.stdout, /Verdict: approve|Need to check what setup prints/);
+    assert.match(rendered.result.stdout, /without an answer/);
+    assert.match(rendered.result.stdout, /I would approve/);
+  }
+});
+
+test("an adversarial review whose Copilot calls a json tool is stopped with a clear error", async () => {
+  const { result, runs } = runReview("adversarial-review", makeRepo(), {
+    behavior: "forbidden-tool",
+    env: { FAKE_COPILOT_TOOL: "json" }
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /Copilot started the tool "json", which a read-only run does not allow\. The run was stopped\./);
+  await waitFor(() => !isAlive(runs[0].pid));
+});
+
 test("a review whose Copilot starts a write tool is stopped and its process is killed", async () => {
   for (const subcommand of ["review", "adversarial-review"]) {
     const repo = makeRepo();

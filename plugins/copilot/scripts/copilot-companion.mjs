@@ -2,11 +2,11 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): ported from codex-companion.mjs for the Copilot
 // CLI. Setup checks the Copilot version and runs a login check; there is no transfer subcommand.
 // Reviews send the diff in the prompt, write large diffs to a patch folder, and check the
-// adversarial review's JSON against the schema. A background task's record is written before its
-// worker starts, the worker claims the job under the state lock, every run starts Copilot under that
-// lock, and cancel marks the job cancelled under it before it stops the job's processes. Resume stays
-// in one mode, never into a review gate job, and there is no spark model alias. The task command takes
-// the review gate's internal --context-dir option.
+// adversarial review's JSON, taken from Copilot's last turn only, against the schema. A background
+// task's record is written before its worker starts, the worker claims the job under the state lock,
+// every run starts Copilot under that lock, and cancel marks the job cancelled under it before it
+// stops the job's processes. Resume stays in one mode, never into a review gate job, and there is no
+// spark model alias. The task command takes the review gate's internal --context-dir option.
 
 import { spawn } from "node:child_process";
 import fs from "node:fs";
@@ -398,9 +398,13 @@ async function executeReviewRun(request) {
     })
   );
   const failureMessage = describeRunFailure(result);
-  let parsed = parseStructuredOutput(result.finalMessage, {
+  // An earlier message, such as "Need to check what setup prints.", is not the verdict.
+  let parsed = parseStructuredOutput(result.lastTurnMessage, {
     status: result.status,
-    failureMessage
+    failureMessage:
+      result.status === 0
+        ? "Copilot ended its last turn without an answer, so the review has no verdict. Run the review again."
+        : failureMessage
   });
   // A failed or stopped run failed, even if it sent JSON first. Codex enforced the schema; here an
   // answer of the wrong shape fails the job like broken JSON.
@@ -426,7 +430,7 @@ async function executeReviewRun(request) {
     copilot: {
       status: result.status,
       stderr: result.stderr,
-      stdout: result.finalMessage,
+      stdout: result.lastTurnMessage,
       reasoning: result.reasoningSummary
     },
     result: parsed.parsed,

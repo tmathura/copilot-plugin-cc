@@ -307,7 +307,11 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
 - Copilot has no setting for an output schema. So `/copilot:adversarial-review` puts the schema in
   the prompt, also accepts the JSON inside one code fence, and checks the answer against the schema.
   An answer that does not match fails the job and keeps Copilot's text. Codex makes its answer match
-  the schema itself.
+  the schema itself. The prompt asks for the JSON as plain text in the final message, and says not
+  to call a tool for it, because Copilot sometimes called a tool named `json` and the read-only run
+  stopped. Only the answer in Copilot's last turn counts: if that turn has no answer, the review
+  fails with a clear error and does not show an earlier message as the result. Upstream's prompt
+  says "Return only valid JSON matching the provided schema". The reason is correctness.
 - Copilot keeps every review session. Codex can run a review in a thread that it does not keep. The
   sessions stay in the plugin's own Copilot folder, so they are not in your own session list.
 - Job state lives in `~/.copilot-companion/state` when Claude Code does not give a plugin data

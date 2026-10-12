@@ -2,6 +2,14 @@
 
 ## Copilot plugin
 
+### 1.0.6
+
+- `/copilot:adversarial-review` asks Copilot for its JSON as plain text in the final message, not
+  through a tool. Before, Copilot sometimes called a tool named `json`, and the review stopped with
+  no verdict.
+- A review whose last Copilot turn has no answer now says so. Before, it showed an earlier message,
+  such as "Need to check what setup prints.", as the answer.
+
 ### 1.0.5
 
 - `/copilot:result <job id>` with the full id of a queued or running job says that the job is still
