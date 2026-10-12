@@ -167,7 +167,7 @@ function firstMeaningfulLine(text, fallback) {
     if (!line || /^#{1,6}(\s|$)/.test(line) || /^([-*_])\1{2,}$/.test(line) || line.startsWith("```")) {
       continue;
     }
-    const bold = /^(\*\*|__)([^*_]+)\1:?$/.exec(line)?.[2].trim();
+    const bold = /^(\*\*|__)((?:(?!\1).)+)\1:?$/.exec(line)?.[2].trim();
     if (bold === undefined) {
       return line;
     }

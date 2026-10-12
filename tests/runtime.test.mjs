@@ -294,6 +294,9 @@ test("a review's job summary skips headings and bold labels, and keeps a bold se
     ["**Findings:**\n- The loop skips the last item.\n", "- The loop skips the last item."],
     ["**The change breaks the empty case.**\n\nDetails follow.\n", "The change breaks the empty case."],
     ["## Review\n---\n__Findings__\n```\nThe loop skips the last item.\n", "The loop skips the last item."],
+    ["**Findings in my_module**:\n**The get_user call fails for a*b.**\n", "The get_user call fails for a*b."],
+    ["**Is the empty case handled?**\n", "Is the empty case handled?"],
+    ["**a** and **b** differ.\n", "**a** and **b** differ."],
     ["# Review\n\n### Findings\n\n**Summary**\n", "Review completed."]
   ];
   for (const [answer, summary] of cases) {
