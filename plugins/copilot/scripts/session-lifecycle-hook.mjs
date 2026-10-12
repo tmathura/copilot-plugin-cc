@@ -160,7 +160,11 @@ export async function cleanupSessionJobs(cwd, sessionId, options = {}) {
             }
             const kept = { ...job, ...Object.fromEntries(clearedNow.map(([key]) => [key, null])) };
             if (children.length > 0) {
-              kept.errorMessage = `${job.errorMessage ?? "The Claude session ended."} ${children.map((pid) => `PID ${pid}`).join(", ")} kept running after its parent exited, so a cancel cannot reach it. If Task Manager still shows it as a Copilot or gh process, end it there.`;
+              const note =
+                children.length === 1
+                  ? `PID ${children[0]} kept running after its parent exited, so a cancel cannot reach it. If Task Manager still shows it as a Copilot or gh process, end it there.`
+                  : `${children.map((pid) => `PID ${pid}`).join(", ")} kept running after their parents exited, so a cancel cannot reach them. If Task Manager still shows them as Copilot or gh processes, end them there.`;
+              kept.errorMessage = `${job.errorMessage ?? "The Claude session ended."} ${note}`;
             }
             writeJobRecord(workspaceRoot, kept, jobFilesDeadline);
             return kept;

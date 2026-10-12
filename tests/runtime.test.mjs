@@ -2173,15 +2173,20 @@ test("SessionEnd clears a pid whose stop shows it has exited, keeps one that can
     updateState(tasks.cwd, (state) => {
       state.jobs.unshift(
         { id: "task-orphan-only", status: "running", jobClass: "task", sessionId, pid: 111111, copilotPid: 222222 },
-        { id: "task-orphan-and-live", status: "running", jobClass: "task", sessionId, pid: 333333, copilotPid: 444444 }
+        { id: "task-orphan-and-live", status: "running", jobClass: "task", sessionId, pid: 333333, copilotPid: 444444 },
+        { id: "task-two-orphans", status: "running", jobClass: "task", sessionId, pid: 555555, copilotPid: 666666 }
       );
     });
     const orphan = Object.assign(new Error("Still running: PID 4321."), { orphans: true, stillRunning: [4321] });
+    const other = Object.assign(new Error("Still running: PID 8765."), { orphans: true, stillRunning: [8765] });
 
     await cleanupSessionJobs(tasks.cwd, sessionId, {
       terminateImpl: async (pid) => {
-        if (pid === 222222 || pid === 333333) {
+        if (pid === 222222 || pid === 333333 || pid === 555555) {
           throw orphan;
+        }
+        if (pid === 666666) {
+          throw other;
         }
         if (pid === 444444) {
           throw new Error("taskkill failed");
@@ -2191,10 +2196,15 @@ test("SessionEnd clears a pid whose stop shows it has exited, keeps one that can
     });
 
     const jobs = Object.fromEntries(readJobs(tasks.dataDir).map((job) => [job.id, job]));
-    assert.deepEqual(Object.keys(jobs).sort(), ["task-orphan-and-live", "task-orphan-only"]);
+    assert.deepEqual(Object.keys(jobs).sort(), ["task-orphan-and-live", "task-orphan-only", "task-two-orphans"]);
     assert.deepEqual([jobs["task-orphan-only"].pid, jobs["task-orphan-only"].copilotPid], [null, null]);
     assert.deepEqual([jobs["task-orphan-and-live"].pid, jobs["task-orphan-and-live"].copilotPid], [null, 444444]);
-    for (const job of Object.values(jobs)) {
+    assert.deepEqual([jobs["task-two-orphans"].pid, jobs["task-two-orphans"].copilotPid], [null, null]);
+    assert.match(
+      jobs["task-two-orphans"].errorMessage,
+      /^The Claude session ended\. PID 4321, PID 8765 kept running after their parents exited, so a cancel cannot reach them\. If Task Manager still shows them as Copilot or gh processes, end them there\.$/
+    );
+    for (const job of [jobs["task-orphan-only"], jobs["task-orphan-and-live"]]) {
       assert.match(
         job.errorMessage,
         /^The Claude session ended\. PID 4321 kept running after its parent exited, so a cancel cannot reach it\. If Task Manager still shows it as a Copilot or gh process, end it there\.$/
