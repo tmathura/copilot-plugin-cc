@@ -304,6 +304,11 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
 - `/copilot:review` sends Copilot's `/review` command with the diff in the prompt. Codex uses its
   built-in reviewer, which collects the diff itself. Copilot's `/review` collects the diff with
   `git` in a shell, and reviews have no shell.
+- A job's summary in `/copilot:status` skips heading lines, bold labels, rules and code fences,
+  such as `## Review`, `**Findings**` or `---`, and takes the first line that says something. A bold sentence is kept without its
+  `**`. Copilot's `/review` changes its format from run to run and often starts with such a line.
+  Codex's review starts with a plain sentence, so Codex takes the first line. The reason is
+  correctness.
 - Copilot has no setting for an output schema. So `/copilot:adversarial-review` puts the schema in
   the prompt, also accepts the JSON inside one code fence, and checks the answer against the schema.
   An answer that does not match fails the job and keeps Copilot's text. Codex makes its answer match

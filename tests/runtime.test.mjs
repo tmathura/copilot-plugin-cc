@@ -287,6 +287,32 @@ function runReview(subcommand, repo, options = {}) {
   return { result, runs: readFakeCopilotRuns(recordPath), dataDir };
 }
 
+test("a review's job summary skips headings and bold labels, and keeps a bold sentence without its markers", () => {
+  const cases = [
+    ["## Review\n\nThe loop skips the last item.\n", "The loop skips the last item."],
+    ["**Review findings**\n\n1. The loop skips the last item.\n", "1. The loop skips the last item."],
+    ["**Findings:**\n- The loop skips the last item.\n", "- The loop skips the last item."],
+    ["**The change breaks the empty case.**\n\nDetails follow.\n", "The change breaks the empty case."],
+    ["## Review\n---\n__Findings__\n```\nThe loop skips the last item.\n", "The loop skips the last item."],
+    ["**Findings in my_module**:\n**The get_user call fails for a*b.**\n", "The get_user call fails for a*b."],
+    ["**Is the empty case handled?**\n", "Is the empty case handled?"],
+    ["**a** and **b** differ.\n", "**a** and **b** differ."],
+    ["***Findings***\r\n~~~markdown\r\n***The cache never expires.***\r\n", "The cache never expires."],
+    ["~~~\n~~~\n* * *\n-  -  -\n", "Review completed."],
+    ["# Review\n\n### Findings\n\n**Summary**\n", "Review completed."]
+  ];
+  for (const [answer, summary] of cases) {
+    const { result, dataDir } = runReview("review", makeRepo(), { env: { FAKE_COPILOT_ANSWER: answer } });
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(readJobs(dataDir)[0].summary, summary, answer);
+  }
+
+  const { companion, dataDir } = setUpTasks("ok", { env: { FAKE_COPILOT_ANSWER: "## Done\n\nI fixed the null check." } });
+  assert.equal(companion(["task", "fix it"]).status, 0);
+  assert.equal(readJobs(dataDir)[0].summary, "I fixed the null check.");
+});
+
 function readJobs(dataDir) {
   const stateRoot = path.join(dataDir, "state");
   const [workspaceDir] = fs.readdirSync(stateRoot);
