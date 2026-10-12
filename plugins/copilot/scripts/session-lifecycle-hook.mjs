@@ -118,9 +118,9 @@ export async function cleanupSessionJobs(cwd, sessionId, options = {}) {
     { lockTimeoutMs: timeLeft(), deadline }
   );
 
-  // One shared wait, then SIGKILL, so three jobs cost no more time than one. A job whose processes
-  // could not all be stopped keeps its record, so /copilot:cancel can try again; as in cancel, only
-  // the pids whose stop failed stay in it, because a stopped pid can be reused.
+  // One shared wait, then SIGKILL, so three jobs cost no more time than one. A job keeps its record
+  // while one of its own pids may still be alive, so /copilot:cancel can try again; as in cancel, a pid
+  // that stopped or has exited is cleared, because it can be reused.
   const forceKillAfterMs = Math.max(0, Math.min(STOP_WAIT_MS, timeLeft() - FINAL_UPDATE_RESERVE_MS));
   const stoppedPids = new Map();
   await Promise.all(

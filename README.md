@@ -367,8 +367,8 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
   Copilot process itself at the same time, so a Copilot process whose companion was killed is still
   stopped, and a process that ignores the stop signal costs one 5-second wait, not two.
   Codex stops the process first and marks the job after, so a job that starts between the two steps
-  can keep running. If a process cannot be stopped, by cancel or at the end of a run, the job keeps
-  its process ids, and you can run `/copilot:cancel <job id>` again.
+  can keep running. If one of the job's own processes cannot be stopped, by cancel or at the end of
+  a run, the job keeps that process id, and you can run `/copilot:cancel <job id>` again.
 - On Windows, when `taskkill` fails, the plugin checks whether the process and each process that
   `taskkill` could not stop are still alive, for up to 5 seconds. Only one that is still alive
   counts as a failed stop. When a child that the job does not track is left after its parent
