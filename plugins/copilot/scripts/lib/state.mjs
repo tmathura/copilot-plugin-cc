@@ -4,7 +4,7 @@
 // state records closed Claude sessions; on Windows, a file replace or read that meets another process
 // is retried; a companion that a hook starts counts from the hook's start for the closed-session check; a caller's deadline also
 // limits the Windows retries of an update; the companion's own data folder export wins over
-// CLAUDE_PLUGIN_DATA.
+// CLAUDE_PLUGIN_DATA; a lock file is linked into place with its owner already written.
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -197,10 +197,37 @@ function readLockOwner(lockFile) {
   }
 }
 
-function tryCreateLock(lockFile, owner) {
-  let fd;
+// A lock with no readable owner is never reclaimed, so a lock name appears only as a link to an owner
+// file that is already written. An owner file left by a killed process has a unique name and blocks
+// nothing.
+function writeOwnerFile(lockFile, owner) {
+  const ownerFile = `${lockFile}.${process.pid}.${randomUUID()}.tmp`;
+  const fd = fs.openSync(ownerFile, "wx");
   try {
-    fd = fs.openSync(lockFile, "wx");
+    try {
+      fs.writeFileSync(fd, JSON.stringify(owner), "utf8");
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch (error) {
+    removeOwnerFile(ownerFile);
+    throw error;
+  }
+  return ownerFile;
+}
+
+function removeOwnerFile(ownerFile) {
+  try {
+    fs.rmSync(ownerFile, { force: true });
+  } catch {
+    // A leftover owner file blocks nothing; the lock result must not be lost over it.
+  }
+}
+
+function tryLinkLock(ownerFile, lockFile) {
+  try {
+    fs.linkSync(ownerFile, lockFile);
+    return true;
   } catch (error) {
     // Windows reports EPERM while another process is still deleting the old lock file.
     if (error?.code === "EEXIST" || (error?.code === "EPERM" && process.platform === "win32")) {
@@ -208,16 +235,6 @@ function tryCreateLock(lockFile, owner) {
     }
     throw error;
   }
-  try {
-    fs.writeFileSync(fd, JSON.stringify(owner), "utf8");
-  } catch (error) {
-    // A lock with no readable owner is never reclaimed, so this attempt must not leave one.
-    fs.closeSync(fd);
-    fs.rmSync(lockFile, { force: true });
-    throw error;
-  }
-  fs.closeSync(fd);
-  return true;
 }
 
 function releaseLock(lockFile, token) {
@@ -236,7 +253,14 @@ function reclaimDeadLock(lockFile, options) {
 
   const reclaimFile = `${lockFile}.reclaim`;
   const reclaimer = { pid: process.pid, token: randomUUID() };
-  if (!tryCreateLock(reclaimFile, reclaimer)) {
+  const ownerFile = writeOwnerFile(reclaimFile, reclaimer);
+  let linked;
+  try {
+    linked = tryLinkLock(ownerFile, reclaimFile);
+  } finally {
+    removeOwnerFile(ownerFile);
+  }
+  if (!linked) {
     const other = readLockOwner(reclaimFile);
     if (other && !isAlive(other.pid)) {
       throw new Error(
@@ -264,7 +288,8 @@ function describeLockBlocker(lockFile, options) {
   if (!holder) {
     return "The lock has no readable owner; if no Copilot companion is running, delete it and retry.";
   }
-  // A reclaimer that died before it wrote its owner leaves a reclaim file that no one can free.
+  // A damaged reclaim file, or one that an older version left without its owner, names no process to
+  // check, so no one can free it.
   if (!isAlive(holder.pid) && fs.existsSync(reclaimFile)) {
     return `Process ${holder.pid} has ended, but ${reclaimFile} blocks freeing its lock; if no Copilot companion is running, delete ${reclaimFile} and retry.`;
   }
@@ -277,18 +302,23 @@ function acquireStateLock(cwd, options) {
   const owner = { pid: process.pid, token: randomUUID() };
   const deadline = Date.now() + timeoutMs;
   ensureStateDir(cwd);
-  for (;;) {
-    if (tryCreateLock(lockFile, owner)) {
-      return { lockFile, token: owner.token };
+  const ownerFile = writeOwnerFile(lockFile, owner);
+  try {
+    for (;;) {
+      if (tryLinkLock(ownerFile, lockFile)) {
+        return { lockFile, token: owner.token };
+      }
+      reclaimDeadLock(lockFile, options);
+      if (Date.now() >= deadline) {
+        throw new Error(
+          `Timed out after ${timeoutMs} ms waiting for the state lock ${lockFile}. The state was not changed. ` +
+            describeLockBlocker(lockFile, options)
+        );
+      }
+      sleepSync(LOCK_RETRY_MS);
     }
-    reclaimDeadLock(lockFile, options);
-    if (Date.now() >= deadline) {
-      throw new Error(
-        `Timed out after ${timeoutMs} ms waiting for the state lock ${lockFile}. The state was not changed. ` +
-          describeLockBlocker(lockFile, options)
-      );
-    }
-    sleepSync(LOCK_RETRY_MS);
+  } finally {
+    removeOwnerFile(ownerFile);
   }
 }
 
@@ -314,7 +344,8 @@ function isBusyFileError(error) {
 }
 
 // State and job files are replaced only under the state lock, so a missing file is only worth a retry
-// while another process holds that lock. A lock with no readable owner may be one still being made.
+// while another process holds that lock. A lock with no readable owner may be one that an older version
+// was still writing.
 function isLockHeldByOther(lockFile) {
   return fs.existsSync(lockFile) && readLockOwner(lockFile)?.pid !== process.pid;
 }
