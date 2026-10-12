@@ -2,6 +2,11 @@
 
 ## Copilot plugin
 
+### 1.0.10
+
+- `/copilot:status` shows a job's first line that says something as its summary. Before, a review
+  could show a heading or a label, such as `## Review` or `**Findings**`.
+
 ### 1.0.9
 
 - A run that fails because Copilot is not logged in now names `/copilot:setup` after Copilot's

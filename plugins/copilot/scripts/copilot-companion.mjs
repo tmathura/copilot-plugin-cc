@@ -7,7 +7,7 @@
 // every run starts Copilot under that lock, and cancel marks the job cancelled under it before it
 // stops the job's processes. Resume stays in one mode, never into a review gate job, and there is no
 // spark model alias. The task command takes the review gate's internal --context-dir option, and its
-// JSON output gives a failed run's failureMessage.
+// JSON output gives a failed run's failureMessage. A job summary skips heading and bold label lines.
 
 import { spawn } from "node:child_process";
 import fs from "node:fs";
@@ -158,12 +158,24 @@ function shorten(text, limit = 96) {
   return `${normalized.slice(0, limit - 3)}...`;
 }
 
+// Copilot's /review often opens with a heading or a bold label, such as "## Review" or "**Findings**",
+// which says nothing as a job summary. A bold line that ends like a sentence is a real summary.
 function firstMeaningfulLine(text, fallback) {
-  const line = String(text ?? "")
-    .split(/\r?\n/)
-    .map((value) => value.trim())
-    .find(Boolean);
-  return line ?? fallback;
+  for (const value of String(text ?? "").split(/\r?\n/)) {
+    const line = value.trim();
+    // Headings, rules such as "---" and code fences.
+    if (!line || /^#{1,6}(\s|$)/.test(line) || /^([-*_])\1{2,}$/.test(line) || line.startsWith("```")) {
+      continue;
+    }
+    const bold = /^(\*\*|__)([^*_]+)\1:?$/.exec(line)?.[2].trim();
+    if (bold === undefined) {
+      return line;
+    }
+    if (/[.!?]$/.test(bold)) {
+      return bold;
+    }
+  }
+  return fallback;
 }
 
 function normalizeArgv(argv) {
