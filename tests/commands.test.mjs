@@ -136,7 +136,7 @@ test("rescue command absorbs continue semantics", () => {
   assert.match(rescue, /Do not paraphrase, summarize, rewrite, or add commentary before or after it/i);
   assert.match(rescue, /return that command's stdout as-is/i);
   assert.match(rescue, /Leave `--resume` and `--fresh` in the forwarded request/i);
-  assert.match(rescue, /If the subagent returns the companion's error, for example that Copilot is missing, too old or not logged in, return it verbatim/i);
+  assert.match(rescue, /If the subagent returns the companion's error, for example that Copilot is missing or too old, or a foreground run's failure such as a missing login, return it verbatim/i);
   assert.doesNotMatch(rescue, /If the helper reports that Copilot is missing/i);
   for (const source of [agent, runtimeSkill]) {
     assert.doesNotMatch(source, /return nothing/i);
