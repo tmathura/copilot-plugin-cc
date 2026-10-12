@@ -406,6 +406,8 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
   `CLAUDE_PLUGIN_DATA`. The Codex plugin exports `CLAUDE_PLUGIN_DATA` to the same shell, and the
   last export wins. With both plugins installed, one plugin's commands would otherwise use the other
   plugin's jobs and review gate setting.
+- A long option written as `--name=value` keeps every `=` in its value, so `--base=refs/x=y` gives
+  `refs/x=y`. Codex cuts the value at the second `=` without an error.
 
 ## Development
 
