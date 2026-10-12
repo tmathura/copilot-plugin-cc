@@ -2,6 +2,12 @@
 
 ## Copilot plugin
 
+### 1.0.8
+
+- `/copilot:rescue` shows why it cannot run Copilot. A missing or too old Copilot gives the error
+  and `/copilot:setup` as the next step. A foreground run that fails at once, for example without a
+  login, shows Copilot's error. Before, the answer was empty.
+
 ### 1.0.7
 
 - On Windows, `/copilot:cancel` during Copilot's start reports the job cancelled. Before, it often

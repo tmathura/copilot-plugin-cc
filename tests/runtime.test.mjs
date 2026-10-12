@@ -794,6 +794,42 @@ function sessionIdOf(copilotRun) {
   return copilotRun.args.find((arg) => arg.startsWith("--session-id=")).slice("--session-id=".length);
 }
 
+test("a rescue task with a missing or too old Copilot fails with an error that names /copilot:setup", () => {
+  // An empty PATH, because a real copilot can sit next to node (nvm, Homebrew).
+  const missing = setUpTasks("ok", { env: { PATH: makeTempDir() } });
+  const old = setUpTasks("old-version");
+
+  for (const [name, { companion, runs }, expected] of [
+    ["missing", missing, /Copilot CLI is not installed .*rerun `\/copilot:setup`\./],
+    ["old", old, /Copilot CLI 1\.0\.92 is not supported\. .*rerun `\/copilot:setup`\./]
+  ]) {
+    for (const mode of [[], ["--background"]]) {
+      const result = companion(["task", "--write", ...mode, "fix the bug"]);
+
+      assert.notEqual(result.status, 0, name);
+      assert.match(result.stderr, expected, name);
+    }
+    assert.equal(runs().filter((record) => !record.args.includes("--version")).length, 0, name);
+  }
+});
+
+test("a rescue task without a Copilot login prints Copilot's login steps, at once in the foreground and later in a background result", async () => {
+  const { companion, dataDir } = setUpTasks("not-logged-in");
+  const result = companion(["task", "--write", "fix the bug"]);
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout, /No authentication information found\./);
+  assert.match(result.stdout, /run the '\/login' command/);
+
+  // A background run starts first; its login failure shows later in /copilot:status and /copilot:result.
+  const background = companion(["task", "--write", "--background", "--json", "fix the bug"]);
+  assert.equal(background.status, 0, background.stderr);
+  const { jobId } = JSON.parse(background.stdout);
+  await waitFor(() => findJob(dataDir, jobId)?.status === "failed", 30000);
+  assert.match(companion(["status", jobId]).stdout, new RegExp(`${jobId} \\| failed`));
+  assert.match(companion(["result", jobId]).stdout, /No authentication information found\.[\s\S]*run the '\/login' command/);
+});
+
 test("a read-only task cannot write, and a --write task gets the write profile with the sandbox", () => {
   const readOnly = setUpTasks("write-attempt");
   const readOnlyResult = readOnly.companion(["task", "fix the bug"]);
