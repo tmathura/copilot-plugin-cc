@@ -1190,10 +1190,22 @@ export async function cancelJob(workspaceRoot, jobId, options = {}) {
   const outcomes = await Promise.allSettled(
     ["pid", "copilotPid"].map(async (key) => {
       const pid = cancelled[key];
-      await terminate(pid ?? Number.NaN);
-      if (pid) {
-        updateJobRecord(workspaceRoot, jobId, (current) => (current?.[key] === pid ? { ...current, [key]: null } : null));
+      const clear = () =>
+        pid && updateJobRecord(workspaceRoot, jobId, (current) => (current?.[key] === pid ? { ...current, [key]: null } : null));
+      try {
+        await terminate(pid ?? Number.NaN);
+      } catch (error) {
+        // This pid has exited and only children it left are alive, so keeping it would only block a resume.
+        if (error?.orphans) {
+          try {
+            clear();
+          } catch {
+            // The pid then stays; a later cancel finds it gone and clears it.
+          }
+        }
+        throw error;
       }
+      clear();
     })
   );
   try {
@@ -1215,11 +1227,11 @@ export async function cancelJob(workspaceRoot, jobId, options = {}) {
     );
     if (orphans.length === 1) {
       parts.push(
-        `The parent of PID ${orphans[0]} has exited, so a new cancel cannot reach it. If it keeps running, end it in Task Manager.`
+        `The parent of PID ${orphans[0]} has exited, so a new cancel cannot reach it. If Task Manager still shows it as a Copilot or gh process, end it there.`
       );
     } else if (orphans.length > 1) {
       parts.push(
-        `The parents of ${orphans.map((pid) => `PID ${pid}`).join(", ")} have exited, so a new cancel cannot reach them. If they keep running, end them in Task Manager.`
+        `The parents of ${orphans.map((pid) => `PID ${pid}`).join(", ")} have exited, so a new cancel cannot reach them. If Task Manager still shows them as Copilot or gh processes, end them there.`
       );
     }
     if (failures.some((reason) => !reason?.orphans)) {

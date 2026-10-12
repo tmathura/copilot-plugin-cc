@@ -1330,7 +1330,7 @@ test("a cancel that leaves a child whose parent exited names it and asks for a r
 
       await assert.rejects(cancelJob(tasks.cwd, jobId, { terminateImpl }), (error) => {
         assert.equal(
-          /The parent of PID 4321 has exited, so a new cancel cannot reach it\. If it keeps running, end it in Task Manager\./.test(error.message),
+          /The parent of PID 4321 has exited, so a new cancel cannot reach it\. If Task Manager still shows it as a Copilot or gh process, end it there\./.test(error.message),
           named,
           jobId
         );
@@ -1339,6 +1339,11 @@ test("a cancel that leaves a child whose parent exited names it and asks for a r
         assert.equal(/Run \/copilot:cancel .* again\.$/.test(error.message), retry, jobId);
         return true;
       });
+      // A pid that stopped, or whose own stop shows it has exited, is cleared; any other stays for a retry.
+      const job = findJob(tasks.dataDir, jobId);
+      for (const [key, pid] of [["pid", 111111], ["copilotPid", 222222]]) {
+        assert.equal(job[key], errors[pid] === null || errors[pid]?.orphans ? null : pid, `${jobId} ${key}`);
+      }
     }
 
     const jobId = "task-two-orphans";
@@ -1348,7 +1353,7 @@ test("a cancel that leaves a child whose parent exited names it and asks for a r
     const two = { 111111: orphan(4321), 222222: orphan(8765) };
     await assert.rejects(
       cancelJob(tasks.cwd, jobId, { terminateImpl: async (pid) => Promise.reject(two[pid]) }),
-      /The parents of PID 4321, PID 8765 have exited, so a new cancel cannot reach them\. If they keep running, end them in Task Manager\.$/
+      /The parents of PID 4321, PID 8765 have exited, so a new cancel cannot reach them\. If Task Manager still shows them as Copilot or gh processes, end them there\.$/
     );
   });
 });
