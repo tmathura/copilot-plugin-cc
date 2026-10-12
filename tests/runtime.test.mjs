@@ -1310,8 +1310,9 @@ test("a cancel that leaves a child whose parent exited names it and asks for a r
       ["task-orphan-twice", { 111111: orphan(), 222222: orphan() }, true, false],
       ["task-orphan-and-root", { 111111: new Error("taskkill failed"), 222222: orphan() }, true, true],
       ["task-undefined-reason", { 111111: undefined, 222222: orphan() }, true, true],
-      // The job's own Copilot pid is left after its companion exits. Its own stop worked, so it is gone.
-      ["task-orphan-is-stopped-copilot", { 111111: orphan(222222), 222222: null }, false, false],
+      // The job's own Copilot pid is left after its companion exits. Its own stop worked, so the cancel
+      // succeeds.
+      ["task-orphan-is-stopped-copilot", { 111111: orphan(222222), 222222: null }, null, null],
       // Its own stop left only its child, so it is gone too; only that child is named.
       ["task-orphan-is-gone-copilot", { 111111: orphan(222222), 222222: orphan() }, true, false],
       // Its own stop failed with Copilot still alive, so a new cancel can reach it.
@@ -1328,17 +1329,21 @@ test("a cancel that leaves a child whose parent exited names it and asks for a r
         return { attempted: true, delivered: false, method: "taskkill" };
       };
 
-      await assert.rejects(cancelJob(tasks.cwd, jobId, { terminateImpl }), (error) => {
-        assert.equal(
-          /The parent of PID 4321 has exited, so a new cancel cannot reach it\. If Task Manager still shows it as a Copilot or gh process, end it there\./.test(error.message),
-          named,
-          jobId
-        );
-        assert.equal(/PID 222222( has|, | have)/.test(error.message), false, jobId);
-        assert.equal(/PID 4321, PID 4321/.test(error.message), false, jobId);
-        assert.equal(/Run \/copilot:cancel .* again\.$/.test(error.message), retry, jobId);
-        return true;
-      });
+      if (named === null) {
+        assert.equal((await cancelJob(tasks.cwd, jobId, { terminateImpl })).job.status, "cancelled", jobId);
+      } else {
+        await assert.rejects(cancelJob(tasks.cwd, jobId, { terminateImpl }), (error) => {
+          assert.equal(
+            /The parent of PID 4321 has exited, so a new cancel cannot reach it\. If Task Manager still shows it as a Copilot or gh process, end it there\./.test(error.message),
+            named,
+            jobId
+          );
+          assert.equal(/PID 222222/.test(error.message.replace(/^[^(]*\([^)]*\)/, "")), false, jobId);
+          assert.equal(/PID 4321, PID 4321/.test(error.message), false, jobId);
+          assert.equal(/Run \/copilot:cancel .* again\.$/.test(error.message), retry, jobId);
+          return true;
+        });
+      }
       // A pid that stopped, or whose own stop shows it has exited, is cleared; any other stays for a retry.
       const job = findJob(tasks.dataDir, jobId);
       for (const [key, pid] of [["pid", 111111], ["copilotPid", 222222]]) {

@@ -1213,18 +1213,21 @@ export async function cancelJob(workspaceRoot, jobId, options = {}) {
   } catch {
     // The log is only a record; the processes are what matter.
   }
-  const failures = outcomes.filter((outcome) => outcome.status === "rejected").map((outcome) => outcome.reason);
+  // A new cancel signals the job's own pids. A stored pid that is still alive fails its own stop
+  // without `orphans`, which asks for the retry below; one that is gone needs nothing. So a stop that
+  // left only the job's other pid is covered by that pid's own stop. Any other child whose parent has
+  // exited is out of a new cancel's reach.
+  const stored = [cancelled.pid, cancelled.copilotPid];
+  const untracked = (reason) => (reason?.orphans ? reason.stillRunning.filter((pid) => !stored.includes(pid)) : []);
+  const failures = outcomes
+    .filter((outcome) => outcome.status === "rejected")
+    .map((outcome) => outcome.reason)
+    .filter((reason) => !reason?.orphans || untracked(reason).length > 0);
   if (failures.length > 0) {
     const parts = [
       `Job ${jobId} is ${cancelled.status}, but a process could not be stopped (${failures.map((reason) => reason?.message ?? reason).join("; ")}).`
     ];
-    // A new cancel signals the job's own pids. A stored pid that is still alive fails its own stop
-    // without `orphans`, which asks for the retry below; one that is gone needs nothing. Any other child
-    // whose parent has exited is out of a new cancel's reach.
-    const stored = [cancelled.pid, cancelled.copilotPid];
-    const orphans = [...new Set(failures.flatMap((reason) => (reason?.orphans ? reason.stillRunning : [])))].filter(
-      (pid) => !stored.includes(pid)
-    );
+    const orphans = [...new Set(failures.flatMap(untracked))];
     if (orphans.length === 1) {
       parts.push(
         `The parent of PID ${orphans[0]} has exited, so a new cancel cannot reach it. If Task Manager still shows it as a Copilot or gh process, end it there.`
