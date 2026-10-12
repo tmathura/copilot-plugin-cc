@@ -2,6 +2,11 @@
 
 ## Copilot plugin
 
+### 1.0.3
+
+- An option written as `--name=value` keeps every `=` in its value. Before, `--base=refs/x=y`
+  gave `refs/x` without an error.
+
 ### 1.0.2
 
 - A companion that is stopped while it takes the state lock no longer leaves an empty lock file.

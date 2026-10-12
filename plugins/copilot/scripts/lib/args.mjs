@@ -1,3 +1,5 @@
+// Changed from upstream codex-plugin-cc (Apache-2.0): a long option is split at the first "=" only, so
+// its value keeps any later "=".
 export function parseArgs(argv, config = {}) {
   const valueOptions = new Set(config.valueOptions ?? []);
   const booleanOptions = new Set(config.booleanOptions ?? []);
@@ -25,7 +27,9 @@ export function parseArgs(argv, config = {}) {
     }
 
     if (token.startsWith("--")) {
-      const [rawKey, inlineValue] = token.slice(2).split("=", 2);
+      const separator = token.indexOf("=");
+      const rawKey = separator === -1 ? token.slice(2) : token.slice(2, separator);
+      const inlineValue = separator === -1 ? undefined : token.slice(separator + 1);
       const key = aliasMap[rawKey] ?? rawKey;
 
       if (booleanOptions.has(key)) {
