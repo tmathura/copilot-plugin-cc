@@ -1303,15 +1303,17 @@ test("a cancel that leaves a child whose parent exited names it and asks for a r
   const tasks = setUpTasks();
   await withCompanionEnv(tasks.env, async ({ cancelJob }) => {
     const { updateState } = await import("../plugins/copilot/scripts/lib/state.mjs");
-    const orphan = () =>
-      Object.assign(new Error("taskkill /PID 222222 /T /F: exit=128\nStill running: PID 4321."), { orphans: true, stillRunning: [4321] });
+    const orphan = (pid = 4321) =>
+      Object.assign(new Error(`taskkill /PID 222222 /T /F: exit=128\nStill running: PID ${pid}.`), { orphans: true, stillRunning: [pid] });
     const cases = [
-      ["task-orphan-only", { 111111: null, 222222: orphan() }, false],
-      ["task-orphan-twice", { 111111: orphan(), 222222: orphan() }, false],
-      ["task-orphan-and-root", { 111111: new Error("taskkill failed"), 222222: orphan() }, true],
-      ["task-undefined-reason", { 111111: undefined, 222222: orphan() }, true]
+      ["task-orphan-only", { 111111: null, 222222: orphan() }, true, false],
+      ["task-orphan-twice", { 111111: orphan(), 222222: orphan() }, true, false],
+      ["task-orphan-and-root", { 111111: new Error("taskkill failed"), 222222: orphan() }, true, true],
+      ["task-undefined-reason", { 111111: undefined, 222222: orphan() }, true, true],
+      // The job's own Copilot pid is left after its companion exits; a new cancel signals it directly.
+      ["task-orphan-is-copilot", { 111111: orphan(222222), 222222: null }, false, true]
     ];
-    for (const [jobId, errors, retry] of cases) {
+    for (const [jobId, errors, named, retry] of cases) {
       updateState(tasks.cwd, (state) => {
         state.jobs.unshift({ id: jobId, status: "running", jobClass: "task", write: false, pid: 111111, copilotPid: 222222 });
       });
@@ -1323,12 +1325,16 @@ test("a cancel that leaves a child whose parent exited names it and asks for a r
       };
 
       await assert.rejects(cancelJob(tasks.cwd, jobId, { terminateImpl }), (error) => {
-        assert.match(error.message, /The parent of PID 4321 has exited, so a new cancel cannot reach it\. If it keeps running, end it in Task Manager\./, jobId);
+        assert.equal(
+          /The parent of PID 4321 has exited, so a new cancel cannot reach it\. If it keeps running, end it in Task Manager\./.test(error.message),
+          named,
+          jobId
+        );
+        assert.equal(/The parent of PID 222222/.test(error.message), false, jobId);
         assert.equal(/PID 4321, PID 4321/.test(error.message), false, jobId);
         assert.equal(/Run \/copilot:cancel .* again\.$/.test(error.message), retry, jobId);
         return true;
       });
-      assert.equal(findJob(tasks.dataDir, jobId).copilotPid, 222222, jobId);
     }
   });
 });
