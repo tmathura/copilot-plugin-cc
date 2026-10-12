@@ -2,6 +2,11 @@
 
 ## Copilot plugin
 
+### 1.0.11
+
+- A large branch review keeps white space at the end of the last changed file name, such as a
+  no-break space. Before, that one name lost it.
+
 ### 1.0.10
 
 - `/copilot:status` shows a job's first line that says something as its summary. Before, a review

@@ -764,6 +764,28 @@ test("above the inline limit, a branch review gets only the branch patch, withou
   assert.doesNotMatch(runs[0].prompt, /LOCAL_MARKER/);
 });
 
+test("above the inline limit, a branch review keeps a trailing no-break space on the last changed file name", () => {
+  const repo = makeTempDir();
+  initGitRepo(repo);
+  const names = ["a.txt", "b.txt", "z.txt "];
+  for (const name of names) {
+    writeFile(repo, name, `${name} v1\n`);
+  }
+  git(repo, "add", ".");
+  git(repo, "commit", "-q", "-m", "init");
+  git(repo, "checkout", "-q", "-b", "feature");
+  for (const name of names) {
+    writeFile(repo, name, `${name} v2\n`);
+  }
+  git(repo, "commit", "-qam", "change");
+
+  const { result, runs } = runReview("review", repo, { args: ["--base", "main"] });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(addDirsOf(runs[0]).length, 1);
+  assert.ok(runs[0].prompt.includes("## Changed Files\n\na.txt\nb.txt\nz.txt \n\n## Patch Files"), runs[0].prompt);
+});
+
 test("focus text with shell characters reaches the prompt unchanged, in a repo path with spaces", () => {
   const repo = path.join(makeTempDir(), "repo with spaces & more");
   fs.mkdirSync(repo);
