@@ -197,6 +197,48 @@ test("terminateProcessTree reports a failed taskkill for a named process that st
   );
 });
 
+test("terminateProcessTree checks every named process even when taskkill also reports a missing one", async () => {
+  const output = [
+    'ERROR: The process "1234" not found.',
+    "ERROR: The process with PID 5678 (child process of PID 1234) could not be terminated.",
+    "Reason: Access is denied."
+  ].join("\r\n");
+  const aliveOnly = (living) => (pid) => {
+    if (living.includes(pid)) {
+      return true;
+    }
+    throw Object.assign(new Error("no such process"), { code: "ESRCH" });
+  };
+  const run = (command, args) => ({ command, args, status: 128, signal: null, stdout: output, stderr: "", error: null });
+
+  await assert.rejects(
+    terminateProcessTree(1234, { platform: "win32", forceKillAfterMs: 100, runCommandImpl: run, killImpl: aliveOnly([5678]) }),
+    /Still running: PID 5678\.$/
+  );
+  await assert.rejects(
+    terminateProcessTree(1234, { platform: "win32", forceKillAfterMs: 100, runCommandImpl: failedTaskkill, killImpl: aliveOnly([1234]) }),
+    /Still running: PID 1234\.$/
+  );
+});
+
+test("terminateProcessTree reports a failed taskkill whose output names no process", async () => {
+  const run = (command, args) => ({ command, args, status: 1, signal: null, stdout: "", stderr: "FEHLER: Zugriff verweigert.", error: null });
+
+  await assert.rejects(
+    terminateProcessTree(1234, {
+      platform: "win32",
+      runCommandImpl: run,
+      killImpl() {
+        throw Object.assign(new Error("no such process"), { code: "ESRCH" });
+      }
+    }),
+    (error) => {
+      assert.equal(error.message, "taskkill /PID 1234 /T /F: exit=1: FEHLER: Zugriff verweigert.");
+      return true;
+    }
+  );
+});
+
 test("runCommand passes spaces and shell characters unchanged and ignores a shell option", () => {
   const args = ["a b", "x&y", "p|q", "s;t", "$HOME", "%PATH%", "say \"hi\"", "it's", "c^d"];
 

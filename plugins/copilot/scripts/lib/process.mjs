@@ -206,11 +206,6 @@ export async function terminateProcessTree(pid, options = {}) {
       return { attempted: true, delivered: true, method: "taskkill", result };
     }
 
-    const combinedOutput = `${result.stderr}\n${result.stdout}`.trim();
-    if (!result.error && looksLikeMissingProcessMessage(combinedOutput)) {
-      return { attempted: true, delivered: false, method: "taskkill", result };
-    }
-
     if (result.error?.code === "ENOENT") {
       try {
         killImpl(pid);
@@ -230,12 +225,20 @@ export async function terminateProcessTree(pid, options = {}) {
     // taskkill /T also fails on short-lived children, such as gh.exe at Copilot's start, that exit
     // while it walks the tree. Only a process that is still alive after the wait is a failure. Each
     // line names its process first; a later PID is its parent, which can be this process itself.
+    const combinedOutput = `${result.stderr}\n${result.stdout}`.trim();
     const named = combinedOutput
       .split(/\r?\n/)
       .filter((line) => !/^SUCCESS/i.test(line.trim()))
       .map((line) => /\bPID\s+(\d+)/i.exec(line)?.[1])
       .filter(Boolean)
       .map(Number);
+    // Output that names no process cannot show that the tree stopped, unless the root was already gone.
+    if (named.length === 0) {
+      if (looksLikeMissingProcessMessage(combinedOutput)) {
+        return { attempted: true, delivered: false, method: "taskkill", result };
+      }
+      throw new Error(formatCommandFailure(result));
+    }
     let alive = [...new Set([pid, ...named])];
     const deadline = Date.now() + (options.forceKillAfterMs ?? DEFAULT_FORCE_KILL_AFTER_MS);
     for (;;) {
