@@ -558,6 +558,40 @@ test("an owner file that cannot be written is removed, and no lock is made", (t)
   assert.deepEqual(fs.readdirSync(path.dirname(lockFile)).filter((name) => name.endsWith(".tmp")), []);
 });
 
+test("a reclaim lock appears only with its owner already in it, and no temp file stays behind", (t) => {
+  const workspace = makeTempDir();
+  const lockFile = `${resolveStateFile(workspace)}.lock`;
+  writeLock(lockFile, { pid: deadPid(), token: "dead-owner" });
+  fs.writeFileSync(`${lockFile}.reclaim.999999.dead-empty.tmp`, "", "utf8");
+  const linkSync = fs.linkSync;
+  const links = t.mock.method(fs, "linkSync", (source, target) => {
+    assert.equal(JSON.parse(fs.readFileSync(source, "utf8")).pid, process.pid, `${target} linked from a file with no owner`);
+    return linkSync(source, target);
+  });
+
+  updateState(workspace, (state) => {
+    state.config.stopReviewGate = true;
+  });
+
+  assert.deepEqual(links.mock.calls.map((call) => path.basename(call.arguments[1])), ["state.json.lock", "state.json.lock.reclaim", "state.json.lock"]);
+  assert.equal(loadState(workspace).config.stopReviewGate, true);
+  assert.equal(fs.existsSync(`${lockFile}.reclaim`), false);
+  assert.deepEqual(fs.readdirSync(path.dirname(lockFile)).filter((name) => name.endsWith(".tmp")), [`state.json.lock.reclaim.999999.dead-empty.tmp`]);
+});
+
+test("a lock link that fails for another reason gives its error and leaves no lock or temp file", (t) => {
+  const workspace = makeTempDir();
+  const lockFile = `${resolveStateFile(workspace)}.lock`;
+  t.mock.method(fs, "linkSync", () => {
+    throw Object.assign(new Error("access denied"), { code: "EACCES" });
+  });
+
+  assert.throws(() => updateState(workspace, () => {}), /access denied/);
+
+  assert.equal(fs.existsSync(lockFile), false);
+  assert.deepEqual(fs.readdirSync(path.dirname(lockFile)).filter((name) => name.endsWith(".tmp")), []);
+});
+
 test("a temp lock file left by a killed process does not block a later lock", () => {
   const workspace = makeTempDir();
   const lockFile = `${resolveStateFile(workspace)}.lock`;
