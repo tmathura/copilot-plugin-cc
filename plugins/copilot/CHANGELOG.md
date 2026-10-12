@@ -4,8 +4,9 @@
 
 ### 1.0.12
 
-- On Windows, when `/copilot:cancel` cannot stop a child process whose parent has already exited,
-  it names that process and says that a new cancel cannot reach it. Before, it only asked you to
+- On Windows, when `/copilot:cancel` cannot stop a child process that the job does not track, and
+  whose parent has already exited, it names that process and says that a new cancel cannot reach
+  it. Before, it only asked you to
   run cancel again.
 
 ### 1.0.11

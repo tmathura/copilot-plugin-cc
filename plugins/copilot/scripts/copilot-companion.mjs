@@ -1213,9 +1213,13 @@ export async function cancelJob(workspaceRoot, jobId, options = {}) {
     const orphans = [...new Set(failures.flatMap((reason) => (reason?.orphans ? reason.stillRunning : [])))].filter(
       (pid) => !stored.includes(pid)
     );
-    if (orphans.length > 0) {
+    if (orphans.length === 1) {
       parts.push(
-        `The parent of ${orphans.map((pid) => `PID ${pid}`).join(", ")} has exited, so a new cancel cannot reach it. If it keeps running, end it in Task Manager.`
+        `The parent of PID ${orphans[0]} has exited, so a new cancel cannot reach it. If it keeps running, end it in Task Manager.`
+      );
+    } else if (orphans.length > 1) {
+      parts.push(
+        `The parents of ${orphans.map((pid) => `PID ${pid}`).join(", ")} have exited, so a new cancel cannot reach them. If they keep running, end them in Task Manager.`
       );
     }
     if (failures.some((reason) => !reason?.orphans)) {
