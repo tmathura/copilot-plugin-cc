@@ -17,13 +17,13 @@ How work moves from an idea to `main`. The rules behind these steps are in the
 5. Run `npm run build`, `npm test`, `npm run check-version` and `claude plugin validate .`. They
    must pass.
 6. Review the diff, and check it against `CLAUDE.md` and the docs it links to. Fix what you find,
-   then test again.
+   then test again. Do steps 5 and 6 before every commit, also in the review rounds below.
 7. Commit with the subject `[#n] Imperative description`.
 8. Review the branch with `/codex:adversarial-review` and `/copilot:adversarial-review`, both with
    `--scope branch --base origin/main`, in rounds. In each round, fix the confirmed findings, record
    rejected ones with the reason, test, and commit. Stop when both reviewers approve, or when every
-   finding left was rejected in an earlier round. If one reviewer is not set up, run the step with
-   the other one, and say so in the PR.
+   finding left was rejected in an earlier round. If one reviewer is not set up, run this step and
+   step 10 with the other one, and say so in the PR.
 9. Open a PR into `main`. The bot reviewers (today Copilot and CodeRabbit) review each push.
 10. Review the PR in rounds. In each round, read every review, including findings that are only in a
     review body or summary comment. Fix the confirmed findings, have Codex and Copilot review the
