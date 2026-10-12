@@ -221,6 +221,28 @@ test("terminateProcessTree checks every named process even when taskkill also re
   );
 });
 
+test("a failed taskkill marks whether only children whose root has exited are left", async () => {
+  const aliveOnly = (living) => (pid) => {
+    if (living.includes(pid)) {
+      return true;
+    }
+    throw Object.assign(new Error("no such process"), { code: "ESRCH" });
+  };
+  const stop = (living) =>
+    terminateProcessTree(1234, { platform: "win32", forceKillAfterMs: 100, runCommandImpl: failedTaskkill, killImpl: aliveOnly(living) });
+
+  await assert.rejects(stop([5678]), (error) => {
+    assert.equal(error.orphans, true);
+    assert.deepEqual(error.stillRunning, [5678]);
+    return true;
+  });
+  await assert.rejects(stop([1234, 5678]), (error) => {
+    assert.equal(error.orphans, false);
+    assert.deepEqual(error.stillRunning, [1234, 5678]);
+    return true;
+  });
+});
+
 test("terminateProcessTree reports a failed taskkill whose output names no process", async () => {
   const run = (command, args) => ({ command, args, status: 1, signal: null, stdout: "", stderr: "FEHLER: Zugriff verweigert.", error: null });
 

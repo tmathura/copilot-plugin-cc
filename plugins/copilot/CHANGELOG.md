@@ -2,6 +2,12 @@
 
 ## Copilot plugin
 
+### 1.0.12
+
+- On Windows, when `/copilot:cancel` cannot stop a child process whose parent has already exited,
+  it names that process and says that a new cancel cannot reach it. Before, it only asked you to
+  run cancel again.
+
 ### 1.0.11
 
 - A large branch review keeps white space at the end of the last changed file name, such as a

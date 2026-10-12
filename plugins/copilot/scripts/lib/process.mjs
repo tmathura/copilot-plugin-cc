@@ -1,7 +1,8 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): never starts a shell; adds resolveLauncher for
 // Windows npm shims; terminateProcessTree returns a promise, signals a process that leads no group,
 // sends SIGKILL to what is still alive after a wait, and accepts the macOS EPERM for a group whose
-// members have exited; a failed taskkill counts only for processes still alive after a wait.
+// members have exited; a failed taskkill counts only for processes still alive after a wait, and
+// its error marks children whose root has exited.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -252,7 +253,12 @@ export async function terminateProcessTree(pid, options = {}) {
       }
       await delay(Math.min(EXIT_POLL_MS, remaining));
     }
-    throw new Error(`${formatCommandFailure(result)}\nStill running: ${alive.map((candidate) => `PID ${candidate}`).join(", ")}.`);
+    // A new taskkill on a root that has exited cannot reach its children, so the caller must not
+    // offer a retry for them.
+    throw Object.assign(
+      new Error(`${formatCommandFailure(result)}\nStill running: ${alive.map((candidate) => `PID ${candidate}`).join(", ")}.`),
+      { stillRunning: alive, orphans: !alive.includes(pid) }
+    );
   }
 
   let target = -pid;

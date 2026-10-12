@@ -1299,6 +1299,40 @@ test("a worker that cannot start fails the job with the spawn error", async () =
   });
 });
 
+test("a cancel that leaves a child whose parent exited names it and asks for a retry only when one can help", async () => {
+  const tasks = setUpTasks();
+  await withCompanionEnv(tasks.env, async ({ cancelJob }) => {
+    const { updateState } = await import("../plugins/copilot/scripts/lib/state.mjs");
+    const orphan = () =>
+      Object.assign(new Error("taskkill /PID 222222 /T /F: exit=128\nStill running: PID 4321."), { orphans: true, stillRunning: [4321] });
+    const cases = [
+      ["task-orphan-only", { 111111: null, 222222: orphan() }, false],
+      ["task-orphan-twice", { 111111: orphan(), 222222: orphan() }, false],
+      ["task-orphan-and-root", { 111111: new Error("taskkill failed"), 222222: orphan() }, true],
+      ["task-undefined-reason", { 111111: undefined, 222222: orphan() }, true]
+    ];
+    for (const [jobId, errors, retry] of cases) {
+      updateState(tasks.cwd, (state) => {
+        state.jobs.unshift({ id: jobId, status: "running", jobClass: "task", write: false, pid: 111111, copilotPid: 222222 });
+      });
+      const terminateImpl = async (pid) => {
+        if (errors[pid] !== null) {
+          throw errors[pid];
+        }
+        return { attempted: true, delivered: false, method: "taskkill" };
+      };
+
+      await assert.rejects(cancelJob(tasks.cwd, jobId, { terminateImpl }), (error) => {
+        assert.match(error.message, /The parent of PID 4321 has exited, so a new cancel cannot reach it\. If it keeps running, end it in Task Manager\./, jobId);
+        assert.equal(/PID 4321, PID 4321/.test(error.message), false, jobId);
+        assert.equal(/Run \/copilot:cancel .* again\.$/.test(error.message), retry, jobId);
+        return true;
+      });
+      assert.equal(findJob(tasks.dataDir, jobId).copilotPid, 222222, jobId);
+    }
+  });
+});
+
 test("a cancel whose signal fails keeps that pid and blocks a resume, and a second cancel stops the process", async () => {
   const tasks = setUpTasks();
   await withCompanionEnv(tasks.env, async ({ cancelJob }) => {
