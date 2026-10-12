@@ -6,7 +6,8 @@
 // task's record is written before its worker starts, the worker claims the job under the state lock,
 // every run starts Copilot under that lock, and cancel marks the job cancelled under it before it
 // stops the job's processes. Resume stays in one mode, never into a review gate job, and there is no
-// spark model alias. The task command takes the review gate's internal --context-dir option.
+// spark model alias. The task command takes the review gate's internal --context-dir option, and its
+// JSON output gives a failed run's failureMessage.
 
 import { spawn } from "node:child_process";
 import fs from "node:fs";
@@ -601,6 +602,10 @@ async function executeTaskRun(request) {
     status: result.status,
     threadId: result.threadId,
     rawOutput,
+    failureMessage:
+      result.status !== 0
+        ? failureMessage || `Copilot reported a failed run (exit code ${result.result?.exitCode ?? "unknown"}).`
+        : null,
     touchedFiles: result.touchedFiles,
     reasoningSummary: result.reasoningSummary
   };

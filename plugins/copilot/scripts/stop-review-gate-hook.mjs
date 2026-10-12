@@ -5,7 +5,7 @@
 // the limit, or when the hook itself is stopped, the hook stops the companion's process tree and
 // cancels its job, which stops the job's Copilot process; it also cancels the job of a companion that
 // ended before its job did. The hook uses Claude Code's own CLAUDE_PLUGIN_DATA, not an inherited
-// companion export.
+// companion export. A failed run's message gives the reason from the task's JSON payload.
 
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -127,6 +127,15 @@ function buildSetupNote(availability) {
 
   const detail = availability.detail ? ` ${availability.detail}.` : "";
   return `Copilot is not set up for the review gate.${detail} Run /copilot:setup.`;
+}
+
+// The task runs with --json, so a failed run gives its reason in the payload, not on stderr.
+function readTaskFailure(stdout) {
+  try {
+    return JSON.parse(stdout)?.failureMessage ?? "";
+  } catch {
+    return "";
+  }
 }
 
 function parseStopReviewOutput(rawOutput) {
@@ -276,7 +285,7 @@ export async function runStopReview(cwd, input = {}, options = {}) {
   }
 
   if (result.status !== 0) {
-    const detail = String(result.stderr || result.stdout || "").trim();
+    const detail = String(readTaskFailure(result.stdout) || result.stderr || result.stdout || "").trim();
     return {
       ok: false,
       reason: detail

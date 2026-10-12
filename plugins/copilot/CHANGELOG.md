@@ -2,6 +2,13 @@
 
 ## Copilot plugin
 
+### 1.0.9
+
+- A run that fails because Copilot is not logged in now names `/copilot:setup` after Copilot's
+  own error, in a task, a review, `/copilot:result` and the review gate.
+- The review gate's message for a failed run gives the reason. Before, it showed the task's raw
+  JSON output.
+
 ### 1.0.8
 
 - `/copilot:rescue` shows why it cannot run Copilot. A missing or too old Copilot gives the error

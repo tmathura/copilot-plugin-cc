@@ -820,6 +820,7 @@ test("a rescue task without a Copilot login prints Copilot's login steps, at onc
   assert.notEqual(result.status, 0);
   assert.match(result.stdout, /No authentication information found\./);
   assert.match(result.stdout, /run the '\/login' command/);
+  assert.match(result.stdout, /\nRun `\/copilot:setup` to check the login and see how to log in\./);
 
   // A background run starts first; its login failure shows later in /copilot:status and /copilot:result.
   const background = companion(["task", "--write", "--background", "--json", "fix the bug"]);
@@ -827,7 +828,21 @@ test("a rescue task without a Copilot login prints Copilot's login steps, at onc
   const { jobId } = JSON.parse(background.stdout);
   await waitFor(() => findJob(dataDir, jobId)?.status === "failed", 30000);
   assert.match(companion(["status", jobId]).stdout, new RegExp(`${jobId} \\| failed`));
-  assert.match(companion(["result", jobId]).stdout, /No authentication information found\.[\s\S]*run the '\/login' command/);
+  assert.match(companion(["result", jobId]).stdout, /No authentication information found\.[\s\S]*run the '\/login' command[\s\S]*Run `\/copilot:setup`/);
+});
+
+test("a review and the review gate without a Copilot login name /copilot:setup", () => {
+  const { result } = runReview("adversarial-review", makeRepo(), { behavior: "not-logged-in", args: ["--json"] });
+  assert.equal(result.status, 1);
+  assert.match(JSON.parse(result.stdout).parseError, /No authentication information found[\s\S]*Run `\/copilot:setup`/);
+  const native = runReview("review", makeRepo(), { behavior: "not-logged-in" }).result;
+  assert.equal(native.status, 1);
+  assert.match(native.stdout, /No authentication information found[\s\S]*Run `\/copilot:setup`/);
+
+  const { gate } = setUpGate("not-logged-in");
+  const blocked = gate({ last_assistant_message: "Edited src/app.js." });
+  assert.equal(blocked.status, 0, blocked.stderr);
+  assert.match(JSON.parse(blocked.stdout).reason, /^The stop-time Copilot review task failed: [\s\S]*Run `\/copilot:setup`/);
 });
 
 test("a read-only task cannot write, and a --write task gets the write profile with the sandbox", () => {

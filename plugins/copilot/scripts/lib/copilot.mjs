@@ -42,6 +42,7 @@ const INSTALL_HINT = "Install it with `npm install -g @github/copilot`, then rer
 export const UPDATE_HINT =
   "Update it with the tool that installed it (for an npm install: `npm install -g @github/copilot`), then rerun `/copilot:setup`.";
 export const CHECK_HINT = "Check that `copilot --no-auto-update --version` works, then rerun `/copilot:setup`.";
+const LOGIN_HINT = "Run `/copilot:setup` to check the login and see how to log in.";
 const READ_ONLY_TOOLS = ["view", "glob", "grep"];
 const WRITE_TOOLS = ["create", "edit", "apply_patch"];
 const SHELL_TOOLS = new Set(["bash", "powershell"]);
@@ -350,8 +351,10 @@ async function captureTurn(client, sessionId, options = {}) {
       state.error = client.protocolError;
     } else if (!state.result) {
       const how = exit.signal ? `signal ${exit.signal}` : `exit ${exit.exitCode}`;
+      // Setup knows more than Copilot's own steps, for example a token for a system with no keyring.
+      const hint = NOT_LOGGED_IN_PATTERN.test(state.stderr) ? `\n${LOGIN_HINT}` : "";
       state.error = new Error(
-        `Copilot stopped before it sent a result (${how}).${state.stderr ? `\n${state.stderr}` : ""}`
+        `Copilot stopped before it sent a result (${how}).${state.stderr ? `\n${state.stderr}` : ""}${hint}`
       );
     }
   }
