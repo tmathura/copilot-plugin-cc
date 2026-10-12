@@ -365,6 +365,10 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
   Codex stops the process first and marks the job after, so a job that starts between the two steps
   can keep running. If a process cannot be stopped, by cancel or at the end of a run, the job keeps
   its process ids, and you can run `/copilot:cancel <job id>` again.
+- On Windows, when `taskkill` fails, the plugin checks whether the process and each process that
+  `taskkill` could not stop are still alive, for up to 5 seconds. Only one that is still alive
+  counts as a failed stop. Copilot starts short-lived `gh.exe` children that exit while `taskkill` stops the
+  tree, and Codex reports such a cancel as failed. The reason is correctness.
 - A background task's record is written before its worker starts. Codex starts the worker first, and
   a worker that finds no record leaves the job queued forever. If the worker cannot start, or stops
   with an error before its run ends, the job is marked failed.

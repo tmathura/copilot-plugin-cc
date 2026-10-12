@@ -2,6 +2,12 @@
 
 ## Copilot plugin
 
+### 1.0.7
+
+- On Windows, `/copilot:cancel` during Copilot's start reports the job cancelled. Before, it often
+  failed with "The process with PID ... could not be terminated" for short-lived children that had
+  already exited, and asked you to run it again.
+
 ### 1.0.6
 
 - `/copilot:adversarial-review` asks Copilot for its JSON as plain text in the final message, not

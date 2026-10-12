@@ -142,6 +142,61 @@ test("terminateProcessTree treats missing Windows processes as already stopped",
   assert.match(outcome.result.stdout, /not found/i);
 });
 
+// PID 1000 is the caller, so it stays alive; 2222 was stopped, and its pid may be reused at once.
+const TASKKILL_CHILD_FAILURE = [
+  "SUCCESS: The process with PID 2222 (child process of PID 1234) has been terminated.",
+  "ERROR: The process with PID 5678 (child process of PID 1234) could not be terminated.",
+  "Reason: The operation attempted is not supported.",
+  "SUCCESS: The process with PID 1234 (child process of PID 1000) has been terminated."
+].join("\r\n");
+
+function failedTaskkill(command, args) {
+  return { command, args, status: 128, signal: null, stdout: "", stderr: TASKKILL_CHILD_FAILURE, error: null };
+}
+
+test("terminateProcessTree reports success when taskkill names children that exit during the wait", async () => {
+  const checks = new Map();
+  const outcome = await terminateProcessTree(1234, {
+    platform: "win32",
+    runCommandImpl: failedTaskkill,
+    killImpl(pid, signal) {
+      assert.equal(signal, 0);
+      checks.set(pid, (checks.get(pid) ?? 0) + 1);
+      // The child is still exiting at the first check; the caller and a reused pid stay alive.
+      if ((pid === 5678 && checks.get(pid) === 1) || pid === 1000 || pid === 2222) {
+        return true;
+      }
+      throw Object.assign(new Error("no such process"), { code: "ESRCH" });
+    }
+  });
+
+  assert.equal(outcome.delivered, true);
+  assert.equal(outcome.method, "taskkill");
+  assert.deepEqual([...checks.keys()].sort(), [1234, 5678]);
+  assert.equal(checks.get(5678), 2);
+});
+
+test("terminateProcessTree reports a failed taskkill for a named process that stays alive", async () => {
+  await assert.rejects(
+    terminateProcessTree(1234, {
+      platform: "win32",
+      forceKillAfterMs: 100,
+      runCommandImpl: failedTaskkill,
+      killImpl(pid) {
+        if (pid === 5678) {
+          return true;
+        }
+        throw Object.assign(new Error("no such process"), { code: "ESRCH" });
+      }
+    }),
+    (error) => {
+      assert.match(error.message, /^taskkill \/PID 1234 \/T \/F: exit=128: .*could not be terminated/s);
+      assert.match(error.message, /Still running: PID 5678\.$/);
+      return true;
+    }
+  );
+});
+
 test("runCommand passes spaces and shell characters unchanged and ignores a shell option", () => {
   const args = ["a b", "x&y", "p|q", "s;t", "$HOME", "%PATH%", "say \"hi\"", "it's", "c^d"];
 

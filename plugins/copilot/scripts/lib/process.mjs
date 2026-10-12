@@ -1,7 +1,7 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): never starts a shell; adds resolveLauncher for
 // Windows npm shims; terminateProcessTree returns a promise, signals a process that leads no group,
 // sends SIGKILL to what is still alive after a wait, and accepts the macOS EPERM for a group whose
-// members have exited.
+// members have exited; a failed taskkill counts only for processes still alive after a wait.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -227,7 +227,29 @@ export async function terminateProcessTree(pid, options = {}) {
       throw result.error;
     }
 
-    throw new Error(formatCommandFailure(result));
+    // taskkill /T also fails on short-lived children, such as gh.exe at Copilot's start, that exit
+    // while it walks the tree. Only a process that is still alive after the wait is a failure. Each
+    // line names its process first; a later PID is its parent, which can be this process itself.
+    const named = combinedOutput
+      .split(/\r?\n/)
+      .filter((line) => !/^SUCCESS/i.test(line.trim()))
+      .map((line) => /\bPID\s+(\d+)/i.exec(line)?.[1])
+      .filter(Boolean)
+      .map(Number);
+    let alive = [...new Set([pid, ...named])];
+    const deadline = Date.now() + (options.forceKillAfterMs ?? DEFAULT_FORCE_KILL_AFTER_MS);
+    for (;;) {
+      alive = alive.filter((candidate) => isAlive(candidate, killImpl));
+      if (alive.length === 0) {
+        return { attempted: true, delivered: true, method: "taskkill", result };
+      }
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) {
+        break;
+      }
+      await delay(Math.min(EXIT_POLL_MS, remaining));
+    }
+    throw new Error(`${formatCommandFailure(result)}\nStill running: ${alive.map((candidate) => `PID ${candidate}`).join(", ")}.`);
   }
 
   let target = -pid;
