@@ -1363,6 +1363,38 @@ test("a cancel that leaves a child whose parent exited names it and asks for a r
   });
 });
 
+test("a cancel whose record cannot be cleared after an orphan-only stop names the child and asks for a retry", async (t) => {
+  const tasks = setUpTasks();
+  await withCompanionEnv(tasks.env, async ({ cancelJob }) => {
+    const { updateState } = await import("../plugins/copilot/scripts/lib/state.mjs");
+    const jobId = "task-orphan-unclearable";
+    updateState(tasks.cwd, (state) => {
+      state.jobs.unshift({ id: jobId, status: "running", jobClass: "task", write: false, pid: null, copilotPid: 222222 });
+    });
+    const renameSync = fs.renameSync;
+    const terminateImpl = async (pid) => {
+      if (pid === 222222) {
+        // From here on the state cannot be saved, so the pid cannot be cleared.
+        t.mock.method(fs, "renameSync", () => {
+          throw Object.assign(new Error("disk error"), { code: "EIO" });
+        });
+        throw Object.assign(new Error("Still running: PID 4321."), { orphans: true, stillRunning: [4321] });
+      }
+      return { attempted: false, delivered: false, method: null };
+    };
+
+    await assert.rejects(cancelJob(tasks.cwd, jobId, { terminateImpl }), (error) => {
+      assert.match(error.message, /The job record could not be updated: disk error/);
+      assert.match(error.message, /The parent of PID 4321 has exited/);
+      assert.match(error.message, /Run \/copilot:cancel task-orphan-unclearable again\.$/);
+      return true;
+    });
+    t.mock.restoreAll();
+    assert.equal(fs.renameSync, renameSync);
+    assert.equal(findJob(tasks.dataDir, jobId).copilotPid, 222222);
+  });
+});
+
 test("a cancel whose signal fails keeps that pid and blocks a resume, and a second cancel stops the process", async () => {
   const tasks = setUpTasks();
   await withCompanionEnv(tasks.env, async ({ cancelJob }) => {

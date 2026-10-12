@@ -1199,8 +1199,13 @@ export async function cancelJob(workspaceRoot, jobId, options = {}) {
         if (error?.orphans) {
           try {
             clear();
-          } catch {
-            // The pid then stays; a later cancel finds it gone and clears it.
+          } catch (clearError) {
+            // The record keeps the pid, so a retry is needed to clear it; the children are still named.
+            throw Object.assign(new Error(`${error.message}\nThe job record could not be updated: ${clearError.message}`), {
+              orphans: true,
+              stillRunning: error.stillRunning,
+              retry: true
+            });
           }
         }
         throw error;
@@ -1222,7 +1227,7 @@ export async function cancelJob(workspaceRoot, jobId, options = {}) {
   const failures = outcomes
     .filter((outcome) => outcome.status === "rejected")
     .map((outcome) => outcome.reason)
-    .filter((reason) => !reason?.orphans || untracked(reason).length > 0);
+    .filter((reason) => !reason?.orphans || reason.retry || untracked(reason).length > 0);
   if (failures.length > 0) {
     const parts = [
       `Job ${jobId} is ${cancelled.status}, but a process could not be stopped (${failures.map((reason) => reason?.message ?? reason).join("; ")}).`
@@ -1237,7 +1242,7 @@ export async function cancelJob(workspaceRoot, jobId, options = {}) {
         `The parents of ${orphans.map((pid) => `PID ${pid}`).join(", ")} have exited, so a new cancel cannot reach them. If Task Manager still shows them as Copilot or gh processes, end them there.`
       );
     }
-    if (failures.some((reason) => !reason?.orphans)) {
+    if (failures.some((reason) => !reason?.orphans || reason.retry)) {
       parts.push(`Run /copilot:cancel ${jobId} again.`);
     }
     throw new Error(parts.join(" "));
