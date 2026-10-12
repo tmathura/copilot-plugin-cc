@@ -5,19 +5,34 @@ How work moves from an idea to `main`. The rules behind these steps are in the
 
 ## Ticket workflow
 
-1. Open a GitHub issue for the change.
-2. Make a branch `<type>/<n>-<slug>` from the latest `origin/main`, in its own worktree. The type is
-   `bugfix` for an issue with the `bug` label, and `feature` for all others.
-3. Plan with Claude plan mode or with Spec Kit (below). Run the plan's Constitution Check.
+1. Plan with Claude plan mode or with Spec Kit (below). Run the plan's Constitution Check. Have
+   Codex and Copilot review the plan, and apply their confirmed findings.
+2. Open a GitHub issue from the plan.
+3. Make a branch `<type>/<n>-<slug>` from the latest `origin/main`, in its own worktree. The type is
+   `bugfix` for an issue with the `bug` label, and `feature` for all others. Spec Kit wrote its files
+   in the main checkout; move `specs/NNN-<name>/` and `.specify/feature.json` into the worktree.
 4. Make the change, with its tests and docs. If the work departs from the spec, update the spec in
-   the same commit ("Keeping the spec current", below).
-5. Commit with the subject `[#n] Imperative description`.
-6. Run a Codex review of the branch. Fix confirmed findings, and record rejected ones with the reason.
-7. Open a PR into `main`. The bot reviewers (today Copilot and CodeRabbit) review each push. Read
-   every review, including findings that are only in a review body or summary comment. Answer and
-   resolve every thread.
-8. Squash-merge when the reviews are done and CI passes. Until the repo has CI, run the tests and
-   checks that exist on your own machine. They must pass.
+   the same commit ("Keeping the spec current", below). If the change is a release, raise the
+   version and add the `CHANGELOG.md` entry ("Release", below).
+5. Run `npm run build`, `npm test`, `npm run check-version` and `claude plugin validate .`. They
+   must pass.
+6. Review the diff, and check it against `CLAUDE.md` and the docs it links to. Fix what you find,
+   then test again.
+7. Commit with the subject `[#n] Imperative description`.
+8. Review the branch with `/codex:adversarial-review` and `/copilot:adversarial-review`, both with
+   `--scope branch --base origin/main`, in rounds. In each round, fix the confirmed findings, record
+   rejected ones with the reason, test, and commit. Stop when both reviewers approve, or when every
+   finding left was rejected in an earlier round. If one reviewer is not set up, run the step with
+   the other one, and say so in the PR.
+9. Open a PR into `main`. The bot reviewers (today Copilot and CodeRabbit) review each push.
+10. Review the PR in rounds. In each round, read every review, including findings that are only in a
+    review body or summary comment. Fix the confirmed findings, have Codex and Copilot review the
+    fixes, test, commit and push. Answer and resolve every thread, then wait for the next reviews.
+    Stop when no reviewer has findings and no thread is open, or when every finding left was
+    rejected in an earlier round.
+11. Squash-merge when every CI check passes.
+12. Remove the worktree and the branch, and pull `main`. If the PR raised the version, publish the
+    release ("Release", below).
 
 The owner runs these steps with personal `cpcc-workflow-*` Claude Code skills. They are not in this
 repo. You can follow the same steps by hand.
@@ -128,8 +143,36 @@ status.
 
 ## Release
 
-1. Raise the version in the package, plugin and marketplace files. The check script must pass.
-2. Run the tests and `claude plugin validate .`.
-3. Run the plugin with `claude --plugin-dir` on a real git repo: a review, a background task with
-   status and result, cancel, and the review gate.
-4. Merge, and tag the release.
+A ticket is a release when it changes anything under `plugins/copilot/` or
+`.claude-plugin/marketplace.json`, because Claude Code updates an installed plugin by its version.
+A ticket that changes only repo files (docs, specs, tests, CI, scripts, package files, README) is
+not a release. Each user-facing ticket is its own release.
+
+Pick the level by what users see (SemVer):
+
+- patch for a fix;
+- minor for a new command, flag or behaviour;
+- major for a change that breaks use.
+
+In the PR that raises the version:
+
+1. Run `npm run bump-version -- X.Y.Z`. `npm run check-version` must pass.
+2. Add a `### X.Y.Z` entry at the top of the "Copilot plugin" section of
+   `plugins/copilot/CHANGELOG.md`: a few plain bullets that say what changed for users. The summary
+   lives in the repo, so it survives a move away from GitHub.
+3. Run the tests and `claude plugin validate .`.
+4. Do the manual run that the constitution asks for (Principle VI).
+
+After the merge, publish a GitHub release like
+[upstream's](https://github.com/openai/codex-plugin-cc/releases):
+
+- the tag `vX.Y.Z` on the merge commit;
+- the title `vX.Y.Z` (the first release, `v1.0.0`, is titled "Initial Release", as upstream's is);
+- notes that are the `CHANGELOG.md` entry, followed by GitHub's generated notes.
+
+```bash
+gh release create vX.Y.Z --target <merge commit> --title "vX.Y.Z" --notes-file <entry> --generate-notes
+```
+
+The full PR list of a release comes from git, because every squash merge puts the PR title in the
+commit subject: `git log --oneline v<previous>..v<version>`.
