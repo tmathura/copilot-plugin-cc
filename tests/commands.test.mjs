@@ -154,7 +154,7 @@ test("rescue command absorbs continue semantics", () => {
   assert.match(agent, /If the user asks for a concrete model name such as `gpt-5\.4-mini`, pass it through with `--model`/i);
   assert.match(agent, /If the request says that the continued task is read-only, do not add `--write`\. If it says that the continued task is a `--write` task, add `--write`/i);
   assert.match(agent, /Return the stdout of the `copilot-companion` command exactly as-is/i);
-  assert.match(agent, /If the Bash call fails, return its stdout exactly as-is, or its stderr when stdout is empty, with nothing added\. When Copilot is missing or too old, that output names `\/copilot:setup` as the next step/i);
+  assert.match(agent, /If the Bash call fails, return its output exactly as-is, with nothing added\. When Copilot is missing or too old, that output names `\/copilot:setup` as the next step/i);
   assert.match(agent, /gpt-5-4-prompting/);
   assert.match(agent, /only to tighten the user's request into a better Copilot prompt/i);
   assert.match(agent, /Do not use that skill to inspect the repository, reason through the problem yourself, draft a solution, or do any independent work/i);
@@ -168,7 +168,7 @@ test("rescue command absorbs continue semantics", () => {
   assert.match(runtimeSkill, /Strip it before calling `task`/i);
   assert.match(runtimeSkill, /`--effort`: accepted values are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`/i);
   assert.match(runtimeSkill, /Do not inspect the repository, read files, grep, monitor progress, poll status, fetch results, cancel jobs, summarize output, or do any follow-up work of your own/i);
-  assert.match(runtimeSkill, /If the Bash call fails, return its stdout exactly as-is, or its stderr when stdout is empty, with nothing added\. When Copilot is missing or too old, that output names `\/copilot:setup` as the next step/i);
+  assert.match(runtimeSkill, /If the Bash call fails, return its output exactly as-is, with nothing added\. When Copilot is missing or too old, that output names `\/copilot:setup` as the next step/i);
   for (const source of [rescue, agent, runtimeSkill]) {
     assert.doesNotMatch(source, /spark/i);
   }

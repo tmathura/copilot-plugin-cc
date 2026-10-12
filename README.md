@@ -386,12 +386,11 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
   research without edits, and the prompt recipes run diagnosis without edits read-only. The Codex
   skill lists the exceptions in one rule but not in the other, and its recipes run diagnosis in
   write mode.
-- When the rescue subagent's `task` call fails, it returns the companion's output (its stdout, or
-  its stderr when stdout is empty). So a missing or too old Copilot shows the error and
-  `/copilot:setup` as the next step, and a foreground run that fails at once, for example without a
-  login, shows Copilot's error. The Codex subagent returns nothing, so the user gets an empty
-  answer, and its rescue command has a `/codex:setup` rule that its helper can never trigger. The
-  reason is correctness.
+- When the rescue subagent's `task` call fails, it returns the command's output as it is. So a
+  missing or too old Copilot shows the error and `/copilot:setup` as the next step, and a
+  foreground run that fails at once, for example without a login, shows Copilot's error. The Codex
+  subagent returns nothing, so the user gets an empty answer, and its rescue command has a
+  `/codex:setup` rule that its helper can never trigger. The reason is correctness.
 - The plugin replaces the job state and job files through a temp file and a rename, so a reader
   never sees half a file. Codex writes over the file. On Windows a rename fails while another
   process reads the file, and a reader can miss the file during a rename, so the plugin retries both
