@@ -5,7 +5,7 @@
 // CLAUDE_PLUGIN_DATA over an inherited export. SessionEnd closes the session and marks its
 // active jobs cancelled in one locked update, stops their companions and Copilot processes with one
 // shared wait, and then removes the session's finished jobs and the jobs it stopped, all inside the
-// hook's 5 s timeout.
+// hook's 5 s timeout. A pid whose stop shows it has exited counts as stopped.
 
 import fs from "node:fs";
 import process from "node:process";
@@ -127,12 +127,15 @@ export async function cleanupSessionJobs(cwd, sessionId, options = {}) {
     stopping.map(async (job) => {
       const keys = ["pid", "copilotPid"].filter((key) => job[key]);
       const outcomes = await Promise.allSettled(keys.map((key) => terminate(job[key], { forceKillAfterMs })));
-      if (outcomes.every((outcome) => outcome.status === "fulfilled")) {
+      // A stop that leaves only children of an exited pid is done with that pid: a cancel cannot reach
+      // the children, and the pid may be reused.
+      const done = outcomes.map((outcome) => outcome.status === "fulfilled" || Boolean(outcome.reason?.orphans));
+      if (done.every(Boolean)) {
         removedIds.add(job.id);
       } else {
         stoppedPids.set(
           job.id,
-          keys.filter((_, index) => outcomes[index].status === "fulfilled").map((key) => [key, job[key]])
+          keys.filter((_, index) => done[index]).map((key) => [key, job[key]])
         );
       }
     })

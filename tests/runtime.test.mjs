@@ -2126,6 +2126,38 @@ test("SessionEnd keeps a job whose stop fails, and an older job whose stop never
   });
 });
 
+test("SessionEnd clears a pid whose stop shows it has exited, and keeps one that can still be stopped", async () => {
+  const tasks = setUpTasks();
+  await withCompanionEnv(tasks.env, async () => {
+    const { cleanupSessionJobs } = await import(pathToFileURL(SESSION_HOOK).href);
+    const { updateState } = await import("../plugins/copilot/scripts/lib/state.mjs");
+    const sessionId = "orphan-stop-session";
+    updateState(tasks.cwd, (state) => {
+      state.jobs.unshift(
+        { id: "task-orphan-only", status: "running", jobClass: "task", sessionId, pid: 111111, copilotPid: 222222 },
+        { id: "task-orphan-and-live", status: "running", jobClass: "task", sessionId, pid: 333333, copilotPid: 444444 }
+      );
+    });
+    const orphan = Object.assign(new Error("Still running: PID 4321."), { orphans: true, stillRunning: [4321] });
+
+    await cleanupSessionJobs(tasks.cwd, sessionId, {
+      terminateImpl: async (pid) => {
+        if (pid === 222222 || pid === 333333) {
+          throw orphan;
+        }
+        if (pid === 444444) {
+          throw new Error("taskkill failed");
+        }
+        return { attempted: true, delivered: true, method: "taskkill" };
+      }
+    });
+
+    const jobs = readJobs(tasks.dataDir);
+    assert.deepEqual(jobs.map((job) => job.id), ["task-orphan-and-live"]);
+    assert.deepEqual([jobs[0].pid, jobs[0].copilotPid], [null, 444444]);
+  });
+});
+
 test("SessionEnd still closes the session and stops a job whose job file cannot be written", async () => {
   const tasks = setUpTasks();
   await withCompanionEnv(tasks.env, async () => {
