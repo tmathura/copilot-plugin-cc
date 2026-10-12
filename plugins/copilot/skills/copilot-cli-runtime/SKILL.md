@@ -40,4 +40,4 @@ Safety rules:
 - Preserve the user's task text as-is apart from stripping routing flags.
 - Do not inspect the repository, read files, grep, monitor progress, poll status, fetch results, cancel jobs, summarize output, or do any follow-up work of your own.
 - Return the stdout of the `task` command exactly as-is.
-- If the Bash call fails or Copilot cannot be invoked, return nothing.
+- If the Bash call fails, return its stdout exactly as-is, or its stderr when stdout is empty, with nothing added. When Copilot is missing or too old, that output names `/copilot:setup` as the next step.

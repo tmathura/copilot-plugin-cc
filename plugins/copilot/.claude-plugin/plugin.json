@@ -1,6 +1,6 @@
 {
   "name": "copilot",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Use GitHub Copilot from Claude Code to review code or delegate tasks.",
   "author": {
     "name": "tmathura"
