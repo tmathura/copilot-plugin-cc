@@ -41,7 +41,8 @@ export const NOT_LOGGED_IN_STDERR = [
 //   reject-flags        rejects its arguments and exits 1 before it reads the prompt
 // Every run records its arguments, environment, prompt, pid and the files of each --add-dir folder
 // (base64, so the bytes stay exact). Each child that a run starts is recorded with the run's pid.
-// FAKE_COPILOT_ANSWER replaces the final answer text.
+// FAKE_COPILOT_ANSWER replaces the final answer text. FAKE_COPILOT_EARLIER gives the first turn's
+// message, which comes with the view tool call.
 export function installFakeCopilot(binDir, behavior = "ok") {
   const scriptPath = path.join(binDir, "copilot");
   const recordPath = path.join(binDir, "fake-copilot-runs.jsonl");
@@ -125,7 +126,7 @@ function emitTurn() {
   process.stdout.write("null\\n");
   emit({ type: "assistant.turn_start", data: { turnId: "0" } });
   emit({ type: "assistant.reasoning", data: { content: "Looked at the request." } });
-  emit({ type: "assistant.message", data: { content: "", toolRequests: [{ toolCallId: "call-1", name: "view" }] } });
+  emit({ type: "assistant.message", data: { content: process.env.FAKE_COPILOT_EARLIER ?? "", toolRequests: [{ toolCallId: "call-1", name: "view" }] } });
   emit({ type: "tool.execution_start", data: { toolCallId: "call-1", toolName: "view", arguments: { path: "a.txt" } } });
   emit({ type: "tool.execution_complete", data: { toolCallId: "call-1", success: true } });
   emit({ type: "assistant.turn_start", data: { turnId: "1" } });

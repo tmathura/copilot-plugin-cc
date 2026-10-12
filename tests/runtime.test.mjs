@@ -527,6 +527,18 @@ test("an adversarial review whose last turn has no answer fails with a clear err
   }
 });
 
+test("an adversarial review takes the JSON from the last turn, after an earlier message", () => {
+  const { result } = runReview("adversarial-review", makeRepo(), {
+    args: ["--json"],
+    env: { FAKE_COPILOT_EARLIER: "Need to check what setup prints.", FAKE_COPILOT_ANSWER: REVIEW_JSON }
+  });
+  const payload = JSON.parse(result.stdout);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(payload.result.verdict, "needs-attention");
+  assert.equal(payload.copilot.stdout, REVIEW_JSON);
+});
+
 test("an adversarial review whose run fails with an empty last turn reports the failure", () => {
   const { result } = runReview("adversarial-review", makeRepo(), { behavior: "truncated", args: ["--json"] });
   const payload = JSON.parse(result.stdout);
