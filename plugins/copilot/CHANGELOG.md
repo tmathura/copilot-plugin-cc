@@ -5,8 +5,8 @@
 ### 1.0.4
 
 - A review's Git Status keeps the leading space of its first line. Before, an unstaged change on
-  the first line looked staged to Copilot. A review section also keeps white space at the end of
-  its last line, such as a no-break space at the end of a file name.
+  the first line looked staged to Copilot. The status and most file lists also keep white space at
+  the end of a file name, such as a no-break space.
 
 ### 1.0.3
 
