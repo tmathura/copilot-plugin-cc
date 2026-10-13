@@ -5,7 +5,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const SCRIPT = path.join(ROOT, ".claude", "skills", "cpcc-workflow-common", "poll-reviews.mjs");
+const SCRIPT = path.join(ROOT, ".claude", "skills", "workflow-common", "poll-reviews.mjs");
 const SHA = "a".repeat(40);
 
 // The checks run before any gh call; the timeout stops a regression from polling GitHub in CI.

@@ -7,7 +7,7 @@
 # npm install output.
 node_modules/
 
-# Ticket worktrees made by the cpcc workflow.
+# Ticket worktrees made by the ticket workflow.
 .claude/worktrees/
 
 # Extension catalog cache from `specify extension update`.

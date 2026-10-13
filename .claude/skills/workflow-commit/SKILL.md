@@ -1,12 +1,12 @@
 ---
-name: cpcc-workflow-commit
+name: workflow-commit
 description: Commit staged changes on a copilot-plugin-cc ticket branch with the "[#n] Imperative description" subject and the session's Co-Authored-By trailer, if it gives one. Never commits on main.
 argument-hint: "[imperative description] [-- commit body]"
 ---
 
-# cpcc workflow: commit
+# workflow: commit
 
-First read the repo's `.claude/skills/cpcc-workflow-common/REFERENCE.md`. Follow its "Commit and push rules".
+First read the repo's `.claude/skills/workflow-common/REFERENCE.md`. Follow its "Commit and push rules".
 
 ## Input
 
@@ -19,7 +19,7 @@ round, for example, passes its findings and their outcomes as the body.
    branch name `<type>/<n>-<slug>`. If the name does not match, stop and report.
 2. **Look at the changes** with `git status` and `git diff --staged`.
 3. **If nothing is staged:**
-   - When `cpcc-workflow-start` passed a file list, stage those files by name
+   - When `workflow-start` passed a file list, stage those files by name
      (`git add -- <files>`). Leave any other changed or untracked files alone, and ask whether they
      belong to this ticket.
    - Otherwise ask: **Stage tracked changes with `git add -u` (Recommended)** / **Pick files** /
@@ -48,4 +48,4 @@ round, for example, passes its findings and their outcomes as the body.
 
 7. **Check** with `git status` and `git log -1 --oneline`. Report the hash and the subject.
 
-Do not push. `cpcc-workflow-pr` pushes.
+Do not push. `workflow-pr` pushes.

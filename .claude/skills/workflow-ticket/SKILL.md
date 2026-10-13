@@ -1,13 +1,13 @@
 ---
-name: cpcc-workflow-ticket
+name: workflow-ticket
 description: Create a GitHub issue on tmathura/copilot-plugin-cc from a drafted ticket in the repo's ticket format (docs/development.md "Tickets"), with its one type label, and print its number.
 argument-hint: "<drafted ticket, or nothing to use the draft in the conversation>"
 ---
 
-# cpcc workflow: ticket
+# workflow: ticket
 
-First read the repo's `.claude/skills/cpcc-workflow-common/REFERENCE.md`. Act at once: the user already
-approved the draft in `cpcc-workflow-start`.
+First read the repo's `.claude/skills/workflow-common/REFERENCE.md`. Act at once: the user already
+approved the draft in `workflow-start`.
 
 ## Input
 

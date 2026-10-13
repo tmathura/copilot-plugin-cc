@@ -1,12 +1,12 @@
 ---
-name: cpcc-workflow-start
+name: workflow-start
 description: Run the copilot-plugin-cc ticket workflow end to end (plan, GitHub issue, worktree branch, implement, test, review, commit, Codex and Copilot loop, PR, PR review loop, merge). Asks only for the planning mode, to approve the plan and issue, before merging the PR into main, and before publishing a version's GitHub release; everything in between runs without asking unless something needs a decision. Use to start new work or resume a ticket in copilot-plugin-cc.
 argument-hint: "[issue number to resume or start from | new]"
 ---
 
-# cpcc workflow: start
+# workflow: start
 
-First read the repo's `.claude/skills/cpcc-workflow-common/REFERENCE.md`. It holds the repo facts, the names,
+First read the repo's `.claude/skills/workflow-common/REFERENCE.md`. It holds the repo facts, the names,
 the commands and the loop rules. This file does not repeat them.
 
 ## When to ask the user
@@ -68,11 +68,12 @@ planning folder.
 1. Find the branch: `git -C "$MAIN" branch --list "feature/<n>-*" "bugfix/<n>-*"` and
    `git -C "$MAIN" worktree list --porcelain`.
 2. Enter its worktree (see "Worktrees" in REFERENCE.md). If it has no worktree, invoke
-   `cpcc-workflow-branch` to add one.
+   `workflow-branch` to add one.
 3. Find where the run stopped from `git status`, `git log origin/main..HEAD` and
    `gh pr view --json number,state,url,reviewDecision`. Having no PR is fine.
-4. If the worktree has no `.claude/skills/cpcc-workflow-common/REFERENCE.md` (its branch was made
-   before the workflow skills were in the repo), bring them in before anything else:
+4. If the worktree has no `.claude/skills/workflow-common/REFERENCE.md` (its branch was made
+   before the workflow skills were in the repo under these names), bring them in before anything
+   else:
    - `git status --porcelain` must be empty. If not, stop and ask.
    - Run `git fetch origin`, then `git merge origin/main`. If the merge stops on a conflict, run
      `git merge --abort`, then stop and report.
@@ -95,32 +96,32 @@ two Spec Kit modes.
   approval.
 - **Spec Kit spec flow**: offer it only when REFERENCE.md "Spec Kit" allows it. Run the skills in
   the main checkout, as REFERENCE.md "Planning mode" says. The spec files stay untracked;
-  `cpcc-workflow-branch` moves them into the worktree.
+  `workflow-branch` moves them into the worktree.
 - **Spec Kit bug triage**: offer it for a bug, when REFERENCE.md "Bug triage" allows it. Pull `main`,
   check the slug, then run `/speckit-bug-assess "<symptom>" slug=<slug>` in the main checkout. Write
   a Constitution Check at the end of `assessment.md`. The approved plan is `assessment.md` with that
   check.
-  The notes stay untracked; `cpcc-workflow-branch` moves them into the worktree.
+  The notes stay untracked; `workflow-branch` moves them into the worktree.
 
 Run the Codex and Copilot loop on the approved plan (REFERENCE.md). A bug triage plan goes in a
 prompt file, as a plan-mode plan does. Apply confirmed findings to the plan. Correct Spec Kit files
 by hand.
 
 Draft the ticket from the plan: its title, body and one type label, as "Tickets" in the repo's
-`docs/development.md` says. Pass the type label to `cpcc-workflow-ticket` apart from the body,
+`docs/development.md` says. Pass the type label to `workflow-ticket` apart from the body,
 not as a line in it.
 
 With Spec Kit, also pass the planning folder (`specs/<name>/` or `.specify/bugs/<slug>/`, still
-without the issue number). `cpcc-workflow-ticket` adds the number to the folder and the `Spec:` or
+without the issue number). `workflow-ticket` adds the number to the folder and the `Spec:` or
 `Bug notes:` line to the issue.
 
 Ask: **Create as drafted (Recommended)** / **Edit first** / **Stop**. Say what the reviewers changed in the
-plan. Then invoke `cpcc-workflow-ticket` with the draft and keep the issue number.
+plan. Then invoke `workflow-ticket` with the draft and keep the issue number.
 
 ## Step 2. Branch
 
 Work out the type and slug (see "Naming" in REFERENCE.md). Print the branch name. Invoke
-`cpcc-workflow-branch` with the issue number, type and slug.
+`workflow-branch` with the issue number, type and slug.
 
 ## Step 3. Read the repo context
 
@@ -176,7 +177,7 @@ Never hide a timing problem with a sleep or a retry in a test.
 
 ## Step 7. Commit
 
-Invoke `cpcc-workflow-commit` with a one-line description of the diff and the list of files this
+Invoke `workflow-commit` with a one-line description of the diff and the list of files this
 ticket changed. With bug triage, the list includes `.specify/bugs/NNN-<slug>/`, the path in the
 issue's `Bug notes:` line.
 
@@ -189,7 +190,7 @@ the outcome of each finding.
 
 ## Step 8. Push and PR
 
-Invoke `cpcc-workflow-pr`. The PR body gets a short **Review rounds** section from the Step 7b commit
+Invoke `workflow-pr`. The PR body gets a short **Review rounds** section from the Step 7b commit
 bodies.
 
 ## Step 8b. PR review loop
@@ -228,7 +229,7 @@ To merge:
    then refuses the merge if anything was pushed after the approval.
 3. Check that `gh pr view <n> --json state` shows `MERGED`. If not, stop and report.
 4. `ExitWorktree` with `action: "keep"`.
-5. Run the "Cleanup" commands in `cpcc-workflow-branch`. `git branch -D` is safe only after the check
+5. Run the "Cleanup" commands in `workflow-branch`. `git branch -D` is safe only after the check
    in point 3. A squash merge makes the branch look unmerged to `git branch -d`.
 6. Run `git -C "$MAIN" pull --ff-only origin main`.
 7. If the PR raised the plugin version, it is a release (see "Release" in REFERENCE.md). Show the

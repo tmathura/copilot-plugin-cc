@@ -1,12 +1,12 @@
 ---
-name: cpcc-workflow-branch
+name: workflow-branch
 description: Create (or resume) the worktree and branch for a copilot-plugin-cc ticket from the latest origin/main, named <type>/<n>-<slug>, and enter it.
 argument-hint: "<issue number> <feature|bugfix> <slug>"
 ---
 
-# cpcc workflow: branch
+# workflow: branch
 
-First read the repo's `.claude/skills/cpcc-workflow-common/REFERENCE.md`. Act at once; do not ask to proceed.
+First read the repo's `.claude/skills/workflow-common/REFERENCE.md`. Act at once; do not ask to proceed.
 
 ## Input
 
@@ -40,14 +40,14 @@ with the `MAIN=` and `WT_ROOT=` lines from REFERENCE.md, and run git as `git -C 
    git -C "$MAIN" worktree add --no-track -b "<branch>" "$WT_ROOT/<type>-<n>-<slug>" origin/main
    ```
 
-   `--no-track` stops the branch from tracking `origin/main`. `cpcc-workflow-pr` sets the upstream on
+   `--no-track` stops the branch from tracking `origin/main`. `workflow-pr` sets the upstream on
    the first push.
 6. **Copy `.env`** if the main checkout has one and the worktree does not.
 7. **Move Spec Kit files** (only when this ticket's Spec Kit planning ran in the main checkout and
    its files are still untracked there; skip this step when planning runs in the worktree). Move `specs/NNN-<name>/` and
    `.specify/feature.json`, or `.specify/bugs/NNN-<slug>/`, from `$MAIN` to the same paths in the
    worktree. The path is the one in the issue body's `Spec:` or `Bug notes:` line, which
-   `cpcc-workflow-ticket` added. Move only an untracked folder (`git -C "$MAIN" ls-files <folder>`
+   `workflow-ticket` added. Move only an untracked folder (`git -C "$MAIN" ls-files <folder>`
    prints nothing). Create the parent folder
    in the worktree first, and stop if the destination exists. After a move, check that
    `git -C "$MAIN" status --porcelain` is clean.
@@ -55,7 +55,7 @@ with the `MAIN=` and `WT_ROOT=` lines from REFERENCE.md, and run git as `git -C 
 9. **Report** the branch, the worktree path, the base commit
    (`git -C "$MAIN" log -1 --oneline origin/main`), and whether `.env` and Spec Kit files were moved.
 
-Do not push. `cpcc-workflow-pr` pushes.
+Do not push. `workflow-pr` pushes.
 
 ## Cleanup
 
