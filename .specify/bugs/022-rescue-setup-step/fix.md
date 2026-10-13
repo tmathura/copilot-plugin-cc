@@ -48,7 +48,7 @@ As recorded in PR #46:
 ## Deviations from Assessment
 
 - The choice between the two ways: the subagent returns the companion's output when `task` fails. Recorded in the issue comment of 2026-10-12. Reasons: the companion's error already names the next step; it covers `--resume`, `--fresh` and a subagent that Claude starts on its own, which skip the helper; and it adds no version check or login check to each rescue. Rejected: `task-resume-candidate` reports readiness and `rescue.md` stops before routing.
-- The decision is recorded in the issue comment and the README, not in a spec folder: the port spec (`specs/001-copilot-plugin-port/`) is history since #26, and this bug fix got no new spec.
+- The decision is recorded in the issue comment and the README, not in a spec folder: the port spec (`specs/005-copilot-plugin-port/`) is history since #26, and this bug fix got no new spec.
 - The rule returns the failed call's output, not only stderr, and covers any failure, not only one before Copilot starts, because the Bash tool merges stdout and stderr on a failure (Copilot review, round 2).
 - A missing login gets Copilot's own steps, not a `/copilot:setup` hint, because that needs a change in the companion, outside these files. Moved to #45.
 

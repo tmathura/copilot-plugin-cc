@@ -127,7 +127,6 @@ digits, as Spec Kit pads its own numbers: `specs/NNN-<name>/` and `.specify/bugs
   `cpcc-workflow-ticket` does these steps.
 - In both cases, the issue body ends with a line that names the folder: `Spec: specs/NNN-<name>/` or
   `Bug notes: .specify/bugs/NNN-<slug>/`.
-- `specs/001-copilot-plugin-port/` is older than this rule. Its number is not an issue number.
 
 ### Bug fixes
 

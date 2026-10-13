@@ -5,7 +5,7 @@ description: "Task list for the Copilot plugin port"
 
 # Tasks: Copilot plugin port
 
-**Input**: Design documents from `specs/001-copilot-plugin-port/`
+**Input**: Design documents from `specs/005-copilot-plugin-port/`
 
 **Prerequisites**: [plan.md](plan.md), [spec.md](spec.md), [research.md](research.md),
 [call-site-map.md](call-site-map.md), [data-model.md](data-model.md), [contracts/](contracts/),
@@ -42,13 +42,13 @@ Each ticket is one GitHub issue and one PR.
 - [X] T001 Check `copilot --version`; install `@github/copilot` on Node 22 or later; check a
   non-interactive call works (research.md §1)
 - [X] T002 Compare ACP and prompt mode on the Principle III points, with the official docs, the
-  three community ports and a GitHub search, in specs/001-copilot-plugin-port/research.md
+  three community ports and a GitHub search, in specs/005-copilot-plugin-port/research.md
 - [X] T003 Record the owner's choice (prompt mode, after ACP was found to run repository hooks) and
   the design rules in
-  specs/001-copilot-plugin-port/research.md §6 and §7
-- [X] T004 Map every upstream Codex call site in specs/001-copilot-plugin-port/call-site-map.md
+  specs/005-copilot-plugin-port/research.md §6 and §7
+- [X] T004 Map every upstream Codex call site in specs/005-copilot-plugin-port/call-site-map.md
 - [X] T005 Write plan.md, data-model.md, contracts/ and quickstart.md in
-  specs/001-copilot-plugin-port/
+  specs/005-copilot-plugin-port/
 
 **Checkpoint**: the transport is chosen, and every later phase has a map to follow.
 
@@ -541,13 +541,13 @@ and to `BLOCK`.
 
 - [X] T080 [P] [US6] Write the full `README.md`: install, every command with its flags, requirements,
   and the complete "Differences from the Codex plugin" section, checked against
-  specs/001-copilot-plugin-port/call-site-map.md
+  specs/005-copilot-plugin-port/call-site-map.md
 - [X] T081 [P] [US6] Write `docs/architecture.md` from the real code: modules, the prompt-mode run as a
   Mermaid sequence diagram, permission profiles, job state flow
 - [X] T082 [US6] Update `UPSTREAM.md`: every upstream file has a status (ported or skipped with a
   reason). Check that every changed file without a change comment is listed under "Changes" in
   `NOTICE`
-- [ ] T083 Run the manual check in specs/001-copilot-plugin-port/quickstart.md with
+- [ ] T083 Run the manual check in specs/005-copilot-plugin-port/quickstart.md with
   `claude --plugin-dir` on a throwaway git repo; record the results in the PR. Done on Windows
   (results in PR #24). On 2026-10-11 the owner ran steps 1 to 6 with the installed 1.0.1 plugin,
   and a full Windows run passed every step, 3b and both failure checks (step 7 with the read-only

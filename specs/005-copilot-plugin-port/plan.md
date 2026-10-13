@@ -2,7 +2,7 @@
 
 **Branch**: set by the ticket workflow for each ticket | **Date**: 2026-10-08 | **Spec**: [spec.md](spec.md)
 
-**Input**: Feature specification from `specs/001-copilot-plugin-port/spec.md`
+**Input**: Feature specification from `specs/005-copilot-plugin-port/spec.md`
 
 ## Summary
 
@@ -71,7 +71,7 @@ Re-check after Phase 1 design: no change. No principle is "not met", so Complexi
 ### Documentation (this feature)
 
 ```text
-specs/001-copilot-plugin-port/
+specs/005-copilot-plugin-port/
 ├── spec.md              # what the port must do
 ├── research.md          # transport comparison and decision, design rules
 ├── call-site-map.md     # every upstream Codex call and its Copilot match

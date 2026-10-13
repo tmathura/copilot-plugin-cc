@@ -43,7 +43,9 @@ Use only labels from REFERENCE.md. Do not create new ones.
    `docs/development.md` says. `NNN` is `<n>` padded to 3 digits (`printf '%03d' <n>`). Start each
    Bash call with the `MAIN=` line from REFERENCE.md, and give every path from `$MAIN`.
    - If `$MAIN/<parent>/NNN-<name>` already exists from an earlier run of this step for `#<n>`, and
-     the unnumbered folder is gone, skip the check and the `mv`, and do the rest.
+     the unnumbered folder is gone, check that the numbered folder is untracked
+     (`git -C "$MAIN" ls-files <numbered folder>` prints nothing; if not, stop and report), skip the
+     `mv`, and do the rest.
    - Otherwise check that the folder is untracked (`git -C "$MAIN" ls-files <folder>` prints
      nothing) and that `NNN-<name>` (or `NNN-<slug>`) does not exist. If not, stop and report.
    - `mv "$MAIN/specs/<name>" "$MAIN/specs/NNN-<name>"` (or the same in `$MAIN/.specify/bugs/`).
