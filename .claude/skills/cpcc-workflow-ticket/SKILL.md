@@ -27,6 +27,10 @@ Use only labels from REFERENCE.md. Do not create new ones.
 
 ## Steps
 
+Before step 1 (not on a resume), check the draft against "Tickets": the title rule, the four
+sections in order, and `- [ ]` items under `## Acceptance criteria`. If a check fails, stop, say
+which, and do not create the issue.
+
 1. Write the body (from `## Problem` to the end, with no title or label line) to
    `<scratchpad>/issue-body.md`.
 2. Create the issue with its type label. Repeat `--label` for any other label from "Tickets":

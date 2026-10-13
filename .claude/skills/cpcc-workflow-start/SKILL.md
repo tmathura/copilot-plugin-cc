@@ -60,6 +60,10 @@ the run. If the user says to stop at a step, ask at that step.
 
 ## Resume
 
+First check the issue against "Tickets" and fix it, as for a ticket id with no branch (see "Input").
+Keep its scope lines and its folder line where they are. A fix does not rename the branch or the
+planning folder.
+
 1. Find the branch: `git -C "$MAIN" branch --list "feature/<n>-*" "bugfix/<n>-*"` and
    `git -C "$MAIN" worktree list --porcelain`.
 2. Enter its worktree (see "Worktrees" in REFERENCE.md). If it has no worktree, invoke
@@ -231,6 +235,7 @@ To merge:
    **Not now**. On **Publish**, run the publish command from REFERENCE.md.
 8. Report the PR URL, the merge commit on `main`, the release URL if there is one, the rounds of
    each loop, any rejected findings, and the issue that `Closes #<n>` closed. If the defect also
-   exists in codex-plugin-cc and upstream has not fixed it ("Tickets", Upstream), say so, and give
-   the owner the command to run once the upstream issue exists:
+   exists in codex-plugin-cc and upstream has not fixed it ("Tickets", Upstream), say so. The owner
+   reports it upstream, or finds the upstream issue that already reports it. Give the owner the
+   command to run with that upstream issue number:
    `gh issue comment <n> -R tmathura/copilot-plugin-cc --body 'Reported upstream: openai/codex-plugin-cc#<m>'`.

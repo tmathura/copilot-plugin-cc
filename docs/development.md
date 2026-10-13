@@ -95,8 +95,9 @@ port, or one filed by hand) is made to match before its branch is made.
 - **Scope change:** when the scope changes during the work, edit the issue body and add a dated line
   that says what changed and why. Put it above the folder line, if there is one.
 - **Upstream:** when the defect also exists in codex-plugin-cc and upstream has not fixed it, the
-  owner reports it there, and the issue gets a comment "Reported upstream: openai/codex-plugin-cc#n".
-  A port of an upstream fix needs no such comment.
+  owner reports it there, or finds the upstream issue that already reports it. The issue then gets
+  a comment that starts "Reported upstream: openai/codex-plugin-cc#n". A port of an upstream fix
+  needs no such comment.
 - **Closing:** the PR body has `Closes #n`, so the merge closes the issue. Do not tick the
   acceptance boxes; the PR body ("Change" and "Testing") says what was done and how it was checked.
 
