@@ -298,7 +298,8 @@ Each round:
    "Commands".
 4. **Run a Codex and Copilot round on the fixes** with `--scope working-tree` and the findings as the focus.
    Check its findings too. If you fix any of them, run the commands from "Commands" again.
-5. **Commit** with `cpcc-workflow-commit`. The body lists each finding and what happened to it.
+5. **Review the diff** as in Step 6 of `cpcc-workflow-start` (`code-review`, then the docs check).
+   Then **commit** with `cpcc-workflow-commit`. The body lists each finding and what happened to it.
 6. **Push and rewrite the PR body** with `cpcc-workflow-pr`.
 7. **Reply to every thread and resolve it.** Say what was done, or why the finding was rejected. Write
    the reply to a file and pass it with `-F body=@<file>`, because backticks in a quoted string run as

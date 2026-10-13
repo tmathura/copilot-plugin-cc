@@ -169,7 +169,8 @@ Never hide a timing problem with a sleep or a retry in a test.
    check it against `spec.md` and `plan.md`. With bug triage, check it against `assessment.md` and
    the "Deviations from Assessment" in `fix.md` (only `assessment.md` for an `invalid` port).
 3. Report the checks that ran and the findings, with `path:lines`, or "No deviations found".
-4. Check the findings (REFERENCE.md). Fix the confirmed ones, then repeat Steps 4 and 5.
+4. Check the findings (REFERENCE.md). Fix the confirmed ones, then repeat Steps 4, 5 and 6 until
+   no confirmed finding is left.
 
 ## Step 7. Commit
 
@@ -178,8 +179,8 @@ ticket changed. With bug triage, the list includes `.specify/bugs/<slug>/`.
 
 ## Step 7b. Codex and Copilot loop on the code
 
-Run the Codex and Copilot loop (REFERENCE.md) with branch scope and the plan in the focus text. After each round,
-run Step 5 again. With bug triage, a round that changed the fix also updates `fix.md` (REFERENCE.md
+Run the Codex and Copilot loop (REFERENCE.md) with branch scope and the plan in the focus text. After each round
+that changed files, run Steps 5 and 6 again before the commit. With bug triage, a round that changed the fix also updates `fix.md` (REFERENCE.md
 "Bug triage", Edits). Commit with the description `Address Codex and Copilot review round <k>` and a body that gives
 the outcome of each finding.
 
