@@ -1,6 +1,6 @@
 ---
 name: cpcc-workflow-commit
-description: Commit staged changes on a copilot-plugin-cc ticket branch with the "[#n] Imperative description" subject and the Co-Authored-By trailer. Never commits on main.
+description: Commit staged changes on a copilot-plugin-cc ticket branch with the "[#n] Imperative description" subject and the session's Co-Authored-By trailer, if it gives one. Never commits on main.
 argument-hint: "[imperative description] [-- commit body]"
 ---
 
