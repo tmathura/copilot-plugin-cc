@@ -18,7 +18,7 @@ Each upstream file has one row. The status is one of:
 - **skipped**: the file does not apply. Give the reason.
 
 The details of each change are in
-[specs/001-copilot-plugin-port/call-site-map.md](specs/001-copilot-plugin-port/call-site-map.md).
+[specs/005-copilot-plugin-port/call-site-map.md](specs/005-copilot-plugin-port/call-site-map.md).
 `P/` is `plugins/copilot/` here, and `plugins/codex/` upstream.
 
 | Upstream file | Status | File here, PR or reason |

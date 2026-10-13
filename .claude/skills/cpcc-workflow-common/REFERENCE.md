@@ -65,6 +65,7 @@ WT_ROOT="$MAIN/.claude/worktrees"                                               
 | Branch | `<type>/<n>-<slug>`, lowercase. The type is `bugfix` if the issue has the `bug` label, otherwise `feature`. | `feature/12-copilot-review-polling` |
 | Slug | 3 to 5 words from the issue title, kebab-case, ASCII only | `copilot-review-polling` |
 | Worktree folder | `$WT_ROOT/<type>-<n>-<slug>` | `.claude/worktrees/feature-12-copilot-review-polling` |
+| Planning folder | `specs/NNN-<name>/` or `.specify/bugs/NNN-<slug>/`. `NNN` is the issue number padded to 3 digits ("Folder names" in the repo's `docs/development.md`). | `.specify/bugs/016-quoted-untracked-file-names/` |
 | Commit subject | `[#<n>] Imperative description`, 72 characters at most, no full stop at the end | `[#12] Poll for the Copilot review` |
 | Commit trailer | a blank line, then the `Co-Authored-By:` line that Claude Code gives for this session. Leave it out if there is none. Do not write a model name from memory. | |
 | PR title | the commit subject format, for the whole change | `[#12] Poll for the Copilot review` |
@@ -97,7 +98,7 @@ When the repo gets tooling, add the commands here. Do not guess them in the step
 - Use Spec Kit only if `$MAIN/.specify/` exists and `command -v specify` finds the CLI.
 - The order is `/speckit-specify`, then `/speckit-clarify` if the spec has open questions, then
   `/speckit-plan`, `/speckit-tasks` and `/speckit-analyze`.
-- Specs go in `specs/NNN-<name>/`. `.specify/feature.json` points to the current spec. It is per
+- Specs go in `specs/NNN-<name>/` (see "Naming"). `.specify/feature.json` points to the current spec. It is per
   checkout and gitignored.
 - Spec Kit does not create branches. `cpcc-workflow-branch` does.
 - `/speckit-specify`, `/speckit-plan` and `/speckit-tasks` rewrite their files and lose earlier
@@ -119,11 +120,17 @@ the file test in "Is this ticket a release?" below.
 - A plugin change never uses plan mode. For it, the planning-mode question chooses only between
   bug triage and the spec flow.
 - Give any defect the `bug` label before the branch is made, so the branch is `bugfix/`.
-- On resume, plugin work with no `.specify/bugs/<slug>/` or `specs/NNN-<name>/` in the branch: stop
+- **Folder line:** the issue body ends with `Spec: specs/NNN-<name>/` or
+  `Bug notes: .specify/bugs/NNN-<slug>/`. When you plan in Step 1, `cpcc-workflow-ticket` adds it.
+  When you plan in the worktree for an issue that already exists, add it yourself: append it to the
+  body from `gh issue view <n> -R tmathura/copilot-plugin-cc --json body --jq .body` in a scratchpad
+  file, then `gh issue edit <n> -R tmathura/copilot-plugin-cc --body-file <file>`.
+- On resume, plugin work with no `.specify/bugs/NNN-<slug>/` or `specs/NNN-<name>/` in the branch: stop
   and ask. A plan-mode ticket that grows into plugin files: stop and ask.
-- **Spec flow:** before `/speckit-specify`, list the spec numbers in use: `specs/` on `origin/main`
-  (`git -C "$MAIN" ls-tree --name-only origin/main specs/`) and in every open worktree. Pass a free
-  folder: `/speckit-specify SPECIFY_FEATURE_DIRECTORY=specs/NNN-<name> <description>`. Then run
+- **Spec flow:** pass the folder: `/speckit-specify SPECIFY_FEATURE_DIRECTORY=specs/NNN-<name>
+  <description>` when the issue exists, or `specs/<name>` in Step 1, before the issue exists
+  (`cpcc-workflow-ticket` adds the number). In Step 1, first check that no untracked
+  `$MAIN/specs/<name>/` exists. Then run
   `/speckit-clarify` if needed, `/speckit-plan`, `/speckit-tasks` and `/speckit-analyze`. The plan
   for the review loop is `spec.md`, `plan.md` and `tasks.md`. In a worktree, check that
   `.specify/feature.json` exists after specify.
@@ -136,12 +143,12 @@ fix and test only for a ticket that used bug triage.
 
 - **Order:** assess in Step 1 (main checkout) or at the start of Step 4 (worktree, for a bug issue
   that already exists), then fix in Step 4, then test in Step 5. Notes go in
-  `.specify/bugs/<slug>/` and are committed with the fix. They do not count toward the 3-file limit.
-- **Slug:** pick a kebab-case slug at assess time and keep it for the whole ticket. Do not rename it
-  to the branch slug. Before assess, check that no folder has it: `ls "$MAIN/.specify/bugs"`,
-  `git -C "$MAIN" ls-tree --name-only origin/main .specify/bugs/`, and `.specify/bugs/` in each open
-  worktree. Pass it as `slug=<slug>`. The `Slug:` line in the assess output must equal it; if not,
-  stop. Put `Bug notes: .specify/bugs/<slug>/` in the ticket body, so a resumed run finds it.
+  `.specify/bugs/NNN-<slug>/` and are committed with the fix. They do not count toward the 3-file limit.
+- **Slug:** `NNN-<slug>` when the issue exists; in Step 1, before the issue exists, `<slug>` alone
+  (`cpcc-workflow-ticket` adds the number and the `Bug notes:` line). Apart from that number, keep
+  the slug for the whole ticket; do not rename it to the branch slug. Before a Step 1 assess, check
+  that no untracked folder in `$MAIN/.specify/bugs/` has it. Pass it as `slug=<slug>`. The `Slug:`
+  line in the assess output must equal it; if not, stop.
 - **Input:** pull `main` before assess in the main checkout. For an issue, pass the text from
   `gh issue view <n>`, not the URL. Before each commit of the bug folder, check that it holds no
   token, password or signed URL (constitution Principle IV), and remove any you find.

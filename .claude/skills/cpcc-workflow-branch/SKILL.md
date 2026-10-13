@@ -22,7 +22,7 @@ with the `MAIN=` and `WT_ROOT=` lines from REFERENCE.md, and run git as `git -C 
    If not, stop.
 2. **Check the main checkout.** It must be on `main`, and
    `git -C "$MAIN" status --porcelain --untracked-files=no` must be empty. If not, stop and report.
-   Untracked `specs/` and `.specify/bugs/<slug>/` from Spec Kit planning are expected.
+   Untracked `specs/NNN-<name>/` and `.specify/bugs/NNN-<slug>/` from Spec Kit planning are expected.
 3. **Fetch:** `git -C "$MAIN" fetch origin`.
 4. **Does the branch exist already?** Check `git -C "$MAIN" branch --list "<branch>"`,
    `git -C "$MAIN" ls-remote --heads origin "<branch>"` and `git -C "$MAIN" worktree list`. If it
@@ -45,9 +45,10 @@ with the `MAIN=` and `WT_ROOT=` lines from REFERENCE.md, and run git as `git -C 
 6. **Copy `.env`** if the main checkout has one and the worktree does not.
 7. **Move Spec Kit files** (only when this ticket's Spec Kit planning ran in the main checkout and
    its files are still untracked there; skip this step when planning runs in the worktree). Move `specs/NNN-<name>/` and
-   `.specify/feature.json`, or this ticket's `.specify/bugs/<slug>/` (the slug from the ticket body,
-   REFERENCE.md "Bug triage"), from `$MAIN` to the same paths in the worktree. Move only an untracked
-   folder (`git -C "$MAIN" ls-files .specify/bugs/<slug>` prints nothing). Create the parent folder
+   `.specify/feature.json`, or `.specify/bugs/NNN-<slug>/`, from `$MAIN` to the same paths in the
+   worktree. The path is the one in the issue body's `Spec:` or `Bug notes:` line, which
+   `cpcc-workflow-ticket` added. Move only an untracked folder (`git -C "$MAIN" ls-files <folder>`
+   prints nothing). Create the parent folder
    in the worktree first, and stop if the destination exists. After a move, check that
    `git -C "$MAIN" status --porcelain` is clean.
 8. **Enter the worktree** (see "Worktrees" in REFERENCE.md).
