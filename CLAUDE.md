@@ -27,6 +27,7 @@ docs/                             architecture, configuration, operations, conve
 specs/001-copilot-plugin-port/    the port spec: transport decision, call-site map, plan, tasks
 .specify/                         Spec Kit: constitution, templates, scripts, the bug extension, bug notes
 .claude/skills/speckit-*          Spec Kit skills (managed, do not edit)
+.claude/skills/cpcc-workflow-*    the ticket workflow skills (written for this repo, edit as normal)
 ```
 
 ## Commands

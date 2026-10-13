@@ -56,8 +56,10 @@ How work moves from an idea to `main`. The rules behind these steps are in the
 12. Remove the worktree and the branch, and pull `main`. If the PR raised the version, publish the
     release ("Release", below).
 
-The owner runs these steps with personal `cpcc-workflow-*` Claude Code skills. They are not in this
-repo. You can follow the same steps by hand.
+The `cpcc-workflow-*` Claude Code skills in `.claude/skills/` run these steps. Start with
+`/cpcc-workflow-start`. Their shared rules are in `.claude/skills/cpcc-workflow-common/REFERENCE.md`.
+The skills load only when this repo is open as the project in Claude Code. You can also follow the
+steps by hand.
 
 ## Spec Kit
 
