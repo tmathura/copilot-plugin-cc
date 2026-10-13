@@ -98,8 +98,10 @@ port, or one filed by hand) is made to match before its branch is made.
   owner reports it there, or finds the upstream issue that already reports it. The issue then gets
   a comment that starts "Reported upstream: openai/codex-plugin-cc#n". A port of an upstream fix
   needs no such comment.
-- **Closing:** the PR body has `Closes #n`, so the merge closes the issue. Do not tick the
-  acceptance boxes; the PR body ("Change" and "Testing") says what was done and how it was checked.
+- **Closing:** for an issue with its own change, the PR body has `Closes #n`, so the merge closes the
+  issue. Do not tick the acceptance boxes; the PR body ("Change" and "Testing") says what was done
+  and how it was checked. Close an issue with no change of its own (`duplicate`, `invalid`,
+  `wontfix`) by hand, after its comment: as a duplicate, or as not planned.
 
 ## Spec Kit
 
