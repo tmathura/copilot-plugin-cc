@@ -5,12 +5,15 @@ How work moves from an idea to `main`. The rules behind these steps are in the
 
 ## Ticket workflow
 
-1. Plan with Claude plan mode or with Spec Kit (below). Run the plan's Constitution Check. Have
-   Codex and Copilot review the plan, and apply their confirmed findings.
+1. Plan with Claude plan mode or with Spec Kit (below). For a bug, Spec Kit's bug triage ("Bug
+   fixes", below) is a third option. Run the plan's Constitution Check. Have Codex and Copilot review
+   the plan, and apply their confirmed findings.
 2. Open a GitHub issue from the plan.
 3. Make a branch `<type>/<n>-<slug>` from the latest `origin/main`, in its own worktree. The type is
    `bugfix` for an issue with the `bug` label, and `feature` for all others. Spec Kit wrote its files
-   in the main checkout; move `specs/NNN-<name>/` and `.specify/feature.json` into the worktree.
+   in the main checkout; move `specs/NNN-<name>/` and `.specify/feature.json`, or
+   `.specify/bugs/<slug>/`, into the worktree before its first commit. The main checkout must be
+   clean after the move.
 4. Make the change, with its tests and docs. If the work departs from the spec, update the spec in
    the same commit ("Keeping the spec current", below). If the change is a release, raise the
    version and add the `CHANGELOG.md` entry ("Release", below).
@@ -40,8 +43,8 @@ repo. You can follow the same steps by hand.
 ## Spec Kit
 
 The repo uses [Spec Kit](https://github.com/github/spec-kit) 1.1.3 with the Claude Code
-integration (`.claude/skills/speckit-*`) and bash scripts (`.specify/scripts/bash/`). It has no
-extensions.
+integration (`.claude/skills/speckit-*`) and bash scripts (`.specify/scripts/bash/`). It has one
+extension, the bundled `bug` extension ("Bug fixes", below).
 
 ### Using it
 
@@ -83,6 +86,28 @@ Things to know:
   by hand, then run `/speckit-analyze` again.
 - The bundled Spec Kit workflow (`.specify/workflows/`) was deleted because nothing uses it. If an
   upgrade brings it back, delete it again.
+
+### Bug fixes
+
+The `bug` extension gives three skills. Run them in this order:
+
+1. `/speckit-bug-assess "<symptom>" slug=<slug>` finds the cause and writes
+   `.specify/bugs/<slug>/assessment.md`. It changes no code. Pull `main` first, then run it in the
+   main checkout, and move the folder into the worktree as for `specs/`. For a bug issue that already
+   exists, you can run it in the worktree instead, with the text from `gh issue view <n>`.
+2. `/speckit-bug-fix slug=<slug>` makes the fix and writes `fix.md`.
+3. `/speckit-bug-test slug=<slug>` runs the checks again and writes `test.md`.
+
+Things to know:
+
+- Pick a slug that no other bug folder uses, here or in an open worktree. Keep it for the whole
+  ticket.
+- Commit the bug folder with the fix. Once the fix has merged, the folder is history.
+- Bug tickets need no `specs/` folder and no `.specify/feature.json`.
+- `assessment.md` does not change after the fix starts. If the fix departs from it, record why under
+  "Deviations from Assessment" in `fix.md`, in the same commit.
+- The skills ask before they overwrite a report. Do not run `/speckit-bug-fix` again when `fix.md`
+  exists.
 
 ### Keeping the spec current
 
@@ -132,8 +157,10 @@ changed shared files.
 
 1. Find the newest release on the [releases page](https://github.com/github/spec-kit/releases).
    Run `uv tool install specify-cli --force --from git+https://github.com/github/spec-kit.git@vX.Y.Z`,
-   then `specify integration upgrade claude`. `uv tool upgrade` does not move a pinned tag.
-   Change the version and the tag in this file.
+   then `specify integration upgrade claude` and `specify extension update bug`. `uv tool upgrade`
+   does not move a pinned tag. Change the version and the tag in this file.
+   A new version can change the managed files and the bug extension: read that diff. Running the
+   same version again changes only the `installed_at` times.
 2. The upgrade refuses if someone changed a managed file by hand. Read the diff before you commit.
 3. If the upgrade adds a script, run `git add --chmod=+x .specify/scripts/bash/*.sh` again.
 

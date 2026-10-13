@@ -9,3 +9,6 @@ node_modules/
 
 # Ticket worktrees made by the cpcc workflow.
 .claude/worktrees/
+
+# Extension catalog cache from `specify extension update`.
+.specify/extensions/.cache/
