@@ -5,16 +5,31 @@ How work moves from an idea to `main`. The rules behind these steps are in the
 
 ## Ticket workflow
 
-1. Plan with Claude plan mode or with Spec Kit (below). For a bug, Spec Kit's bug triage ("Bug
-   fixes", below) is a third option: its plan is `assessment.md` plus a Constitution Check that you
-   write, because the assessment has none. Run the plan's Constitution Check. Have Codex and Copilot
-   review the plan, and apply their confirmed findings.
-2. Open a GitHub issue from the plan.
+1. Plan. Choose how by what the change touches ("touches the plugin" is the file test in "Release",
+   below):
+
+   | The change | Plan with |
+   | --- | --- |
+   | Touches the plugin and fixes a defect, also a bug fix ported from upstream | Spec Kit bug triage ("Bug fixes", below) |
+   | Touches the plugin, anything else: new or changed behaviour, a refactor, prompt or skill text, a feature ported from upstream | The Spec Kit spec flow ("Using it", below) |
+   | Does not touch the plugin: docs outside it, tests only, tooling, CI, Spec Kit, the workflow | Claude plan mode |
+
+   A change to the plugin always uses Spec Kit, so its reasoning is committed with the code. A plan
+   made in Claude plan mode is not saved in the repo. If it is not clear which row fits, ask the
+   owner. If a plan-mode ticket grows into plugin files, stop and plan it again with Spec Kit.
+
+   The bug triage plan is `assessment.md` plus a Constitution Check that you write in it, because
+   the assessment has none. Run the plan's Constitution Check. Have Codex and Copilot review the
+   plan (for the spec flow: `spec.md`, `plan.md` and `tasks.md`), and apply their confirmed findings.
+   Give any defect the `bug` label.
+2. Open a GitHub issue from the plan. Skip this step when the issue already exists, for example an
+   upstream port. Label it by the table, make its branch (step 3), then plan it in the worktree as
+   in step 1.
 3. Make a branch `<type>/<n>-<slug>` from the latest `origin/main`, in its own worktree. The type is
-   `bugfix` for an issue with the `bug` label, and `feature` for all others. Spec Kit wrote its files
-   in the main checkout; move `specs/NNN-<name>/` and `.specify/feature.json`, or
-   `.specify/bugs/<slug>/`, into the worktree before its first commit. The main checkout must be
-   clean after the move.
+   `bugfix` for an issue with the `bug` label, and `feature` for all others. If Spec Kit ran in the
+   main checkout, move `specs/NNN-<name>/` and `.specify/feature.json`, or
+   `.specify/bugs/<slug>/`, into the worktree before its first commit. The main checkout must then
+   be clean.
 4. Make the change, with its tests and docs. If the work departs from the spec, update the spec in
    the same commit ("Keeping the spec current", below). If the change is a release, raise the
    version and add the `CHANGELOG.md` entry ("Release", below).
@@ -71,10 +86,11 @@ Things to know:
 - Git stores the scripts as executable (mode `100755`). If a script fails with "permission denied",
   run `chmod +x .specify/scripts/bash/*.sh`. If `git ls-files -s .specify/scripts/bash` then shows
   `100644`, also run `git add --chmod=+x .specify/scripts/bash/*.sh` and commit it.
-- Specs live in `specs/NNN-<name>/` with sequential numbers. The next number is the highest one in
-  `specs/` of the current checkout, plus one. A spec in a ticket worktree that is not merged yet is not
-  counted. Before you start a second spec at the same time, check the open worktrees for numbers in
-  use.
+- Specs live in `specs/NNN-<name>/` with sequential numbers. `/speckit-specify` takes the highest
+  number in `specs/` of the current checkout, plus one, so it does not see a spec in another
+  worktree. Before you run it, find the numbers in use in `specs/` on `origin/main` and in every
+  open worktree. Then pass a free folder: `/speckit-specify SPECIFY_FEATURE_DIRECTORY=specs/NNN-<name>
+  <feature description>`. In a worktree, check that `.specify/feature.json` exists after it.
 - `.specify/feature.json` points to the current spec. Each checkout has its own copy, and git ignores
   it. A new or resumed worktree has none, so `/speckit-plan`, `/speckit-analyze` and
   `/speckit-implement` fail with "Feature directory not found". To fix it, write
@@ -108,7 +124,9 @@ Things to know:
   given. Give it the issue text, not a URL. Pasted logs can also hold secrets. Before you commit the
   folder, check that it holds no token, password or signed URL; the constitution (Principle IV)
   keeps credentials out of the repo.
-- Bug tickets need no `specs/` folder and no `.specify/feature.json`.
+- Tickets that use bug triage need no `specs/` folder and no `.specify/feature.json`.
+- Write the Constitution Check by hand as its own section at the end of `assessment.md`, before the
+  first fix. It is then committed with the notes.
 - `assessment.md` does not change after the fix starts. If the fix departs from it, record why under
   "Deviations from Assessment" in `fix.md`, in the same commit.
 - The skills ask before they overwrite a report. Do not run `/speckit-bug-fix` again when `fix.md`
@@ -187,10 +205,32 @@ its changes since that commit. Give each change a status: ported, pending, or sk
 Open a ticket for each change to port. Move the checked commit forward only when every change has a
 status.
 
+The sync itself is one ticket, planned in Claude plan mode, because `UPSTREAM.md` is not part of the
+plugin. It adds the rows, marks the changes that clearly do not apply `skipped`, opens the port
+tickets (rows `pending` with the ticket), and moves the checked commit.
+
+Each port ticket is planned by the table in "Ticket workflow", step 1. Its PR changes the row to
+`ported`, or to `skipped` with the reason.
+
+- **A bug fix:** give `/speckit-bug-assess` plain text, with no URL: the upstream commit SHA, the
+  upstream diff, and the map from upstream to local file names (the file table in `UPSTREAM.md`,
+  for example `codex.mjs` to `copilot.mjs`). The assessment checks that the bug exists here. Its
+  proposed fix is the upstream change.
+- **A bug that does not apply here** (verdict `invalid`): do not run fix or test. Still write the
+  Constitution Check in `assessment.md`. The PR holds only `assessment.md` and the `skipped` row.
+  It is not a release.
+- **A feature:** the spec names the upstream commit and files.
+- A port may differ from upstream only where the constitution allows it (Principle I). List each
+  difference, with its reason, in the README section "Differences from the Codex plugin". The
+  "Deviations from Assessment" section in `fix.md` is only for departures from the assessment.
+- The PR lists the upstream files and commit, and says that someone read them line by line
+  (Principle II).
+
 ## Release
 
 A ticket is a release when it changes anything under `plugins/copilot/` or
 `.claude-plugin/marketplace.json`, because Claude Code updates an installed plugin by its version.
+These files are also what "touches the plugin" means in "Ticket workflow", step 1.
 A ticket that changes only repo files (docs, specs, tests, CI, scripts, package files, README) is
 not a release. Each user-facing ticket is its own release.
 
