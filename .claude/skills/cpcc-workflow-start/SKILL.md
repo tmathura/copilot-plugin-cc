@@ -238,4 +238,4 @@ To merge:
    exists in codex-plugin-cc and upstream has not fixed it ("Tickets", Upstream), say so. The owner
    reports it upstream, or finds the upstream issue that already reports it. Give the owner the
    command to run with that upstream issue number:
-   `gh issue comment <n> -R tmathura/copilot-plugin-cc --body 'Reported upstream: openai/codex-plugin-cc#<m>'`.
+   `gh issue comment <issue number> -R tmathura/copilot-plugin-cc --body 'Reported upstream: openai/codex-plugin-cc#<m>'` (the ticket's issue, not the PR).

@@ -14,7 +14,8 @@ approved the draft in `cpcc-workflow-start`.
 The draft comes from `$ARGUMENTS`, or from the last approved draft in the conversation. It follows
 "Tickets" in the repo's `docs/development.md`: a title, a body, and its one type label, which is
 passed apart from the body. If this is not a resume (below): stop and say so when there is no
-approved draft, or when the draft has no type label or more than one.
+approved draft, or when the draft has no type label, more than one, or one that is not `documentation`,
+`bug` or `enhancement`.
 
 It can also name a Spec Kit planning folder in the main checkout that has no issue number yet:
 `specs/<name>/` or `.specify/bugs/<slug>/`.
