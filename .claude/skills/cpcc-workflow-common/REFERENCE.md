@@ -295,7 +295,9 @@ Each round:
    "<file>"`) that says what happened to it.
 
 3. **Check the findings** (see above). Fix the confirmed ones by hand. Run the commands from
-   "Commands".
+   "Commands". If nothing was changed (every finding was rejected, or there were none), skip steps
+   4 to 6: reply and resolve (step 7), update the PR body with `gh pr edit <n> --body-file "<file>"`
+   (nothing to push), and check the loop's end rule below.
 4. **Run a Codex and Copilot round on the fixes** with `--scope working-tree` and the findings as the focus.
    Check its findings too. If you fix any of them, run the commands from "Commands" again.
 5. **Review the diff** as in Step 6 of `cpcc-workflow-start` (`code-review`, then the docs check).
@@ -310,7 +312,7 @@ Each round:
    gh api graphql -f query='mutation($id:ID!){ resolveReviewThread(input:{threadId:$id}){ thread{ isResolved } } }' -F id=<thread id>
    ```
 
-8. The push starts new reviews. Go back to step 1.
+8. If you pushed, the push starts new reviews: go back to step 1.
 
 If the poll times out (exit 1), trigger the pending reviewer again once (table above) and poll
 again. If it still times out, ask: **Wait longer (Recommended)** / **Treat <reviewer> as
@@ -323,7 +325,8 @@ marked it unavailable), all its reviews have been read, and one of these is true
 
 - No reviewer reported a new finding for that head, and no thread is open. A clean CodeRabbit review
   can be only a success status, with no review object.
-- Every open finding was rejected in an earlier round.
+- Every finding left for that head was rejected with its reason, in this round or an earlier one,
+  each thread got a reply and is resolved, and nothing was pushed after that head.
 
 Keep going without asking while every finding is confirmed and fixed, including rounds started by a
 push the user asked for. Ask only for an unclear finding, or when 20 rounds have run: **One more
