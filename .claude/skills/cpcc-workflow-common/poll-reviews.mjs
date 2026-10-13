@@ -26,21 +26,25 @@ function gh(path) {
   return JSON.parse(execFileSync("gh", ["api", path, "--paginate", "--slurp"], { encoding: "utf8" })).flat();
 }
 
+// Exact bot logins, so a look-alike account cannot end the wait. The REST API may add "[bot]".
+const isCopilot = (login) => /^copilot-pull-request-reviewer(\[bot\])?$/.test(login);
+const isCodeRabbit = (login) => /^coderabbitai(\[bot\])?$/.test(login);
+
 const reviewers = {
-  copilot: (reviews) => reviews.some((r) => /copilot-pull-request-reviewer/.test(r.user.login) && r.commit_id === sha),
+  copilot: (reviews) => reviews.some((r) => isCopilot(r.user.login) && r.commit_id === sha),
   coderabbit: (reviews, comments, statuses) => {
-    const mine = comments.filter((c) => /coderabbit/.test(c.user.login));
+    const mine = comments.filter((c) => isCodeRabbit(c.user.login));
     if (mine.some((c) => /Currently processing/.test(c.body))) {
       return false;
     }
-    const reviewedHead = reviews.some((r) => /coderabbit/.test(r.user.login) && r.commit_id === sha);
+    const reviewedHead = reviews.some((r) => isCodeRabbit(r.user.login) && r.commit_id === sha);
     const finishedSince = mine.some(
       (c) => Date.parse(c.updated_at) > startedAt && /Review finished|Review completed/.test(c.body)
     );
     // A review with no findings posts no review object, only a commit status on the head.
     // A paused CodeRabbit also reports success ("Review paused"); that is not a review of this head.
     const headStatusDone = statuses.some(
-      (s) => /coderabbit/i.test(s.context) && s.state === "success" && !/paused/i.test(s.description ?? "")
+      (s) => isCodeRabbit(s.creator?.login) && s.state === "success" && !/paused/i.test(s.description ?? "")
     );
     return reviewedHead || finishedSince || headStatusDone;
   }
