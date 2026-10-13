@@ -16,7 +16,7 @@ labels.
 | Merge style | squash: `gh pr merge --squash --delete-branch` |
 | PR template | none; use "PR body" below |
 | Branch rules | Changes to `main` go through a PR. No force-push to `main`, and no deleting it. 0 approvals needed. Bot reviewers (see "PR review loop") review each push. |
-| Labels | `bug`, `enhancement`, `documentation`, `duplicate`, `good first issue`, `help wanted`, `invalid`, `question`, `wontfix`, `accessibility` |
+| Labels | `bug`, `enhancement`, `documentation`, `duplicate`, `good first issue`, `help wanted`, `invalid`, `question`, `wontfix`, `accessibility`. When to use each: "Tickets" in the repo's `docs/development.md`. |
 
 ## Shell and paths
 
@@ -119,7 +119,7 @@ the file test in "Is this ticket a release?" below.
 - Decide from the issue text and the files the plan will change. If unclear, ask.
 - A plugin change never uses plan mode. For it, the planning-mode question chooses only between
   bug triage and the spec flow.
-- Give any defect the `bug` label before the branch is made, so the branch is `bugfix/`.
+- Give the issue its type label ("Tickets" in the repo's `docs/development.md`) before the branch is made.
 - **Folder line:** the issue body ends with `Spec: specs/NNN-<name>/` or
   `Bug notes: .specify/bugs/NNN-<slug>/`. When you plan in Step 1, `cpcc-workflow-ticket` adds it.
   When you plan in the worktree for an issue that already exists, add it yourself: append it to the
