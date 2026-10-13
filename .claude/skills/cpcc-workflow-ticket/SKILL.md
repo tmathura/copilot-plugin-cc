@@ -49,11 +49,32 @@ Use only labels from REFERENCE.md. Do not create new ones.
      `**Feature Branch**` line in `spec.md` and the `**Branch**` line in `plan.md`, if they hold the
      bare name. For a spec, write `{"feature_directory": "specs/NNN-<name>"}` to
      `$MAIN/.specify/feature.json`.
-   - Add a last line to `<scratchpad>/issue-body.md`, `Spec: specs/NNN-<name>/` or
-     `Bug notes: .specify/bugs/NNN-<slug>/`, and run
-     `gh issue edit <n> -R tmathura/copilot-plugin-cc --body-file "<scratchpad>/issue-body.md"`.
+   - Check the result. If a check fails, fix the files and check again.
+     - No old path is left. This prints nothing: `grep -rnE 'specs/<name>([^A-Za-z0-9-]|$)'
+       "$MAIN/specs/NNN-<name>"` (for a bug: `'\.specify/bugs/<slug>([^A-Za-z0-9-]|$)'` in
+       `"$MAIN/.specify/bugs/NNN-<slug>"`).
+     - The new names are set. For a bug, `assessment.md` has the line `- **Slug**: NNN-<slug>`. For
+       a spec, a `**Feature Branch**` or `**Branch**` line that held the bare name now holds
+       `NNN-<name>`, and `$MAIN/.specify/feature.json` holds `specs/NNN-<name>`.
+   - Set the folder line in the issue. Read the current body
+     (`gh issue view <n> -R tmathura/copilot-plugin-cc --json body --jq .body`) into
+     `<scratchpad>/issue-body.md`. If the command fails or the body is empty, stop and report: never
+     edit the issue from a body you could not read. The expected line is `Spec: specs/NNN-<name>/`
+     or `Bug notes: .specify/bugs/NNN-<slug>/`. A folder line is a line that starts with `Spec:`
+     or `Bug notes:` and holds a `specs/` or `.specify/bugs/` path; compare lines without a trailing
+     `\r` or spaces. Leave every other line alone. Count the folder lines first:
+     - more than one: stop and report;
+     - one, equal to the expected line: nothing to change;
+     - one other (for example the unnumbered path): replace it with the expected line;
+     - none: append the expected line after a blank line.
+
+     Only when you changed the body, run `gh issue edit <n> -R tmathura/copilot-plugin-cc
+     --body-file "<scratchpad>/issue-body.md"`. On every run, also when nothing changed, read the
+     body again and check that it has exactly one folder line, the expected one, and no old
+     unnumbered path (the same `grep -E` pattern as for the files).
+     If the old path is still in other text of the body, stop and report it; do not edit that text.
    - Print the new folder path. Later steps use it.
    - If this step stops, the issue already exists. Fix the cause, then run this step again for
-     `#<n>`; do not create a second issue.
+     `#<n>`; do not create a second issue. Each part is safe to run again.
 5. Change nothing else on the issue: no milestone or project. The PR's `Closes #<n>` closes
    it when it merges.
