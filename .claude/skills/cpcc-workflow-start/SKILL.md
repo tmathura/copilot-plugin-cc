@@ -196,8 +196,8 @@ Run the PR review loop (REFERENCE.md) until it ends.
 
 The PR is ready when all of these are true:
 
-- Both review loops ended by their own rules. Neither stopped at its round limit with real findings
-  still open, unless the user chose to ship and record them.
+- Both review loops ended by their own rules, and every finding is fixed or rejected with its
+  reason. Any reviewer marked unavailable is named as not available in the PR body.
 - `gh pr checks <n>` shows every check passed, or there are no checks. Wait for running checks in the
   background with `gh pr checks <n> --watch --interval 30`.
 - `gh pr view <n> --json state,isDraft,mergeable,mergeStateStatus,headRefOid` shows `OPEN`, not a
@@ -208,10 +208,9 @@ Report the PR URL, the rounds of each loop, any rejected findings, and whether t
 ask:
 
 - **If it is ready:** **Merge now (Recommended)** / **I'll review it myself first** / **Stop**.
-- **If it is not ready:** say what is missing. Ask **Merge anyway** / **Fix first** (back to Step 4) /
-  **Stop**. Mark no option as recommended. Offer **Merge anyway** only when the missing item is a
-  review loop that stopped at its round limit. Never offer it when a test or a CI check fails, or
-  the PR is not mergeable, because the constitution requires them to pass.
+- **If it is not ready:** say what is missing. Ask **Fix first (Recommended)** (back to Step 4) /
+  **Stop**. There is no "merge anyway": the constitution allows a merge only when tests and CI pass,
+  the review loops have finished, and every finding is fixed or rejected with its reason.
 
 After the user's own review, ask again: **Merge now (Recommended)** / **More changes** (back to
 Step 4) / **Stop**. On **Stop**, leave the PR open and keep the worktree.

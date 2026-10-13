@@ -243,8 +243,9 @@ The loop ends when one of these is true:
 - Every finding left was rejected in an earlier round.
 
 Keep going without asking while every finding is confirmed and fixed. Ask only for an unclear
-finding (see "Checking review findings"), or when 10 rounds have run: **Ship and record the open
-findings (Recommended)** / **One more round** / **Stop**.
+finding (see "Checking review findings"), or when 10 rounds have run: **One more round
+(Recommended)** / **Reject the open findings, each with its reason** / **Stop**. A finding is never
+left open: the constitution allows a merge only when each one is fixed or rejected with a reason.
 
 ## PR review loop
 
@@ -310,14 +311,23 @@ Each round:
 
 8. The push starts new reviews. Go back to step 1.
 
-The loop ends when one of these is true:
+If the poll times out (exit 1), trigger the pending reviewer again once (table above) and poll
+again. If it still times out, ask: **Wait longer (Recommended)** / **Treat <reviewer> as
+unavailable** / **Stop**. An unavailable reviewer counts as done for this head. Name it, as not
+available, in the PR body's **Review rounds** right away (`cpcc-workflow-pr`); the constitution
+allows the merge only when the PR says so.
 
-- Every reviewer's latest review has no findings, and no thread is open.
+The loop ends only when every reviewer is done with the current head (the poll exits 0, or the user
+marked it unavailable), all its reviews have been read, and one of these is true:
+
+- No reviewer reported a new finding for that head, and no thread is open. A clean CodeRabbit review
+  can be only a success status, with no review object.
 - Every open finding was rejected in an earlier round.
 
 Keep going without asking while every finding is confirmed and fixed, including rounds started by a
-push the user asked for. Ask only for an unclear finding, or when 20 rounds have run: **Ship and
-record the open findings (Recommended)** / **One more round** / **Stop**.
+push the user asked for. Ask only for an unclear finding, or when 20 rounds have run: **One more
+round (Recommended)** / **Reject the open findings, each with its reason** / **Stop**. A finding is
+never left open (see the Codex and Copilot loop above).
 
 ## Release
 
