@@ -85,9 +85,15 @@ Why: the owner follows upstream releases. An upstream change must land in the sa
   timeout, cancel with the child process stopped, and the review gate both when it blocks a stop and
   when it lets Claude stop.
 - `claude plugin validate .` MUST pass.
-- Before each release, a person MUST run the plugin with `claude --plugin-dir` on a real git repo, on
-  the owner's system (Windows today). The run covers a review, a background task with status and
-  result, cancel, and the review gate. CI runs the automated tests on Windows, macOS and Linux.
+- Before the GitHub release `vX.Y.Z` is published, a person MUST run the plugin with
+  `claude --plugin-dir` on a real git repo, on the owner's system (Windows today). The run comes
+  after the PR that raises the version is merged, and uses a checkout of the merge commit that the
+  tag will point to. The run covers a review, a background task with status and result, cancel, and
+  the review gate. CI runs the automated tests on Windows, macOS and Linux.
+- Accepted risk: users install from `main`, so a user who updates from the marketplace can get a
+  version before its manual run.
+- If the manual run fails, that version gets no GitHub release, and its number is not used again.
+  The fix is a new ticket and a new patch release, with its own manual run.
 
 ## Distribution, licensing and versioning
 
@@ -155,4 +161,4 @@ Why: the owner follows upstream releases. An upstream change must land in the sa
 Why: the agent trusts the spec folder at the start of each session. A decision changed in one file
 only leaves stale copies in the others, and reviews then find them one at a time.
 
-**Version**: 1.2.0 | **Ratified**: 2026-10-08 | **Last Amended**: 2026-10-12
+**Version**: 2.0.0 | **Ratified**: 2026-10-08 | **Last Amended**: 2026-10-14

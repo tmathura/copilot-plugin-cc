@@ -52,8 +52,8 @@ How work moves from an idea to `main`. The rules behind these steps are in the
     Stop when no reviewer has findings and no thread is open, or when every finding left was
     rejected in an earlier round.
 11. Squash-merge when every CI check passes.
-12. Remove the worktree and the branch, and pull `main`. If the PR raised the version, publish the
-    release ("Release", below).
+12. Remove the worktree and the branch, and pull `main`. If the PR raised the plugin version, do the
+    manual run and, only if it passes, publish the release ("Release", below).
 
 The `workflow-*` Claude Code skills in `.claude/skills/` run these steps. Start with
 `/workflow-start`. Their shared rules are in `.claude/skills/workflow-common/REFERENCE.md`.
@@ -317,9 +317,14 @@ In the PR that raises the version:
    `plugins/copilot/CHANGELOG.md`: a few plain bullets that say what changed for users. The summary
    lives in the repo, so it survives a move away from GitHub.
 3. Run the tests and `claude plugin validate .`.
-4. Do the manual run that the constitution asks for (Principle VI).
 
-After the merge, publish a GitHub release like
+After the merge, do the manual run that the constitution asks for (Principle VI) on the merge
+commit. Run `git switch --detach <merge commit>` in this repo, then, in a real git repo, run
+`claude --plugin-dir <this repo>/plugins/copilot`. Afterwards run `git switch main`. If the run
+fails, do not publish. The version stays on `main` with no tag. The fix is a new ticket, and its
+version is a new, higher number. Its `CHANGELOG.md` entry also says what the failed version changed.
+
+When the run passes, publish a GitHub release on that same merge commit, like
 [upstream's](https://github.com/openai/codex-plugin-cc/releases):
 
 - the tag `vX.Y.Z` on the merge commit;
