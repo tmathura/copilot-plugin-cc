@@ -44,7 +44,7 @@ As recorded in PR #39:
 
 ## Deviations from Assessment
 
-- `formatSection` now keeps white space at the end of every section's last line, not only for Git Status, because a file name or a patch line can end in white space (code review before commit). The other bodies are still trimmed where they are built, so their content does not change.
+- `formatSection` now keeps white space at the end of every section's last line, not only for Git Status, because a file name or a patch line can end in white space (code review before commit). Every diff body (staged, unstaged and branch) and the Changed Files list also go in untrimmed, so their last line now keeps its trailing white space. The stat, shortstat and log bodies are still trimmed where they are built, and an untracked file's content is still trimmed by `formatUntrackedFile` (#61).
 - The PR also closed #29: the owner chose to keep `core.quotePath=false`, and the README now says that hidden Unicode characters in a file name reach the review as they are.
 
 ## Follow-ups
