@@ -5,8 +5,8 @@ How work moves from an idea to `main`. The rules behind these steps are in the
 
 ## Ticket workflow
 
-1. Plan. Choose how by what the change touches ("touches the plugin" is the file test in "Release",
-   below):
+1. Plan. (When the issue already exists, do this step later, in the worktree; see step 2.) Choose
+   how by what the change touches ("touches the plugin" is the file test in "Release", below):
 
    | The change | Plan with |
    | --- | --- |
@@ -22,12 +22,14 @@ How work moves from an idea to `main`. The rules behind these steps are in the
    the assessment has none. Run the plan's Constitution Check. Have Codex and Copilot review the
    plan (for the spec flow: `spec.md`, `plan.md` and `tasks.md`), and apply their confirmed findings.
    Give any defect the `bug` label.
-2. Open a GitHub issue from the plan. Skip this step when the issue already exists, for example an
-   upstream port. Then label it before its branch is made: `bug` when it reports a defect (for a
-   port, an upstream bug fix), `enhancement` otherwise. Make its branch (step 3), then plan it in the
-   worktree as in step 1. If planning shows the label was wrong, fix the label and keep the branch.
+2. Open a GitHub issue from the plan, or use the one that already exists. Before its branch is made,
+   label it `bug` when it reports a defect (for a port, an upstream bug fix) or `enhancement`
+   otherwise. When the issue already exists, for example an upstream port, skip step 1 for now:
+   make its branch (step 3), and then do step 1 once, in the worktree. If planning shows the label
+   was wrong, fix the label.
 3. Make a branch `<type>/<n>-<slug>` from the latest `origin/main`, in its own worktree. The type is
-   `bugfix` for an issue with the `bug` label, and `feature` for all others. If Spec Kit ran in the
+   `bugfix` for an issue with the `bug` label, and `feature` for all others. The type is set when the
+   branch is made; a later label fix does not rename the branch. If Spec Kit ran in the
    main checkout, move `specs/NNN-<name>/` and `.specify/feature.json`, or
    `.specify/bugs/<slug>/`, into the worktree before its first commit. The main checkout must then
    be clean.
