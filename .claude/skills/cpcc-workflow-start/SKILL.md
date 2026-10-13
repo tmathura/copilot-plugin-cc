@@ -61,7 +61,8 @@ the run. If the user says to stop at a step, ask at that step.
 ## Resume
 
 First check the issue against "Tickets" and fix it, as for a ticket id with no branch (see "Input").
-Keep its scope lines and its folder line where they are. A fix does not rename the branch or the
+Keep the text of its scope lines and its folder line; only move them if needed, so that the folder
+line is the last line and the scope lines are above it. A fix does not rename the branch or the
 planning folder.
 
 1. Find the branch: `git -C "$MAIN" branch --list "feature/<n>-*" "bugfix/<n>-*"` and
