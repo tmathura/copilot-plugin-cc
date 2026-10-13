@@ -9,7 +9,7 @@ Written by hand on 2026-10-13 from PR #43 (squash commit `1e29b929be29682e3d836a
 
 ## Summary
 
-When `taskkill` fails on Windows, the plugin now reads the pids it could not stop, then checks the root and those pids until they are gone, within the 5-second limit. Then only a process still alive counts as a failed stop, and the error names it: `Still running: PID <n>.` Output that names no process still fails at once, as before, unless it says the root was already gone. Released as 1.0.7.
+When `taskkill` fails on Windows, the plugin now reads the pids it could not stop, then checks the root and those pids until they are gone, within the 5-second limit. Then only a process still alive counts as a failed stop, and the error names it: `Still running: PID <n>.` Output that names no process still fails at once, as before, unless it matches a known missing-process message (such as "not found"). Released as 1.0.7.
 
 ## Changes
 
@@ -52,7 +52,7 @@ As recorded in PR #43:
 
 - Only the first `PID <n>` on each line is checked; a later pid is the parent, which can be the caller (code review before commit).
 - Pids on `SUCCESS` lines are skipped, because they may already be reused (code review before commit).
-- Output that names no process fails at once, as before, unless it says the root was already gone (Copilot review, round 1).
+- Output that names no process fails at once, as before, unless it matches a known missing-process message (such as "not found") (Copilot review, round 1).
 - The "not found" shortcut no longer skips the checks when another line names a process that could not be stopped (Codex review, round 1).
 - A live child is named in the error (`Still running: PID <n>.`), but its pid is not stored. The job keeps only its root pids for a retry, as before. A retry on a root that has exited cannot reach the child; that became #44.
 
