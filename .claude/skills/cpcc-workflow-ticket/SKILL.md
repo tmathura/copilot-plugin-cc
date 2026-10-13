@@ -13,10 +13,15 @@ approved the draft in `cpcc-workflow-start`.
 
 The draft comes from `$ARGUMENTS`, or from the last approved draft in the conversation. It has a
 title, the sections `## Problem`, `## Expected behaviour`, `## Solution requirements` and
-`## Acceptance criteria`, and maybe suggested labels. If there is no approved draft, stop and say so.
+`## Acceptance criteria`, and maybe suggested labels. If there is no approved draft, and this is not
+a resume (below), stop and say so.
 
 It can also name a Spec Kit planning folder in the main checkout that has no issue number yet:
 `specs/<name>/` or `.specify/bugs/<slug>/`.
+
+To finish step 4 after it stopped (a resume), pass the existing issue (`#<n>`) and the planning
+folder by its name without the number, as first given, instead of a draft. Then skip steps 1 to 3,
+and do not create an issue.
 
 Use only labels from REFERENCE.md. Do not create new ones.
 
@@ -75,7 +80,7 @@ Use only labels from REFERENCE.md. Do not create new ones.
      non-blank line, and no old unnumbered path (the same `grep -E` pattern as for the files).
      If the old path is still in other text of the body, stop and report it; do not edit that text.
    - Print the new folder path. Later steps use it.
-   - If this step stops, the issue already exists. Fix the cause, then run this step again for
-     `#<n>`; do not create a second issue. Each part is safe to run again.
+   - If this step stops, the issue already exists. Fix the cause, then run this skill again with
+     `#<n>` and the planning folder (see "Input"). Each part is safe to run again.
 5. Change nothing else on the issue: no milestone or project. The PR's `Closes #<n>` closes
    it when it merges.
