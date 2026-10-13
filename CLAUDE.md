@@ -25,7 +25,7 @@ tests/                            node --test suites, helpers and the fake copil
 UPSTREAM.md                       last upstream commit checked, and the status of later changes
 docs/                             architecture, configuration, operations, conventions, workflow
 specs/001-copilot-plugin-port/    the port spec: transport decision, call-site map, plan, tasks
-.specify/                         Spec Kit: constitution, templates, scripts
+.specify/                         Spec Kit: constitution, templates, scripts, the bug extension, bug notes
 .claude/skills/speckit-*          Spec Kit skills (managed, do not edit)
 ```
 
