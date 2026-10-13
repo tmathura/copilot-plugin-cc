@@ -1,6 +1,6 @@
-# cpcc workflow: shared reference
+# workflow: shared reference
 
-The `cpcc-workflow-*` skills read this file first. It holds the repo facts and the rules they share.
+The `workflow-*` skills read this file first. It holds the repo facts and the rules they share.
 Each fact lives here once. The step skills link to it and do not repeat it.
 
 This is a solo project. There are no team steps: no Slack, no QA handoff, no colleague review, no Flow
@@ -100,7 +100,7 @@ When the repo gets tooling, add the commands here. Do not guess them in the step
   `/speckit-plan`, `/speckit-tasks` and `/speckit-analyze`.
 - Specs go in `specs/NNN-<name>/` (see "Naming"). `.specify/feature.json` points to the current spec. It is per
   checkout and gitignored.
-- Spec Kit does not create branches. `cpcc-workflow-branch` does.
+- Spec Kit does not create branches. `workflow-branch` does.
 - `/speckit-specify`, `/speckit-plan` and `/speckit-tasks` rewrite their files and lose earlier
   decisions. Make corrections by hand, then run `/speckit-analyze` again.
 - Setup and upgrade steps are in the repo: `docs/development.md`, or the README until that file exists.
@@ -121,7 +121,7 @@ the file test in "Is this ticket a release?" below.
   bug triage and the spec flow.
 - Give the issue its type label ("Tickets" in the repo's `docs/development.md`) before the branch is made.
 - **Folder line:** the issue body ends with `Spec: specs/NNN-<name>/` or
-  `Bug notes: .specify/bugs/NNN-<slug>/`. When you plan in Step 1, `cpcc-workflow-ticket` adds it.
+  `Bug notes: .specify/bugs/NNN-<slug>/`. When you plan in Step 1, `workflow-ticket` adds it.
   When you plan in the worktree for an issue that already exists, add it yourself: append it to the
   body from `gh issue view <n> -R tmathura/copilot-plugin-cc --json body --jq .body` in a scratchpad
   file, then `gh issue edit <n> -R tmathura/copilot-plugin-cc --body-file <file>`.
@@ -129,7 +129,7 @@ the file test in "Is this ticket a release?" below.
   and ask. A plan-mode ticket that grows into plugin files: stop and ask.
 - **Spec flow:** pass the folder: `/speckit-specify SPECIFY_FEATURE_DIRECTORY=specs/NNN-<name>
   <description>` when the issue exists, or `specs/<name>` in Step 1, before the issue exists
-  (`cpcc-workflow-ticket` adds the number). In Step 1, first check that no untracked
+  (`workflow-ticket` adds the number). In Step 1, first check that no untracked
   `$MAIN/specs/<name>/` exists. Then run
   `/speckit-clarify` if needed, `/speckit-plan`, `/speckit-tasks` and `/speckit-analyze`. The plan
   for the review loop is `spec.md`, `plan.md` and `tasks.md`. In a worktree, check that
@@ -145,7 +145,7 @@ fix and test only for a ticket that used bug triage.
   that already exists), then fix in Step 4, then test in Step 5. Notes go in
   `.specify/bugs/NNN-<slug>/` and are committed with the fix. They do not count toward the 3-file limit.
 - **Slug:** `NNN-<slug>` when the issue exists; in Step 1, before the issue exists, `<slug>` alone
-  (`cpcc-workflow-ticket` adds the number and the `Bug notes:` line). Apart from that number, keep
+  (`workflow-ticket` adds the number and the `Bug notes:` line). Apart from that number, keep
   the slug for the whole ticket; do not rename it to the branch slug. Before a Step 1 assess, check
   that no untracked folder in `$MAIN/.specify/bugs/` has it. Pass it as `slug=<slug>`. The `Slug:`
   line in the assess output must equal it; if not, stop.
@@ -178,7 +178,7 @@ fix and test only for a ticket that used bug triage.
 
 ## Commit and push rules
 
-- Starting `cpcc-workflow-start` counts as permission for every commit, push and PR it makes. It does
+- Starting `workflow-start` counts as permission for every commit, push and PR it makes. It does
   **not** give permission to merge into `main`. Merge only after the user answers the Step 9 question.
   It does not give permission to publish a release either. Publish only after the user answers the
   Step 9 release question.
@@ -273,7 +273,7 @@ Each round:
    (`run_in_background: true`). You are called again when it ends:
 
    ```bash
-   node .claude/skills/cpcc-workflow-common/poll-reviews.mjs <head sha> <pr number>   # 60 tries, 30 s apart
+   node .claude/skills/workflow-common/poll-reviews.mjs <head sha> <pr number>   # 60 tries, 30 s apart
    ```
 
    Exit 0: every reviewer is done. Exit 1: timed out; it prints which reviewer is still pending.
@@ -307,9 +307,9 @@ Each round:
    (nothing to push), and check the loop's end rule below.
 4. **Run a Codex and Copilot round on the fixes** with `--scope working-tree` and the findings as the focus.
    Check its findings too. If you fix any of them, run the commands from "Commands" again.
-5. **Review the diff** as in Step 6 of `cpcc-workflow-start` (`code-review`, then the docs check).
-   Then **commit** with `cpcc-workflow-commit`. The body lists each finding and what happened to it.
-6. **Push and rewrite the PR body** with `cpcc-workflow-pr`.
+5. **Review the diff** as in Step 6 of `workflow-start` (`code-review`, then the docs check).
+   Then **commit** with `workflow-commit`. The body lists each finding and what happened to it.
+6. **Push and rewrite the PR body** with `workflow-pr`.
 7. **Reply to every thread and resolve it.** Say what was done, or why the finding was rejected. Write
    the reply to a file and pass it with `-F body=@<file>`, because backticks in a quoted string run as
    commands:
@@ -324,7 +324,7 @@ Each round:
 If the poll times out (exit 1), trigger the pending reviewer again once (table above) and poll
 again. If it still times out, ask: **Wait longer (Recommended)** / **Treat <reviewer> as
 unavailable** / **Stop**. An unavailable reviewer counts as done for this head. Name it, as not
-available, in the PR body's **Review rounds** right away (`cpcc-workflow-pr`); the constitution
+available, in the PR body's **Review rounds** right away (`workflow-pr`); the constitution
 allows the merge only when the PR says so.
 
 The loop ends only when every reviewer is done with the current head (the poll exits 0, or the user

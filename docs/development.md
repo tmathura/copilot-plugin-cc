@@ -55,15 +55,15 @@ How work moves from an idea to `main`. The rules behind these steps are in the
 12. Remove the worktree and the branch, and pull `main`. If the PR raised the version, publish the
     release ("Release", below).
 
-The `cpcc-workflow-*` Claude Code skills in `.claude/skills/` run these steps. Start with
-`/cpcc-workflow-start`. Their shared rules are in `.claude/skills/cpcc-workflow-common/REFERENCE.md`.
+The `workflow-*` Claude Code skills in `.claude/skills/` run these steps. Start with
+`/workflow-start`. Their shared rules are in `.claude/skills/workflow-common/REFERENCE.md`.
 The skills load only when this repo is open as the project in Claude Code. You can also follow the
 steps by hand.
 
 ## Tickets
 
 Each change has one GitHub issue on `tmathura/copilot-plugin-cc`, assigned to the owner.
-`cpcc-workflow-ticket` makes it from the approved draft. An issue that already exists (an upstream
+`workflow-ticket` makes it from the approved draft. An issue that already exists (an upstream
 port, or one filed by hand) is made to match before its branch is made.
 
 - **Title:** an imperative sentence that says what changes, for example "Keep equals signs in long
@@ -167,7 +167,7 @@ digits, as Spec Kit pads its own numbers: `specs/NNN-<name>/` and `.specify/bugs
      `Slug` line to `NNN-<slug>`.
   3. For a spec, write the new path to `.specify/feature.json`.
 
-  `cpcc-workflow-ticket` does these steps.
+  `workflow-ticket` does these steps.
 - In both cases, the issue body ends with a line that names the folder: `Spec: specs/NNN-<name>/` or
   `Bug notes: .specify/bugs/NNN-<slug>/`.
 
