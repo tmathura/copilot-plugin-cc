@@ -13,7 +13,7 @@ the commands and the loop rules. This file does not repeat them.
 
 Always ask:
 
-1. Which planning mode to use (Step 1, or Step 4 for an existing issue that touches the plugin).
+1. Which planning mode to use (Step 1, or the start of Step 4 for an existing issue).
 2. To approve the plan, and to create the issue as drafted (Step 1).
 3. Whether to merge the PR into `main` (Step 9). Never merge without this answer.
 4. Whether to publish the GitHub release, when the PR raised the plugin version (Step 9).
@@ -46,10 +46,11 @@ the run. If the user says to stop at a step, ask at that step.
 - **A ticket id with no branch:** read the issue with `gh issue view <n>`, assign it with
   `gh issue edit <n> -R tmathura/copilot-plugin-cc --add-assignee @me`. Classify it with
   REFERENCE.md "Planning mode", and label it before the branch: `bug` for a defect, otherwise
-  `enhancement` (or `documentation` for docs only). Then start at Step 2. If it
-  touches the plugin, ask at the start of Step 4: **Bug triage** / **Spec flow**, with the one the
-  rule picks marked (Recommended). Run that mode in the worktree with the issue text, write the
-  Constitution Check, and run the Codex and Copilot loop on the plan, as in Step 1, before the code.
+  `enhancement` (or `documentation` for docs only). Then start at Step 2. At the start of Step 4,
+  ask which planning mode to use, with the one the rule picks marked (Recommended): **Bug triage**
+  / **Spec flow** if it touches the plugin, otherwise **Claude plan mode**. Plan once, in the
+  worktree, with the issue text. Write the Constitution Check, and run the Codex and Copilot loop on
+  the plan, as in Step 1, before the code.
 - **Empty or `new`:** start at Step 1. If no task was described, ask: **Describe and plan
   (Recommended)** / **Give an issue number** / **Abort**.
 
@@ -127,6 +128,8 @@ Read the root `CLAUDE.md` in the worktree and the docs it links to. Read
 
 ## Step 4. Implement
 
+- For an existing issue that has not been planned yet, plan it first (see "Input", a ticket id with
+  no branch).
 - Before you write code, say in a few lines which files you will change and why.
 - With Spec Kit feature planning, work through `tasks.md` and tick each task when it is done.
 - With bug triage, run `/speckit-bug-fix slug=<slug>`, then handle its result (REFERENCE.md "Bug
