@@ -9,7 +9,7 @@ Written by hand on 2026-10-13 from PR #50 (squash commit `871329de310308fa373007
 
 ## Summary
 
-The cancel error now names a child whose parent has exited and says to end it in Task Manager if it is still a Copilot or gh process. It asks for a retry only when a stored pid is still alive. No child pid is stored or signalled. SessionEnd follows the same rule. Released as 1.0.12.
+The cancel error now names a child whose parent has exited and says to end it in Task Manager if it is still a Copilot or gh process. It leaves out the retry line only when every failed stop is known to have left nothing but such children; any other failure, or a record that could not be cleared, still asks for a retry. No child pid is stored or signalled. SessionEnd follows the same rule. Released as 1.0.12.
 
 ## Changes
 

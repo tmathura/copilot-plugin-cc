@@ -9,7 +9,7 @@ Written by hand on 2026-10-13 from PR #43 (squash commit `1e29b929be29682e3d836a
 
 ## Summary
 
-When `taskkill` fails on Windows, the plugin now reads the pids it could not stop, then checks the root and those pids until they are gone, within the 5-second limit. Only a process still alive counts as a failed stop, and the error names it: `Still running: PID <n>.` Released as 1.0.7.
+When `taskkill` fails on Windows, the plugin now reads the pids it could not stop, then checks the root and those pids until they are gone, within the 5-second limit. Then only a process still alive counts as a failed stop, and the error names it: `Still running: PID <n>.` Output that names no process still fails at once, as before, unless it says the root was already gone. Released as 1.0.7.
 
 ## Changes
 

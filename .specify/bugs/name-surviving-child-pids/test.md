@@ -10,13 +10,13 @@ Written on 2026-10-13, for #59, after the fix had merged. The checks below were 
 
 ## Summary
 
-The fix's own tests fail on the plugin code from before the fix: the cancel error asks for a retry and does not name the child whose parent exited. They pass on the fix commit. The full suite passes on this branch (current `main` plus these notes).
+The fix's own tests fail on the plugin code from before the fix: the cancel error names the child (`Still running: PID <n>.`, from #25) but asks for a retry and does not say that a retry cannot reach it. They pass on the fix commit. The full suite passes on this branch (current `main` plus these notes).
 
 ## Checks Performed
 
 | Check | Command / Action | Result | Notes |
 |-------|------------------|--------|-------|
-| Reproduction (pre-fix code) | `node --test tests/process.test.mjs tests/runtime.test.mjs` on the pre-fix tree (below) | fail | expected: the bug shows. 128 tests, 116 pass, 4 fail, 8 skipped; the cancel and SessionEnd failures show the bug (a retry is asked for, and the child is not named); the process test checks the new `orphans` field |
+| Reproduction (pre-fix code) | `node --test tests/process.test.mjs tests/runtime.test.mjs` on the pre-fix tree (below) | fail | expected: the bug shows. 128 tests, 116 pass, 4 fail, 8 skipped; the cancel and SessionEnd failures show the bug (a retry is asked for, with no note that it cannot reach the child); the process test checks the new `orphans` field |
 | Reproduction (post-fix) and new / updated tests | `node --test tests/process.test.mjs tests/runtime.test.mjs` at `871329d` | pass | 128 tests, 120 pass, 0 fail, 8 skipped |
 | Regression suite | `npm test` on branch `feature/59-bug-notes-before-extension` (`main` at `980356a`) | pass | 268 tests, 255 pass, 13 skipped, 0 fail |
 | Lint / type-check | `npm run build` | pass | `tsc` type check |
