@@ -6,8 +6,9 @@ How work moves from an idea to `main`. The rules behind these steps are in the
 ## Ticket workflow
 
 1. Plan with Claude plan mode or with Spec Kit (below). For a bug, Spec Kit's bug triage ("Bug
-   fixes", below) is a third option. Run the plan's Constitution Check. Have Codex and Copilot review
-   the plan, and apply their confirmed findings.
+   fixes", below) is a third option: its plan is `assessment.md` plus a Constitution Check that you
+   write, because the assessment has none. Run the plan's Constitution Check. Have Codex and Copilot
+   review the plan, and apply their confirmed findings.
 2. Open a GitHub issue from the plan.
 3. Make a branch `<type>/<n>-<slug>` from the latest `origin/main`, in its own worktree. The type is
    `bugfix` for an issue with the `bug` label, and `feature` for all others. Spec Kit wrote its files
@@ -103,6 +104,10 @@ Things to know:
 - Pick a slug that no other bug folder uses, here or in an open worktree. Keep it for the whole
   ticket.
 - Commit the bug folder with the fix. Once the fix has merged, the folder is history.
+- The assess skill quotes the report in `assessment.md` and records any URL it was given exactly as
+  given. Give it the issue text, not a URL. Pasted logs can also hold secrets. Before you commit the
+  folder, check that it holds no token, password or signed URL; the constitution (Principle IV)
+  keeps credentials out of the repo.
 - Bug tickets need no `specs/` folder and no `.specify/feature.json`.
 - `assessment.md` does not change after the fix starts. If the fix departs from it, record why under
   "Deviations from Assessment" in `fix.md`, in the same commit.
