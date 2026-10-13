@@ -39,7 +39,7 @@ repo. You can follow the same steps by hand.
 
 ## Spec Kit
 
-The repo uses [Spec Kit](https://github.com/github/spec-kit) 1.1.2.dev0 with the Claude Code
+The repo uses [Spec Kit](https://github.com/github/spec-kit) 1.1.4.dev0 with the Claude Code
 integration (`.claude/skills/speckit-*`) and bash scripts (`.specify/scripts/bash/`). It has no
 extensions.
 
