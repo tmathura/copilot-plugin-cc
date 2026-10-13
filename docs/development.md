@@ -161,6 +161,10 @@ changed shared files.
    does not move a pinned tag. Change the version and the tag in this file.
    A new version can change the managed files and the bug extension: read that diff. Running the
    same version again changes only the `installed_at` times.
+   The repo's bug extension comes from the copy inside Spec Kit, not from the online catalogue. If
+   `specify extension list` does not show the version that the new release ships, run
+   `specify extension remove bug`, `specify extension add bug`, then
+   `specify integration upgrade claude` again.
 2. The upgrade refuses if someone changed a managed file by hand. Read the diff before you commit.
 3. If the upgrade adds a script, run `git add --chmod=+x .specify/scripts/bash/*.sh` again.
 
