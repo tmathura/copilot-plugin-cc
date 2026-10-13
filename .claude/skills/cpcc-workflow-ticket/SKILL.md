@@ -41,7 +41,10 @@ Use only labels from REFERENCE.md. Do not create new ones.
 
 3. Take the number from the URL that comes back. Print the URL and `#<n>`. Check that
    `gh issue view <n> -R tmathura/copilot-plugin-cc --json labels,assignees` shows exactly one type
-   label and you as the assignee. If not, fix it with `gh issue edit`.
+   label, the one that was passed in, and you as the assignee. If not, fix it once with
+   `gh issue edit <n> -R tmathura/copilot-plugin-cc --add-label <type> --remove-label <other type>`
+   (or `--add-assignee @me`), check again. If it still does not match, stop and report the mismatch,
+   and say that `#<n>` exists, so the skill must not be run again to create it.
 4. **If a planning folder was named,** add the issue number to it, as "Folder names" in the repo's
    `docs/development.md` says. `NNN` is `<n>` padded to 3 digits (`printf '%03d' <n>`). Start each
    Bash call with the `MAIN=` line from REFERENCE.md, and give every path from `$MAIN`.
