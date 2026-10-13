@@ -64,14 +64,15 @@ Use only labels from REFERENCE.md. Do not create new ones.
      or `Bug notes:` and holds a `specs/` or `.specify/bugs/` path; compare lines without a trailing
      `\r` or spaces. Leave every other line alone. Count the folder lines first:
      - more than one: stop and report;
-     - one, equal to the expected line: nothing to change;
-     - one other (for example the unnumbered path): replace it with the expected line;
-     - none: append the expected line after a blank line.
+     - one, equal to the expected line and already the last non-blank line: nothing to change;
+     - one, anywhere else or with another path (for example the unnumbered one): remove it, with
+       any blank lines it leaves at the end;
+     - then, if the body changed or had no folder line, append the expected line after a blank line.
 
      Only when you changed the body, run `gh issue edit <n> -R tmathura/copilot-plugin-cc
      --body-file "<scratchpad>/issue-body.md"`. On every run, also when nothing changed, read the
-     body again and check that it has exactly one folder line, the expected one, and no old
-     unnumbered path (the same `grep -E` pattern as for the files).
+     body again and check that it has exactly one folder line, the expected one, as its last
+     non-blank line, and no old unnumbered path (the same `grep -E` pattern as for the files).
      If the old path is still in other text of the body, stop and report it; do not edit that text.
    - Print the new folder path. Later steps use it.
    - If this step stops, the issue already exists. Fix the cause, then run this step again for
