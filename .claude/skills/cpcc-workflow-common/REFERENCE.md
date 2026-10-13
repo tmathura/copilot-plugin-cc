@@ -291,7 +291,7 @@ Each round:
    ```
 
    A finding that lives only in a review body gets one PR comment (`gh pr comment <pr> --body-file
-   <file>`) that says what happened to it.
+   "<file>"`) that says what happened to it.
 
 3. **Check the findings** (see above). Fix the confirmed ones by hand. Run the commands from
    "Commands".
@@ -304,7 +304,7 @@ Each round:
    commands:
 
    ```bash
-   gh api -X POST repos/tmathura/copilot-plugin-cc/pulls/<pr>/comments/<comment databaseId>/replies -F body=@<file>
+   gh api -X POST repos/tmathura/copilot-plugin-cc/pulls/<pr>/comments/<comment databaseId>/replies -F body=@"<file>"
    gh api graphql -f query='mutation($id:ID!){ resolveReviewThread(input:{threadId:$id}){ thread{ isResolved } } }' -F id=<thread id>
    ```
 
@@ -361,11 +361,11 @@ comes from `git log --oneline v<previous>..v<version>`.
 
 ```bash
 # The CHANGELOG entry for X.Y.Z, without its heading:
-awk '/^### X.Y.Z/{f=1;next} /^##/{if(f)exit} f' plugins/copilot/CHANGELOG.md | sed '/^$/d' > <scratchpad>/release-summary-X.Y.Z.md
+awk '/^### X.Y.Z/{f=1;next} /^##/{if(f)exit} f' plugins/copilot/CHANGELOG.md | sed '/^$/d' > "<scratchpad>/release-summary-X.Y.Z.md"
 # Preview the generated part:
 gh api repos/tmathura/copilot-plugin-cc/releases/generate-notes -f tag_name=vX.Y.Z -f target_commitish=<merge commit> --jq .body
 # Publish; GitHub puts the summary above the generated notes:
-gh release create vX.Y.Z --target <merge commit> --title "vX.Y.Z" --notes-file <scratchpad>/release-summary-X.Y.Z.md --generate-notes
+gh release create vX.Y.Z --target <merge commit> --title "vX.Y.Z" --notes-file "<scratchpad>/release-summary-X.Y.Z.md" --generate-notes
 ```
 
 Known issues go in tickets and the README, not in the release notes.
