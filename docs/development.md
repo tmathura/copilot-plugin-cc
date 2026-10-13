@@ -72,7 +72,9 @@ extension, the bundled `bug` extension ("Bug fixes", below).
 
 Run the skills in this order:
 
-1. `/speckit-specify SPECIFY_FEATURE_DIRECTORY=specs/NNN-<name> <feature description>` writes `specs/NNN-<name>/spec.md`.
+1. `/speckit-specify SPECIFY_FEATURE_DIRECTORY=specs/<name> <feature description>` writes
+   `specs/<name>/spec.md`. Before the issue exists, use the name alone; when the issue exists, use
+   `specs/NNN-<name>` ("Folder names", below).
 2. `/speckit-clarify` (optional) answers open questions in the spec.
 3. `/speckit-plan` writes `plan.md`.
 4. `/speckit-tasks` writes `tasks.md`.
