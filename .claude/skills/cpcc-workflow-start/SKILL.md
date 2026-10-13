@@ -45,8 +45,10 @@ the run. If the user says to stop at a step, ask at that step.
 - **A ticket id with a branch:** resume it (see below).
 - **A ticket id with no branch:** read the issue with `gh issue view <n>`, assign it with
   `gh issue edit <n> -R tmathura/copilot-plugin-cc --add-assignee @me`. Classify it with
-  REFERENCE.md "Planning mode", and label it before the branch: `bug` for a defect, otherwise
-  `enhancement` (or `documentation` for docs only). Then start at Step 2. At the start of Step 4,
+  REFERENCE.md "Planning mode". Before the branch, check the issue against "Tickets" in the repo's
+  `docs/development.md`. If it does not match, fix it with `gh issue edit`: the title, the
+  sections (keep the author's text), and exactly one type label (remove any other type label).
+  If the planning in Step 4 shows that the type label is wrong, fix it then. Then start at Step 2. At the start of Step 4,
   ask which planning mode to use, with the one the rule picks marked (Recommended): **Bug triage**
   / **Spec flow** if it touches the plugin, otherwise **Claude plan mode**. Plan once, in the
   worktree, with the issue text. With Spec Kit, the folder has the issue number from the start
@@ -99,23 +101,13 @@ Run the Codex and Copilot loop on the approved plan (REFERENCE.md). A bug triage
 prompt file, as a plan-mode plan does. Apply confirmed findings to the plan. Correct Spec Kit files
 by hand.
 
-Draft the ticket from the plan:
+Draft the ticket from the plan: its title, body and one type label, as "Tickets" in the repo's
+`docs/development.md` says. Pass the type label to `cpcc-workflow-ticket` apart from the body,
+not as a line in it.
 
-```markdown
-Title: <imperative, specific>
-
-## Problem
-## Expected behaviour
-## Solution requirements
-## Acceptance criteria
-- [ ] ...
-```
-
-With Spec Kit, pass the planning folder (`specs/<name>/` or `.specify/bugs/<slug>/`, still without
-the issue number) to `cpcc-workflow-ticket`. It adds the number to the folder and the `Spec:` or
+With Spec Kit, also pass the planning folder (`specs/<name>/` or `.specify/bugs/<slug>/`, still
+without the issue number). `cpcc-workflow-ticket` adds the number to the folder and the `Spec:` or
 `Bug notes:` line to the issue.
-
-Suggest a label: `bug` for a defect, `enhancement` for a feature, `documentation` for docs only.
 
 Ask: **Create as drafted (Recommended)** / **Edit first** / **Stop**. Say what the reviewers changed in the
 plan. Then invoke `cpcc-workflow-ticket` with the draft and keep the issue number.
@@ -142,6 +134,7 @@ Read the root `CLAUDE.md` in the worktree and the docs it links to. Read
 - When a decision, a count, the scope, the approach or the shape of a test departs from the spec, do the sweep in
   the repo's `docs/development.md` ("Keeping the spec current") before you commit. Spec files that
   change this way do not count toward the 3-file limit below.
+- When the scope of the ticket changes, add the dated scope line to the issue ("Tickets").
 - Make one change per ticket. Do not change things nobody asked for.
 - If more than 3 hand-written files must change, stop and suggest separate tickets. Generated files
   and lockfiles do not count.
@@ -237,4 +230,7 @@ To merge:
    `CHANGELOG.md` summary and the generated notes preview, and ask: **Publish (Recommended)** /
    **Not now**. On **Publish**, run the publish command from REFERENCE.md.
 8. Report the PR URL, the merge commit on `main`, the release URL if there is one, the rounds of
-   each loop, any rejected findings, and the issue that `Closes #<n>` closed.
+   each loop, any rejected findings, and the issue that `Closes #<n>` closed. If the defect also
+   exists in codex-plugin-cc and upstream has not fixed it ("Tickets", Upstream), say so, and give
+   the owner the command to run once the upstream issue exists:
+   `gh issue comment <n> -R tmathura/copilot-plugin-cc --body 'Reported upstream: openai/codex-plugin-cc#<m>'`.

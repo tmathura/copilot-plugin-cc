@@ -21,13 +21,11 @@ How work moves from an idea to `main`. The rules behind these steps are in the
    The bug triage plan is `assessment.md` plus a Constitution Check that you write in it, because
    the assessment has none. Run the plan's Constitution Check. Have Codex and Copilot review the
    plan (for the spec flow: `spec.md`, `plan.md` and `tasks.md`), and apply their confirmed findings.
-   Give any defect the `bug` label.
-2. Open a GitHub issue from the plan, or use the one that already exists. If you planned with Spec
-   Kit, add the issue number to the planning folder ("Folder names", below). Before its branch is made,
-   label it `bug` when it reports a defect (for a port, an upstream bug fix), otherwise
-   `enhancement` (or `documentation` for a docs-only change). When the issue already exists, for example an upstream port, skip step 1 for now:
-   make its branch (step 3), and then do step 1 once, in the worktree. If planning shows the label
-   was wrong, fix the label.
+2. Open a GitHub issue from the plan, as "Tickets" (below) says, or use the one that already exists.
+   If you planned with Spec Kit, add the issue number to the planning folder ("Folder names",
+   below). Give the issue its type label before its branch is made. When the issue already exists,
+   for example an upstream port, skip step 1 for now: make its branch (step 3), and then do step 1
+   once, in the worktree. If planning shows the label was wrong, fix the label.
 3. Make a branch `<type>/<n>-<slug>` from the latest `origin/main`, in its own worktree. The type is
    `bugfix` for an issue with the `bug` label, and `feature` for all others. The type is set when the
    branch is made; a later label fix does not rename the branch. If Spec Kit ran in the
@@ -61,6 +59,46 @@ The `cpcc-workflow-*` Claude Code skills in `.claude/skills/` run these steps. S
 `/cpcc-workflow-start`. Their shared rules are in `.claude/skills/cpcc-workflow-common/REFERENCE.md`.
 The skills load only when this repo is open as the project in Claude Code. You can also follow the
 steps by hand.
+
+## Tickets
+
+Each change has one GitHub issue on `tmathura/copilot-plugin-cc`, assigned to the owner.
+`cpcc-workflow-ticket` makes it from the approved draft. An issue that already exists (an upstream
+port, or one filed by hand) is made to match before its branch is made.
+
+- **Title:** an imperative sentence that says what changes, for example "Keep equals signs in long
+  option values". No ticket number, no type prefix such as "Bug:", and no full stop at the end.
+- **Body:** these sections, in this order:
+  1. `## Problem`: what is wrong or missing, with evidence (file and line, error text, a failing
+     case).
+  2. `## Expected behaviour`: what must happen instead.
+  3. `## Solution requirements`: what the change must do and must not do.
+  4. `## Acceptance criteria`: a checklist (`- [ ] ...`) that a reviewer can check.
+
+  Other sections can follow, for example `## Constitution Check`. When the plan used Spec Kit, the
+  last line names the planning folder ("Folder names", below).
+- **Type label:** exactly one. Use the first that fits:
+  1. `documentation`: a change to docs only, also when it corrects a mistake in the docs. Docs are
+     `README.md`, `CLAUDE.md`, `UPSTREAM.md`, `docs/`, `specs/`, `.specify/bugs/` and the
+     constitution. Text in the plugin (commands, skills, prompts) and the workflow skills are not
+     docs;
+  2. `bug`: a defect, also an upstream bug fix that is ported;
+  3. `enhancement`: anything else: new or changed behaviour, a refactor, tests, tooling, CI,
+     Spec Kit, the workflow.
+- **Other labels:**
+  - `question`: while the issue asks the owner to decide. Remove it when the owner has decided.
+  - `duplicate`, `invalid`, `wontfix`: when the issue closes without its own change. Add a comment
+    that says why, for a duplicate "Duplicate of #n".
+  - `good first issue`, `help wanted`, `accessibility`: as GitHub defines them.
+
+  Never create a new label.
+- **Scope change:** when the scope changes during the work, edit the issue body and add a dated line
+  that says what changed and why. Put it above the folder line, if there is one.
+- **Upstream:** when the defect also exists in codex-plugin-cc and upstream has not fixed it, the
+  owner reports it there, and the issue gets a comment "Reported upstream: openai/codex-plugin-cc#n".
+  A port of an upstream fix needs no such comment.
+- **Closing:** the PR body has `Closes #n`, so the merge closes the issue. Do not tick the
+  acceptance boxes; the PR body ("Change" and "Testing") says what was done and how it was checked.
 
 ## Spec Kit
 

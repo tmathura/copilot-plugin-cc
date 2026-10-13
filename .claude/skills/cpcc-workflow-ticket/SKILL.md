@@ -1,6 +1,6 @@
 ---
 name: cpcc-workflow-ticket
-description: Create a GitHub issue on tmathura/copilot-plugin-cc from a drafted ticket (title + Problem / Expected behaviour / Solution requirements / Acceptance criteria) and print its number.
+description: Create a GitHub issue on tmathura/copilot-plugin-cc from a drafted ticket in the repo's ticket format (docs/development.md "Tickets"), with its one type label, and print its number.
 argument-hint: "<drafted ticket, or nothing to use the draft in the conversation>"
 ---
 
@@ -11,10 +11,10 @@ approved the draft in `cpcc-workflow-start`.
 
 ## Input
 
-The draft comes from `$ARGUMENTS`, or from the last approved draft in the conversation. It has a
-title, the sections `## Problem`, `## Expected behaviour`, `## Solution requirements` and
-`## Acceptance criteria`, and maybe suggested labels. If there is no approved draft, and this is not
-a resume (below), stop and say so.
+The draft comes from `$ARGUMENTS`, or from the last approved draft in the conversation. It follows
+"Tickets" in the repo's `docs/development.md`: a title, a body, and its one type label, which is
+passed apart from the body. If this is not a resume (below): stop and say so when there is no
+approved draft, or when the draft has no type label or more than one.
 
 It can also name a Spec Kit planning folder in the main checkout that has no issue number yet:
 `specs/<name>/` or `.specify/bugs/<slug>/`.
@@ -27,8 +27,9 @@ Use only labels from REFERENCE.md. Do not create new ones.
 
 ## Steps
 
-1. Write the body (everything below the title) to `<scratchpad>/issue-body.md`.
-2. Create the issue. Repeat `--label` for each label, or leave it out:
+1. Write the body (from `## Problem` to the end, with no title or label line) to
+   `<scratchpad>/issue-body.md`.
+2. Create the issue with its type label. Repeat `--label` for any other label from "Tickets":
 
    ```bash
    gh issue create -R tmathura/copilot-plugin-cc \
@@ -38,7 +39,9 @@ Use only labels from REFERENCE.md. Do not create new ones.
      --label "<label>"
    ```
 
-3. Take the number from the URL that comes back. Print the URL and `#<n>`.
+3. Take the number from the URL that comes back. Print the URL and `#<n>`. Check that
+   `gh issue view <n> -R tmathura/copilot-plugin-cc --json labels,assignees` shows exactly one type
+   label and you as the assignee. If not, fix it with `gh issue edit`.
 4. **If a planning folder was named,** add the issue number to it, as "Folder names" in the repo's
    `docs/development.md` says. `NNN` is `<n>` padded to 3 digits (`printf '%03d' <n>`). Start each
    Bash call with the `MAIN=` line from REFERENCE.md, and give every path from `$MAIN`.
