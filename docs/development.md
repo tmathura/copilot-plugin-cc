@@ -39,7 +39,7 @@ repo. You can follow the same steps by hand.
 
 ## Spec Kit
 
-The repo uses [Spec Kit](https://github.com/github/spec-kit) 1.1.2.dev0 with the Claude Code
+The repo uses [Spec Kit](https://github.com/github/spec-kit) 1.1.3 with the Claude Code
 integration (`.claude/skills/speckit-*`) and bash scripts (`.specify/scripts/bash/`). It has no
 extensions.
 
@@ -107,7 +107,14 @@ A change written only in a PR body or a commit message does not count.
 
 ### Setup
 
-Install the CLI with `uv tool install specify-cli --from git+https://github.com/github/spec-kit.git`.
+Install the CLI from the release tag the repo uses:
+
+```bash
+uv tool install specify-cli --from git+https://github.com/github/spec-kit.git@v1.1.3
+```
+
+Use a release tag, not the main branch. A build from main is unreleased work, and its version ends
+in `.dev0`.
 
 The repo was set up with:
 
@@ -123,7 +130,10 @@ changed shared files.
 
 ### Upgrading
 
-1. Run `uv tool upgrade specify-cli`, then `specify integration upgrade claude`.
+1. Find the newest release on the [releases page](https://github.com/github/spec-kit/releases).
+   Run `uv tool install specify-cli --force --from git+https://github.com/github/spec-kit.git@vX.Y.Z`,
+   then `specify integration upgrade claude`. `uv tool upgrade` does not move a pinned tag.
+   Change the version and the tag in this file.
 2. The upgrade refuses if someone changed a managed file by hand. Read the diff before you commit.
 3. If the upgrade adds a script, run `git add --chmod=+x .specify/scripts/bash/*.sh` again.
 
