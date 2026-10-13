@@ -214,14 +214,18 @@ Step 4) / **Stop**. On **Stop**, leave the PR open and keep the worktree.
 
 To merge:
 
-1. Run `gh pr merge <n> --squash --delete-branch`.
-2. Check that `gh pr view <n> --json state` shows `MERGED`. If not, stop and report.
-3. `ExitWorktree` with `action: "keep"`.
-4. Run the "Cleanup" commands in `cpcc-workflow-branch`. `git branch -D` is safe only after the check
-   in point 2. A squash merge makes the branch look unmerged to `git branch -d`.
-5. Run `git -C "$MAIN" pull --ff-only origin main`.
-6. If the PR raised the plugin version, it is a release (see "Release" in REFERENCE.md). Show the
+1. Keep the `headRefOid` that the readiness check saw; the user approved that commit. Run the
+   readiness checks above again. If `headRefOid` changed, or a check now fails, do not merge: report
+   it, go back to the review loops for the new head, and ask again.
+2. Run `gh pr merge <n> --squash --delete-branch --match-head-commit <approved headRefOid>`. GitHub
+   then refuses the merge if anything was pushed after the approval.
+3. Check that `gh pr view <n> --json state` shows `MERGED`. If not, stop and report.
+4. `ExitWorktree` with `action: "keep"`.
+5. Run the "Cleanup" commands in `cpcc-workflow-branch`. `git branch -D` is safe only after the check
+   in point 3. A squash merge makes the branch look unmerged to `git branch -d`.
+6. Run `git -C "$MAIN" pull --ff-only origin main`.
+7. If the PR raised the plugin version, it is a release (see "Release" in REFERENCE.md). Show the
    `CHANGELOG.md` summary and the generated notes preview, and ask: **Publish (Recommended)** /
    **Not now**. On **Publish**, run the publish command from REFERENCE.md.
-7. Report the PR URL, the merge commit on `main`, the release URL if there is one, the rounds of
+8. Report the PR URL, the merge commit on `main`, the release URL if there is one, the rounds of
    each loop, any rejected findings, and the issue that `Closes #<n>` closed.

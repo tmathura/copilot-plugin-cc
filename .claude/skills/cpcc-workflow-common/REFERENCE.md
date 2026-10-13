@@ -34,7 +34,7 @@ Tools that must be on the PATH:
 | Tool | Notes |
 | --- | --- |
 | `git` | 2.31 or later |
-| `gh` | `gh auth status` shows a login, and that login can push to the repo |
+| `gh` | 2.48 or later (the review poll uses `gh api --slurp`). `gh auth status` shows a login, and that login can push to the repo |
 | `node` | Codex, Copilot and the review poll use it |
 | `specify` | only for Spec Kit |
 
