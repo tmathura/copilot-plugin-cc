@@ -91,7 +91,7 @@ Why: the owner follows upstream releases. An upstream change must land in the sa
   tag will point to. The run covers a review, a background task with status and result, cancel, and
   the review gate. CI runs the automated tests on Windows, macOS and Linux.
 - Accepted risk: users install from `main`, so a user who updates from the marketplace can get a
-  version before its manual run.
+  version before its manual run, or one that failed it, until the fix ships.
 - If the manual run fails, that version gets no GitHub release, and its number is not used again.
   The fix is a new ticket and a new patch release, with its own manual run.
 

@@ -321,8 +321,9 @@ In the PR that raises the version:
 After the merge, do the manual run that the constitution asks for (Principle VI) on the merge
 commit. Run `git switch --detach <merge commit>` in this repo, then, in a real git repo, run
 `claude --plugin-dir <this repo>/plugins/copilot`. Afterwards run `git switch main`. If the run
-fails, do not publish. The version stays on `main` with no tag. The fix is a new ticket, and its
-version is a new, higher number. Its `CHANGELOG.md` entry also says what the failed version changed.
+fails, do not publish. The version stays on `main` with no tag. The fix is a new ticket and a new
+patch release, with a new, higher number. Its `CHANGELOG.md` entry also says what the failed version
+changed.
 
 When the run passes, publish a GitHub release on that same merge commit, like
 [upstream's](https://github.com/openai/codex-plugin-cc/releases):
