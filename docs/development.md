@@ -124,7 +124,8 @@ Things to know:
 
 - Pick a slug that no other bug folder uses, here or in an open worktree. Keep it for the whole
   ticket.
-- Commit the bug folder with the fix. Once the fix has merged, the folder is history.
+- Commit the bug folder with the fix. Once the fix has merged, the folder is history. The twelve bugs
+  fixed before the extension came in (#16 to #45) got their folders later, written in #59.
 - The assess skill quotes the report in `assessment.md` and records any URL it was given exactly as
   given. Give it the issue text, not a URL. Pasted logs can also hold secrets. Before you commit the
   folder, check that it holds no token, password or signed URL; the constitution (Principle IV)
