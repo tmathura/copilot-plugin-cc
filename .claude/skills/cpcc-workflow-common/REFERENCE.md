@@ -296,7 +296,7 @@ Each round:
 3. **Check the findings** (see above). Fix the confirmed ones by hand. Run the commands from
    "Commands".
 4. **Run a Codex and Copilot round on the fixes** with `--scope working-tree` and the findings as the focus.
-   Check its findings too.
+   Check its findings too. If you fix any of them, run the commands from "Commands" again.
 5. **Commit** with `cpcc-workflow-commit`. The body lists each finding and what happened to it.
 6. **Push and rewrite the PR body** with `cpcc-workflow-pr`.
 7. **Reply to every thread and resolve it.** Say what was done, or why the finding was rejected. Write
