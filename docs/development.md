@@ -23,8 +23,8 @@ How work moves from an idea to `main`. The rules behind these steps are in the
    plan (for the spec flow: `spec.md`, `plan.md` and `tasks.md`), and apply their confirmed findings.
    Give any defect the `bug` label.
 2. Open a GitHub issue from the plan, or use the one that already exists. Before its branch is made,
-   label it `bug` when it reports a defect (for a port, an upstream bug fix) or `enhancement`
-   otherwise. When the issue already exists, for example an upstream port, skip step 1 for now:
+   label it `bug` when it reports a defect (for a port, an upstream bug fix), otherwise
+   `enhancement` (or `documentation` for a docs-only change). When the issue already exists, for example an upstream port, skip step 1 for now:
    make its branch (step 3), and then do step 1 once, in the worktree. If planning shows the label
    was wrong, fix the label.
 3. Make a branch `<type>/<n>-<slug>` from the latest `origin/main`, in its own worktree. The type is

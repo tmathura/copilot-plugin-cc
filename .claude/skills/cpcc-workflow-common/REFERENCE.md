@@ -24,7 +24,9 @@ The skills must work the same on macOS, Linux and Windows.
 
 - Run every command with the Bash tool. That is bash on macOS and Linux, and Git Bash on Windows.
 - Do not use PowerShell, `cmd`, `.exe` paths, drive letters or fixed home folders.
-- Use only `git`, `gh`, `node`, `uv`, `specify` and POSIX `sh` builtins.
+- Use only `git`, `gh`, `node`, `npm`, `claude`, `uv`, `specify`, POSIX `sh` builtins, and the
+  standard POSIX tools that the steps use, such as `mkdir`, `mv`, `ls`, `sort`, `tail`, `grep`,
+  `awk` and `sed`.
 - Do not pass `-R` with a different repo to `gh`.
 - Run commands from the root of the current checkout (main checkout or worktree,
   `git rev-parse --show-toplevel`). Paths such as `.claude/skills/...` are relative to it.
@@ -262,7 +264,8 @@ Each round:
    ```
 
    Exit 0: every reviewer is done. Exit 1: timed out; it prints which reviewer is still pending.
-   Exit 2: `gh` failed. The poll is a Node script because the worktree guard blocks shell loops that
+   Exit 2: bad arguments (it prints the usage line; the SHA must be the full 40 characters) or `gh`
+   failed (it prints "gh failed"). The poll is a Node script because the worktree guard blocks shell loops that
    call `gh`.
 
    - If Copilot has not started 3 minutes after the push, trigger it again (table above). Do not

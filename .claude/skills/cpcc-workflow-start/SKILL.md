@@ -45,7 +45,8 @@ the run. If the user says to stop at a step, ask at that step.
 - **A ticket id with a branch:** resume it (see below).
 - **A ticket id with no branch:** read the issue with `gh issue view <n>`, assign it with
   `gh issue edit <n> -R tmathura/copilot-plugin-cc --add-assignee @me`. Classify it with
-  REFERENCE.md "Planning mode", and add the `bug` label to a defect. Then start at Step 2. If it
+  REFERENCE.md "Planning mode", and label it before the branch: `bug` for a defect, otherwise
+  `enhancement` (or `documentation` for docs only). Then start at Step 2. If it
   touches the plugin, ask at the start of Step 4: **Bug triage** / **Spec flow**, with the one the
   rule picks marked (Recommended). Run that mode in the worktree with the issue text, write the
   Constitution Check, and run the Codex and Copilot loop on the plan, as in Step 1, before the code.

@@ -1,6 +1,7 @@
 // Wait until every bot reviewer has finished with one PR head.
 // Usage: node poll-reviews.mjs <head sha> <pr> [tries=60] [intervalSec=30]
-// Exit 0: all reviewers done. Exit 1: timed out (prints who is still pending). Exit 2: gh failed.
+// Exit 0: all reviewers done. Exit 1: timed out (prints who is still pending).
+// Exit 2: bad arguments (prints the usage line) or gh failed (prints "gh failed").
 //
 // Reviewers (keep in step with the "Bot reviewers" table in REFERENCE.md):
 // - copilot: done when it has a review on the head SHA.
@@ -19,7 +20,7 @@ if (!/^[0-9a-f]{40}$/i.test(rawSha) || ![pr, tries, intervalSec].every((value) =
 const sha = rawSha.toLowerCase();
 
 const repo = "repos/tmathura/copilot-plugin-cc";
-const startedAt = new Date().toISOString();
+const startedAt = Date.now();
 
 function gh(path) {
   return JSON.parse(execFileSync("gh", ["api", path, "--paginate", "--slurp"], { encoding: "utf8" })).flat();
@@ -33,7 +34,9 @@ const reviewers = {
       return false;
     }
     const reviewedHead = reviews.some((r) => /coderabbit/.test(r.user.login) && r.commit_id === sha);
-    const finishedSince = mine.some((c) => c.updated_at > startedAt && /Review finished|Review completed/.test(c.body));
+    const finishedSince = mine.some(
+      (c) => Date.parse(c.updated_at) > startedAt && /Review finished|Review completed/.test(c.body)
+    );
     // A review with no findings posts no review object, only a commit status on the head.
     // A paused CodeRabbit also reports success ("Review paused"); that is not a review of this head.
     const headStatusDone = statuses.some(
@@ -63,7 +66,9 @@ for (let attempt = 1; attempt <= Number(tries); attempt += 1) {
     console.log(`all reviewers done after ${attempt} check(s)`);
     process.exit(0);
   }
-  await new Promise((resolve) => setTimeout(resolve, Number(intervalSec) * 1000));
+  if (attempt < Number(tries)) {
+    await new Promise((resolve) => setTimeout(resolve, Number(intervalSec) * 1000));
+  }
 }
 console.log(`timed out; still pending: ${pending.join(", ")}`);
 process.exit(1);
