@@ -30,13 +30,18 @@ The skills must work the same on macOS, Linux and Windows.
 - Do not pass `-R` with a different repo to `gh`.
 - Run commands from the root of the current checkout (main checkout or worktree,
   `git rev-parse --show-toplevel`). Paths such as `.claude/skills/...` are relative to it.
+- Never put generated text (titles, focus text, bodies, findings) inside double quotes or a heredoc
+  in a shell command. Backticks and `$(...)` in it would run, and a line equal to the heredoc end
+  word would cut it. Write long text to a scratchpad file with the file tool and pass the file
+  (`--body-file`, `git commit -F`, `-F body=@<file>`, `--prompt-file`). Put a short one-line text in
+  single quotes, and write each `'` in it as `'\''`.
 
 Tools that must be on the PATH:
 
 | Tool | Notes |
 | --- | --- |
 | `git` | 2.31 or later |
-| `gh` | 2.48 or later (the review poll uses `gh api --slurp`). `gh auth status` shows a login, and that login can push to the repo |
+| `gh` | 2.48 or later (the review poll uses `gh api --slurp`). `gh auth status` shows a login, and `gh api repos/tmathura/copilot-plugin-cc --jq .permissions.push` prints `true` |
 | `node` | Codex, Copilot and the review poll use it |
 | `specify` | only for Spec Kit |
 
@@ -217,8 +222,8 @@ worktree guard refuses `node "$VAR"` with a computed path. Below, `$CODEX` stand
 
 ```bash
 node "$CODEX" setup --json   # must say "ready": true; if not, tell the user to run /codex:setup (or /copilot:setup) and leave that reviewer out
-node "$CODEX" adversarial-review --wait --scope working-tree "<focus text>"            # uncommitted work, Spec Kit plans
-node "$CODEX" adversarial-review --wait --scope branch --base origin/main "<focus text>" # committed code
+node "$CODEX" adversarial-review --wait --scope working-tree '<focus text>'            # uncommitted work, Spec Kit plans
+node "$CODEX" adversarial-review --wait --scope branch --base origin/main '<focus text>' # committed code
 node "$CODEX" task --prompt-file "<scratchpad>/plan-review.md"                         # a plan-mode plan
 ```
 

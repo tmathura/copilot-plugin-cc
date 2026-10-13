@@ -33,17 +33,18 @@ round, for example, passes its findings and their outcomes as the body.
 5. **Ask only if you wrote the description yourself.** Show the message and ask: **Commit
    (Recommended)** / **Edit the subject** / **Stop**. A description that was passed in needs no
    question.
-6. **Commit** with a heredoc, so the body and the trailer keep their line breaks:
+6. **Commit.** Write the message to `<scratchpad>/commit-msg.txt` with the file tool, not with a
+   shell heredoc (a body line that is exactly the heredoc's end word would cut the message):
 
-   ```bash
-   git commit -F - <<'EOF'
+   ```text
    [#<n>] <Imperative description>
 
    <optional body>
 
    <trailer from "Naming" in REFERENCE.md, if there is one>
-   EOF
    ```
+
+   Then run `git commit -F "<scratchpad>/commit-msg.txt"`.
 
 7. **Check** with `git status` and `git log -1 --oneline`. Report the hash and the subject.
 

@@ -14,7 +14,8 @@ Stop and report if one of these fails:
 
 1. `git remote get-url origin` is the remote in REFERENCE.md.
 2. `git branch --show-current` is not `main` and matches `<type>/<n>-<slug>`. Take `<n>` from it.
-3. `gh auth status` shows a login, and that login can push to the repo.
+3. `gh auth status` shows a login, and `gh api repos/tmathura/copilot-plugin-cc --jq .permissions.push`
+   prints `true`.
 4. `git status --porcelain` is empty. If not, run `cpcc-workflow-commit` first.
 5. After `git fetch origin`, `git log origin/main..HEAD` shows at least one commit.
 
@@ -36,7 +37,7 @@ Look for a PR: `gh pr view --json number,state,url,isDraft`.
 
 ```bash
 gh pr create --base main --head "<branch>" \
-  --title "[#<n>] <Imperative description of the whole change>" \
+  --title '[#<n>] <Imperative description of the whole change>' \
   --body-file "<scratchpad>/pr-body-<n>.md"
 ```
 

@@ -24,7 +24,7 @@ Use only labels from REFERENCE.md. Do not create new ones.
 
    ```bash
    gh issue create -R tmathura/copilot-plugin-cc \
-     --title "<title>" \
+     --title '<title>' \
      --body-file "<scratchpad>/issue-body.md" \
      --assignee "@me" \
      --label "<label>"
