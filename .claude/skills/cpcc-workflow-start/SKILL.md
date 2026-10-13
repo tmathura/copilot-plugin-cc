@@ -61,7 +61,11 @@ the run. If the user says to stop at a step, ask at that step.
 3. Find where the run stopped from `git status`, `git log origin/main..HEAD` and
    `gh pr view --json number,state,url,reviewDecision`. Having no PR is fine.
 4. If the worktree has no `.claude/skills/cpcc-workflow-common/REFERENCE.md` (its branch was made
-   before the workflow skills were in the repo), run `git merge origin/main` in it first.
+   before the workflow skills were in the repo), bring them in before anything else:
+   - `git status --porcelain` must be empty. If not, stop and ask.
+   - Run `git fetch origin`, then `git merge origin/main`. If the merge stops on a conflict, run
+     `git merge --abort`, then stop and report.
+   - Check that the file now exists. If not, stop and report.
 5. Say in one line where you resume, for example "Resuming #12 at Step 7b: 2 commits, no PR yet."
    Then go on from that step. If the work touches the plugin and has no planning notes, stop and ask
    (REFERENCE.md "Planning mode").
