@@ -22,7 +22,8 @@ How work moves from an idea to `main`. The rules behind these steps are in the
    the assessment has none. Run the plan's Constitution Check. Have Codex and Copilot review the
    plan (for the spec flow: `spec.md`, `plan.md` and `tasks.md`), and apply their confirmed findings.
    Give any defect the `bug` label.
-2. Open a GitHub issue from the plan, or use the one that already exists. Before its branch is made,
+2. Open a GitHub issue from the plan, or use the one that already exists. If you planned with Spec
+   Kit, add the issue number to the planning folder ("Folder names", below). Before its branch is made,
    label it `bug` when it reports a defect (for a port, an upstream bug fix), otherwise
    `enhancement` (or `documentation` for a docs-only change). When the issue already exists, for example an upstream port, skip step 1 for now:
    make its branch (step 3), and then do step 1 once, in the worktree. If planning shows the label
@@ -31,7 +32,7 @@ How work moves from an idea to `main`. The rules behind these steps are in the
    `bugfix` for an issue with the `bug` label, and `feature` for all others. The type is set when the
    branch is made; a later label fix does not rename the branch. If Spec Kit ran in the
    main checkout, move `specs/NNN-<name>/` and `.specify/feature.json`, or
-   `.specify/bugs/<slug>/`, into the worktree before its first commit. The main checkout must then
+   `.specify/bugs/NNN-<slug>/`, into the worktree before its first commit. The main checkout must then
    be clean.
 4. Make the change, with its tests and docs. If the work departs from the spec, update the spec in
    the same commit ("Keeping the spec current", below). If the change is a release, raise the
@@ -71,7 +72,7 @@ extension, the bundled `bug` extension ("Bug fixes", below).
 
 Run the skills in this order:
 
-1. `/speckit-specify <feature description>` writes `specs/NNN-<name>/spec.md`.
+1. `/speckit-specify SPECIFY_FEATURE_DIRECTORY=specs/NNN-<name> <feature description>` writes `specs/NNN-<name>/spec.md`.
 2. `/speckit-clarify` (optional) answers open questions in the spec.
 3. `/speckit-plan` writes `plan.md`.
 4. `/speckit-tasks` writes `tasks.md`.
@@ -91,11 +92,10 @@ Things to know:
 - Git stores the scripts as executable (mode `100755`). If a script fails with "permission denied",
   run `chmod +x .specify/scripts/bash/*.sh`. If `git ls-files -s .specify/scripts/bash` then shows
   `100644`, also run `git add --chmod=+x .specify/scripts/bash/*.sh` and commit it.
-- Specs live in `specs/NNN-<name>/` with sequential numbers. `/speckit-specify` takes the highest
-  number in `specs/` of the current checkout, plus one, so it does not see a spec in another
-  worktree. Before you run it, find the numbers in use in `specs/` on `origin/main` and in every
-  open worktree. Then pass a free folder: `/speckit-specify SPECIFY_FEATURE_DIRECTORY=specs/NNN-<name>
-  <feature description>`. In a worktree, check that `.specify/feature.json` exists after it.
+- Specs live in `specs/NNN-<name>/`, where `NNN` is the issue number ("Folder names", below). Always
+  pass the folder: `specs/NNN-<name>`, or `specs/<name>` while the issue does not exist yet.
+  Without it, `/speckit-specify` takes the highest number in `specs/` plus one, which is not the
+  issue number. In a worktree, check that `.specify/feature.json` exists after it.
 - `.specify/feature.json` points to the current spec. Each checkout has its own copy, and git ignores
   it. A new or resumed worktree has none, so `/speckit-plan`, `/speckit-analyze` and
   `/speckit-implement` fail with "Feature directory not found". To fix it, write
@@ -109,21 +109,43 @@ Things to know:
 - The bundled Spec Kit workflow (`.specify/workflows/`) was deleted because nothing uses it. If an
   upgrade brings it back, delete it again.
 
+### Folder names
+
+A spec folder and a bug folder start with the ticket's GitHub issue number, padded with zeros to 3
+digits, as Spec Kit pads its own numbers: `specs/NNN-<name>/` and `.specify/bugs/NNN-<slug>/`. For
+#59, `NNN` is `059`. So the folder, the issue and the branch carry the same number.
+
+- When the issue exists before you plan (a ticket that starts from an issue, or an upstream port),
+  use the number from the start: `SPECIFY_FEATURE_DIRECTORY=specs/NNN-<name>`, or `slug=NNN-<slug>`.
+- When you plan before the issue exists (step 1 of the ticket workflow), use the name without the
+  number. As soon as the issue is created, add the number:
+  1. Rename the folder to `NNN-<name>` or `NNN-<slug>`.
+  2. In its files, replace the old folder path with the new one. In `assessment.md`, also set the
+     `Slug` line to `NNN-<slug>`.
+  3. For a spec, write the new path to `.specify/feature.json`.
+
+  `cpcc-workflow-ticket` does these steps.
+- In both cases, the issue body ends with a line that names the folder: `Spec: specs/NNN-<name>/` or
+  `Bug notes: .specify/bugs/NNN-<slug>/`.
+- `specs/001-copilot-plugin-port/` is older than this rule. Its number is not an issue number.
+
 ### Bug fixes
 
 The `bug` extension gives three skills. Run them in this order:
 
 1. `/speckit-bug-assess "<symptom>" slug=<slug>` finds the cause and writes
    `.specify/bugs/<slug>/assessment.md`. It changes no code. Pull `main` first, then run it in the
-   main checkout, and move the folder into the worktree as for `specs/`. For a bug issue that already
-   exists, you can run it in the worktree instead, with the text from `gh issue view <n>`.
-2. `/speckit-bug-fix slug=<slug>` makes the fix and writes `fix.md`.
-3. `/speckit-bug-test slug=<slug>` runs the checks again and writes `test.md`.
+   main checkout. When the issue is created, the folder becomes `.specify/bugs/NNN-<slug>/`
+   ("Folder names", above); move it into the worktree as for `specs/`. For a bug issue that already
+   exists, you can run it in the worktree instead, with the text from `gh issue view <n>` and
+   `slug=NNN-<slug>` ("Folder names", above).
+2. `/speckit-bug-fix slug=NNN-<slug>` makes the fix and writes `fix.md`.
+3. `/speckit-bug-test slug=NNN-<slug>` runs the checks again and writes `test.md`.
 
 Things to know:
 
-- Pick a slug that no other bug folder uses, here or in an open worktree. Keep it for the whole
-  ticket.
+- The slug starts with the issue number ("Folder names", above). Apart from adding that number once
+  the issue exists, keep the slug for the whole ticket.
 - Commit the bug folder with the fix. Once the fix has merged, the folder is history. The twelve bugs
   fixed before the extension came in (#16 to #45) got their folders later, written in #59.
 - The assess skill quotes the report in `assessment.md` and records any URL it was given exactly as

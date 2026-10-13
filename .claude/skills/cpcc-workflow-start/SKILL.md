@@ -49,8 +49,10 @@ the run. If the user says to stop at a step, ask at that step.
   `enhancement` (or `documentation` for docs only). Then start at Step 2. At the start of Step 4,
   ask which planning mode to use, with the one the rule picks marked (Recommended): **Bug triage**
   / **Spec flow** if it touches the plugin, otherwise **Claude plan mode**. Plan once, in the
-  worktree, with the issue text. Write the Constitution Check, and run the Codex and Copilot loop on
-  the plan, as in Step 1, before the code.
+  worktree, with the issue text. With Spec Kit, the folder has the issue number from the start
+  (`slug=NNN-<slug>` or `SPECIFY_FEATURE_DIRECTORY=specs/NNN-<name>`), and you add its `Bug notes:` or
+  `Spec:` line to the issue (REFERENCE.md "Planning mode"). Write the Constitution Check, and run the
+  Codex and Copilot loop on the plan, as in Step 1, before the code.
 - **Empty or `new`:** start at Step 1. If no task was described, ask: **Describe and plan
   (Recommended)** / **Give an issue number** / **Abort**.
 
@@ -109,7 +111,9 @@ Title: <imperative, specific>
 - [ ] ...
 ```
 
-With bug triage, end the draft with the line `Bug notes: .specify/bugs/<slug>/`.
+With Spec Kit, pass the planning folder (`specs/<name>/` or `.specify/bugs/<slug>/`, still without
+the issue number) to `cpcc-workflow-ticket`. It adds the number to the folder and the `Spec:` or
+`Bug notes:` line to the issue.
 
 Suggest a label: `bug` for a defect, `enhancement` for a feature, `documentation` for docs only.
 
@@ -132,7 +136,7 @@ Read the root `CLAUDE.md` in the worktree and the docs it links to. Read
   no branch).
 - Before you write code, say in a few lines which files you will change and why.
 - With Spec Kit feature planning, work through `tasks.md` and tick each task when it is done.
-- With bug triage, run `/speckit-bug-fix slug=<slug>`, then handle its result (REFERENCE.md "Bug
+- With bug triage, run `/speckit-bug-fix slug=NNN-<slug>`, then handle its result (REFERENCE.md "Bug
   triage"). For an upstream port with verdict `invalid`, skip fix and test, and update the
   `UPSTREAM.md` row instead.
 - When a decision, a count, the scope, the approach or the shape of a test departs from the spec, do the sweep in
@@ -151,7 +155,7 @@ Read the root `CLAUDE.md` in the worktree and the docs it links to. Read
 Run the commands from "Commands" in REFERENCE.md. If none are set, say "No build, format or test
 commands are configured" and go on.
 
-With bug triage, then run `/speckit-bug-test slug=<slug>` and handle its result (REFERENCE.md "Bug
+With bug triage, then run `/speckit-bug-test slug=NNN-<slug>` and handle its result (REFERENCE.md "Bug
 triage").
 
 If something fails, decide which kind of failure it is **before you touch a test**:
@@ -175,7 +179,8 @@ Never hide a timing problem with a sleep or a retry in a test.
 ## Step 7. Commit
 
 Invoke `cpcc-workflow-commit` with a one-line description of the diff and the list of files this
-ticket changed. With bug triage, the list includes `.specify/bugs/<slug>/`.
+ticket changed. With bug triage, the list includes `.specify/bugs/NNN-<slug>/`, the path in the
+issue's `Bug notes:` line.
 
 ## Step 7b. Codex and Copilot loop on the code
 
