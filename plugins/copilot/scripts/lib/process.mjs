@@ -2,8 +2,9 @@
 // Windows npm shims; terminateProcessTree returns a promise, signals a process that leads no group,
 // sends SIGKILL to what is still alive after a wait, and accepts the macOS EPERM for a group whose
 // members have exited; a failed taskkill counts only for processes still alive after a wait, and
-// its error marks children whose root has exited.
-import { spawnSync } from "node:child_process";
+// its error marks children whose root has exited; taskkill runs through runCommandAsync, so stops
+// started together run at the same time.
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -35,6 +36,35 @@ export function runCommand(command, args = [], options = {}) {
     stderr: result.stderr ?? "",
     error: result.error ?? null
   };
+}
+
+// Like runCommand, but the wait does not block the event loop, so several commands can run at once.
+// Its one caller, taskkill, reads no input, so it has no input, maxBuffer or stdio option.
+export function runCommandAsync(command, args = [], options = {}) {
+  return new Promise((resolve) => {
+    const child = spawn(command, args, {
+      cwd: options.cwd,
+      env: options.env,
+      stdio: ["ignore", "pipe", "pipe"],
+      // A shell would read repository-derived arguments as commands.
+      shell: false,
+      windowsHide: true
+    });
+    let stdout = "";
+    let stderr = "";
+    // A spawn failure emits error before close, and close may not follow, so the first one settles.
+    child.on("error", (error) => resolve({ command, args, status: null, signal: null, stdout, stderr, error }));
+    child.on("close", (status, signal) => resolve({ command, args, status, signal, stdout, stderr, error: null }));
+    // With no file handles left (EMFILE), Node makes no pipes and reports the error on the next tick.
+    child.stdout?.setEncoding("utf8");
+    child.stderr?.setEncoding("utf8");
+    child.stdout?.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr?.on("data", (chunk) => {
+      stderr += chunk;
+    });
+  });
 }
 
 export function runCommandChecked(command, args = [], options = {}) {
@@ -194,11 +224,13 @@ export async function terminateProcessTree(pid, options = {}) {
   }
 
   const platform = options.platform ?? process.platform;
-  const runCommandImpl = options.runCommandImpl ?? runCommand;
+  const runCommandImpl = options.runCommandImpl ?? runCommandAsync;
   const killImpl = options.killImpl ?? process.kill.bind(process);
 
   if (platform === "win32") {
-    const result = runCommandImpl("taskkill", ["/PID", String(pid), "/T", "/F"], {
+    // One taskkill /T takes about a second; a blocking call would make stops started together run
+    // one after another.
+    const result = await runCommandImpl("taskkill", ["/PID", String(pid), "/T", "/F"], {
       cwd: options.cwd,
       env: options.env
     });

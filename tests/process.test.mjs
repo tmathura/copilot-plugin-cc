@@ -10,6 +10,7 @@ import {
   binaryAvailable,
   resolveLauncher,
   runCommand,
+  runCommandAsync,
   runCommandChecked,
   terminateProcessTree
 } from "../plugins/copilot/scripts/lib/process.mjs";
@@ -118,6 +119,59 @@ test("terminateProcessTree uses taskkill on Windows", async () => {
   });
   assert.equal(outcome.delivered, true);
   assert.equal(outcome.method, "taskkill");
+});
+
+test("terminateProcessTree on Windows lets stops started together run at the same time", async () => {
+  const started = [];
+  const finishers = [];
+  const runCommandImpl = (command, args) => {
+    started.push(args[1]);
+    return new Promise((resolve) => {
+      finishers.push(() => resolve({ command, args, status: 0, signal: null, stdout: "", stderr: "", error: null }));
+    });
+  };
+  const killImpl = () => {
+    throw new Error("kill fallback should not run");
+  };
+
+  const stops = [1234, 5678].map((pid) => terminateProcessTree(pid, { platform: "win32", runCommandImpl, killImpl }));
+  assert.deepEqual(started, ["1234", "5678"]);
+  for (const finish of finishers) {
+    finish();
+  }
+
+  const outcomes = await Promise.all(stops);
+  assert.deepEqual(outcomes.map((outcome) => [outcome.delivered, outcome.method]), [[true, "taskkill"], [true, "taskkill"]]);
+});
+
+test("terminateProcessTree on Windows falls back to kill when taskkill cannot be found", async () => {
+  const calls = [];
+  const outcome = await terminateProcessTree(1234, {
+    platform: "win32",
+    cwd: makeTempDir(),
+    env: envWithPath(makeTempDir()),
+    killImpl(pid, signal) {
+      calls.push([pid, signal]);
+    }
+  });
+
+  assert.deepEqual(calls, [[1234, undefined]]);
+  assert.deepEqual(outcome, { attempted: true, delivered: true, method: "kill" });
+});
+
+test("terminateProcessTree on Windows rejects with a taskkill start error other than a missing command", async () => {
+  const failure = Object.assign(new Error("spawn taskkill EPERM"), { code: "EPERM" });
+
+  await assert.rejects(
+    terminateProcessTree(1234, {
+      platform: "win32",
+      runCommandImpl: async (command, args) => ({ command, args, status: null, signal: null, stdout: "", stderr: "", error: failure }),
+      killImpl() {
+        throw new Error("kill fallback should not run");
+      }
+    }),
+    failure
+  );
 });
 
 test("terminateProcessTree treats missing Windows processes as already stopped", async () => {
@@ -297,6 +351,54 @@ test("a command killed by a signal is not reported as a success", { skip: isWind
   assert.equal(result.signal, "SIGTERM");
   assert.throws(() => runCommandChecked(process.execPath, killSelf), /signal=SIGTERM/);
   assert.deepEqual(binaryAvailable(process.execPath, killSelf), { available: false, detail: "signal SIGTERM" });
+});
+
+test("runCommandAsync gives the exit status and the output of a command that fails", async () => {
+  const result = await runCommandAsync(process.execPath, [
+    "-e",
+    "process.stdout.write('out é'); process.stderr.write('err é'); process.exit(3)"
+  ]);
+
+  assert.deepEqual(result, {
+    command: process.execPath,
+    args: ["-e", "process.stdout.write('out é'); process.stderr.write('err é'); process.exit(3)"],
+    status: 3,
+    signal: null,
+    stdout: "out é",
+    stderr: "err é",
+    error: null
+  });
+});
+
+test("runCommandAsync reports a command killed by a signal with no exit status", { skip: isWindows }, async () => {
+  const result = await runCommandAsync(process.execPath, ["-e", "process.kill(process.pid, 'SIGTERM'); setInterval(() => {}, 1000)"]);
+
+  assert.equal(result.status, null);
+  assert.equal(result.signal, "SIGTERM");
+  assert.equal(result.error, null);
+});
+
+test("runCommandAsync reports a missing command as ENOENT with no exit status", async () => {
+  const result = await runCommandAsync("copilot-plugin-missing-command", []);
+
+  assert.equal(result.status, null);
+  assert.equal(result.error?.code, "ENOENT");
+});
+
+test("runCommandAsync rejects an argument that no command can receive, as runCommand throws", async () => {
+  await assert.rejects(runCommandAsync(process.execPath, ["-e", "\0"]), { code: "ERR_INVALID_ARG_VALUE" });
+});
+
+test("runCommandAsync does not block the event loop while the command runs", async () => {
+  let ticked = false;
+  setImmediate(() => {
+    ticked = true;
+  });
+
+  const result = await runCommandAsync(process.execPath, ["-e", ""]);
+
+  assert.equal(result.status, 0);
+  assert.equal(ticked, true);
 });
 
 test("terminateProcessTree never signals for a pid that is not a positive integer", async () => {

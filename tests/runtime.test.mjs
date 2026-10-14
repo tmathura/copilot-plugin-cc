@@ -2218,6 +2218,7 @@ test("SessionEnd still closes the session and stops a job whose job file cannot 
   await withCompanionEnv(tasks.env, async () => {
     const { cleanupSessionJobs } = await import(pathToFileURL(SESSION_HOOK).href);
     const { resolveJobFile, updateState } = await import("../plugins/copilot/scripts/lib/state.mjs");
+    const { terminateProcessTree } = await import("../plugins/copilot/scripts/lib/process.mjs");
     const worker = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
     const sessionId = "unwritable-job-file";
     try {
@@ -2227,11 +2228,25 @@ test("SessionEnd still closes the session and stops a job whose job file cannot 
       // A folder where the job file should be: no file can replace it.
       fs.mkdirSync(path.join(resolveJobFile(tasks.cwd, "task-unwritable"), "blocker"), { recursive: true });
 
+      // The real stop runs, but its time is left out: one taskkill alone takes up to 1.4 s on Windows.
+      // Stops can overlap, so their time is the span from the first start to the last end.
+      let stopsStarted = null;
+      let stopsEnded = null;
+      const terminateImpl = async (pid, options) => {
+        stopsStarted ??= Date.now();
+        try {
+          return await terminateProcessTree(pid, options);
+        } finally {
+          stopsEnded = Date.now();
+        }
+      };
       const started = Date.now();
-      await cleanupSessionJobs(tasks.cwd, sessionId);
+      await cleanupSessionJobs(tasks.cwd, sessionId, { terminateImpl });
 
       // A job file that cannot be written gets only a short retry, not the state's 2 s.
-      assert.ok(Date.now() - started < 1500, `${Date.now() - started} ms`);
+      const stopMs = stopsEnded - stopsStarted;
+      const cleanupMs = Date.now() - started - stopMs;
+      assert.ok(cleanupMs < 1500, `${cleanupMs} ms without the ${stopMs} ms stop`);
       await waitFor(() => !isAlive(worker.pid));
       assert.deepEqual(readClosedSessions(tasks.dataDir).map((entry) => entry.id), [sessionId]);
       assert.equal(findJob(tasks.dataDir, "task-unwritable"), null);
