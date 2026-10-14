@@ -357,6 +357,8 @@ test("terminateProcessTree on Windows rejects when taskkill runs out of time, un
 
 test("a timed-out taskkill whose root has exited still names a child it reported that stays alive", async () => {
   const timedOut = Object.assign(new Error("taskkill /PID 1234 /T /F did not end within 1000 ms."), { code: "ETIMEDOUT" });
+  // The last line was cut off by the stop; PID 56 is another program.
+  const output = `${TASKKILL_CHILD_FAILURE}\r\nERROR: The process with PID 56`;
   const stop = (living) =>
     terminateProcessTree(1234, {
       platform: "win32",
@@ -367,7 +369,7 @@ test("a timed-out taskkill whose root has exited still names a child it reported
         status: null,
         signal: null,
         stdout: "",
-        stderr: TASKKILL_CHILD_FAILURE,
+        stderr: output,
         error: timedOut
       }),
       killImpl(pid) {
@@ -378,29 +380,39 @@ test("a timed-out taskkill whose root has exited still names a child it reported
       }
     });
 
-  await assert.rejects(stop([5678]), (error) => {
+  await assert.rejects(stop([5678, 56]), (error) => {
     assert.equal(error.orphans, true);
     assert.deepEqual(error.stillRunning, [5678]);
     assert.match(error.message, /did not end within 1000 ms\.\nStill running: PID 5678\.$/);
     return true;
   });
-  const outcome = await stop([]);
+  const outcome = await stop([56]);
   assert.equal(outcome.delivered, true);
 });
 
 test("terminateProcessTree on Windows starts no taskkill when its deadline has passed", async () => {
+  const stop = (deadline, killImpl) =>
+    terminateProcessTree(1234, {
+      platform: "win32",
+      deadline,
+      runCommandImpl() {
+        throw new Error("taskkill should not start");
+      },
+      killImpl
+    });
+  const alive = (pid, signal) => {
+    assert.deepEqual([pid, signal], [1234, 0]);
+    return true;
+  };
+
+  // An exited pid may be reused, so it counts as gone and the caller clears it.
+  const gone = await stop(Date.now() - 1000, () => {
+    throw Object.assign(new Error("no such process"), { code: "ESRCH" });
+  });
+  assert.deepEqual(gone, { attempted: false, delivered: false, method: null });
   for (const deadline of [Date.now(), Date.now() - 1000]) {
     await assert.rejects(
-      terminateProcessTree(1234, {
-        platform: "win32",
-        deadline,
-        runCommandImpl() {
-          throw new Error("taskkill should not start");
-        },
-        killImpl() {
-          throw new Error("kill fallback should not run");
-        }
-      }),
+      stop(deadline, alive),
       (error) => {
         assert.equal(error.code, "ETIMEDOUT");
         assert.equal(error.message, "taskkill /PID 1234 /T /F was not started: no time was left.");

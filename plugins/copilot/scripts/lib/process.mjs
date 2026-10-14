@@ -280,6 +280,10 @@ export async function terminateProcessTree(pid, options = {}) {
     if (hasDeadline(options)) {
       timeoutMs = options.deadline - Date.now();
       if (timeoutMs <= 0) {
+        // An exited pid may be reused, so the caller must clear it, not keep it for a retry.
+        if (!isAlive(pid, killImpl)) {
+          return { attempted: false, delivered: false, method: null };
+        }
         throw Object.assign(new Error(`taskkill /PID ${pid} /T /F was not started: no time was left.`), {
           code: "ETIMEDOUT"
         });
@@ -312,7 +316,11 @@ export async function terminateProcessTree(pid, options = {}) {
     // A root that has exited is stopped, and its pid may be reused, so a retry must not get it. Only
     // the children that taskkill named before it ran out of time can be checked, and with no wait.
     if (result.error?.code === "ETIMEDOUT" && !isAlive(pid, killImpl)) {
-      const stillRunning = namedByTaskkill(result).filter((candidate) => isAlive(candidate, killImpl));
+      // A line cut off by the stop could hold a short, wrong PID.
+      const wholeLines = (text) => text.slice(0, text.lastIndexOf("\n") + 1);
+      const stillRunning = namedByTaskkill({ stdout: wholeLines(result.stdout), stderr: wholeLines(result.stderr) }).filter(
+        (candidate) => isAlive(candidate, killImpl)
+      );
       if (stillRunning.length === 0) {
         return { attempted: true, delivered: true, method: "taskkill", result };
       }

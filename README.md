@@ -378,12 +378,13 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
   as a Claude session ends, the job stays, and `/copilot:result` shows the same note. Copilot starts
   short-lived `gh.exe` children that exit while `taskkill` stops the tree, and Codex reports such a
   cancel as failed. The reason is correctness.
-- On Windows, each `taskkill` has a time limit: 5 seconds for cancel, and the hook's own deadline
-  when a Claude session ends. A `taskkill` that does not end in time is stopped. If the process it
-  was stopping is still alive, the stop did not finish, so the job keeps its process id and you can
-  run `/copilot:cancel <job id>` again. A process that has exited counts as stopped, but a child
-  that `taskkill` named and that is still alive is named, as above. Codex waits
-  for `taskkill` with no limit, so a `taskkill` that stalls holds cancel or the hook. The reason is
+- On Windows, each `taskkill` has a time limit: the hook's own deadline when a Claude session ends,
+  and 5 seconds for every other stop, such as cancel or the stop of Copilot after a run. A
+  `taskkill` that does not end in time is stopped. When the hook has no time left, no `taskkill`
+  starts. If the process is still alive, the stop did not finish, so the job keeps its process id
+  and you can run `/copilot:cancel <job id>` again. A process that has exited counts as stopped,
+  but a child that `taskkill` named and that is still alive is named, as above. Codex waits for
+  `taskkill` with no limit, so a `taskkill` that stalls holds cancel or the hook. The reason is
   correctness.
 - A background task's record is written before its worker starts. Codex starts the worker first, and
   a worker that finds no record leaves the job queued forever. If the worker cannot start, or stops

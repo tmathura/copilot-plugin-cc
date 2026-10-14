@@ -8,7 +8,8 @@
   pass its 5-second limit. Each `taskkill` now ends by the hook's deadline. A job whose stop did not
   finish in time keeps its process ids, so you can run `/copilot:cancel <job id>` again.
 - On Windows, `/copilot:cancel` gives up on a `taskkill` that takes more than 5 seconds and says
-  that the stop failed, so you can run it again. Before, it could wait with no end.
+  that the stop failed, so you can run it again. Before, it could wait with no end. The stop of
+  Copilot after a run has the same 5-second limit.
 
 ### 1.0.13
 

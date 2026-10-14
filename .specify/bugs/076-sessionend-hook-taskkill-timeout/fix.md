@@ -80,6 +80,17 @@ const stopDeadline = Date.now() + Math.max(0, Math.min(STOP_WAIT_MS, timeLeft() 
   helper, `namedByTaskkill`, used by both paths. New test: "a timed-out taskkill whose root has
   exited still names a child it reported that stays alive". Children that `taskkill` never named
   cannot be known (assessment, Risks).
+- 2026-10-14, PR review round 1 (CodeRabbit): with no time left before the deadline, a pid that
+  has already exited now counts as gone (`{ attempted: false, delivered: false, method: null }`),
+  so the caller clears it; only a live pid gets the `ETIMEDOUT` error and is kept. Reason: the same
+  pid-reuse rule as above. The assessment said that with no time left the stop always counts as not
+  finished. The test "starts no taskkill when its deadline has passed" covers both cases.
+- 2026-10-14, PR review round 1 (code-review): after a timed-out `taskkill`, only whole lines of its
+  output are read, because a line cut off by the stop could hold a short, wrong PID that names an
+  unrelated process. The orphan test now ends its output with a cut-off line. Accepted limit: a
+  complete last line with no line end is dropped too, so a child named only there is not reported. The README and
+  CHANGELOG say that the 5000 ms limit covers every stop without a deadline, not only cancel, and
+  that no `taskkill` starts when the hook has no time left.
 
 ## Follow-ups
 
