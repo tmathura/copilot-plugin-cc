@@ -181,7 +181,9 @@ fix and test only for a ticket that used bug triage.
 - Starting `workflow-start` counts as permission for every commit, push and PR it makes. It does
   **not** give permission to merge into `main`. Merge only after the user answers the Step 9 question.
   It does not give permission to publish a release either. Publish only after the user answers the
-  Step 9 release question.
+  Step 9 release question. The one exception: starting `workflow-auto` without `--ask-merge` gives
+  permission to merge each PR that Step 9 finds ready, and to publish each release whose release
+  run allows publishing.
 - Never commit or push on `main`.
 - Never `git add .` or `git add -A`. Stage files by name, or use `git add -u`.
 - If a hook fails, fix the cause and make a new commit. Never use `--no-verify`. Never `--amend` after
@@ -362,6 +364,119 @@ For a release, pick the level by what users see (SemVer, as the constitution say
 Then, in the same PR: run `npm run bump-version -- X.Y.Z`, add the `CHANGELOG.md` entry below, and
 say the level and the reason in the PR body. The version files and the `CHANGELOG.md` entry do not
 count toward the 3-file limit. Each user-facing ticket is its own release; do not batch.
+
+### Release run
+
+The run that Principle VI asks for before a release is published. The owner or Claude does it after
+the merge, on the owner's system, on the merge commit. It covers what Principle VI lists, nothing
+more. Claude does it as in PR #24 ("Manual run (T083)"), with no new script.
+
+**Where.** Only on the owner's system, which is Windows today: if `node -p process.platform` does
+not print `win32`, the run is `unsure` and nothing is created.
+
+**Safety.** Use the real `claude` and `copilot` CLIs and the logins already there. Never print or
+store a token. Never print the environment (`env` or `printenv` with no command, `set -x`). The
+table notes are short summaries in your own words, not raw output.
+
+**Record.** Keep a record in `$WT_ROOT/release-run-X.Y.Z.md`. The record and the three paths below
+are under `$WT_ROOT`, not in a session's scratchpad, so a new session can find and delete them. The
+record holds: the PR, the version, the merge commit, the three paths, the throwaway repo's first
+commit, the companion session id, each job id with its pids as it starts, each step's result as it
+ends, whether the table is posted, the state `open`, and the time of the last update. Before a
+run, look at each `$WT_ROOT/release-run-*.md` whose last update is more than 2 hours old (a crash
+cut it off; a newer one can belong to a run in another session), and at this session's own record
+after a summary (the summary or the `workflow-auto` report names the version). After a summary,
+first wait until this session's background calls of that run have ended; then go on with the run
+from the record if you can, and otherwise clean it up. If a record is still
+`open`, clean it up with the cleanup below; its unfinished steps are `unsure`. If its table is not
+posted, post it.
+
+**Setup.**
+
+1. The three paths are the release worktree `$WT_ROOT/release-X.Y.Z`, the throwaway repo
+   `$WT_ROOT/release-repo-X.Y.Z` and the data folder `$WT_ROOT/release-data-X.Y.Z`. Check
+   that none of them exists. An empty folder that is not in `git worktree list` (one the OS locked
+   after an earlier cleanup) counts as not there. If one exists, create nothing and run no cleanup:
+   the run is `unsure`, report the path, and post the table.
+2. Write the record. Whatever exists at those paths from now on belongs to this run.
+3. `git -C "$MAIN" worktree add --detach "$WT_ROOT/release-X.Y.Z" <merge commit>`. The main
+   checkout is not touched.
+4. Make the throwaway repo: `git init`, one commit, one staged change and one untracked file. Write
+   the first commit's SHA to the record.
+
+**Commands.** Run every command in the throwaway repo, with `env -u COPILOT_COMPANION_PLUGIN_DATA`,
+so nothing touches the installed plugin's jobs or gate. Use a subshell, `(cd "<repo>" && <command>)`,
+so the shell does not stay in the throwaway repo: from there the `MAIN=` line would find the wrong
+repo, and Windows cannot delete a folder that a shell is in.
+
+- Slash commands: `env -u COPILOT_COMPANION_PLUGIN_DATA -u CLAUDE_PLUGIN_DATA claude -p --settings '{"enabledPlugins":{"copilot@tmathura-copilot":false}}' --plugin-dir "$WT_ROOT/release-X.Y.Z/plugins/copilot" '/copilot:<command> <args>'`.
+  `--settings` turns off the installed plugin of the same name for this run, so the commands come
+  from the merge commit. The commands carry their own `allowed-tools`.
+- Steps that need several turns in one session call the companion directly, with a fixed session
+  id and the data folder:
+  `env -u COPILOT_COMPANION_PLUGIN_DATA CLAUDE_PLUGIN_DATA="<data folder>" COPILOT_COMPANION_SESSION_ID=<id> node "$WT_ROOT/release-X.Y.Z/plugins/copilot/scripts/copilot-companion.mjs" <command> <args>`.
+  The Stop hook is `scripts/stop-review-gate-hook.mjs`, run the same way.
+- Run the Stop hook and the `claude -p` reviews as background Bash calls (`run_in_background`). They
+  can take longer than the 600 s limit of a foreground call. A call that runs more than 30 minutes
+  is stopped (`TaskStop`), and its step is `unsure`.
+- Write a path that a program reads from a file (the hook input) in the form that
+  `git rev-parse --show-toplevel` prints (`C:/...` on Windows), not as `/c/...`.
+
+**Steps.**
+
+| Step | Pass when |
+| --- | --- |
+| 1 `/copilot:setup` | It says ready |
+| 2 `/copilot:review --wait` | A review. `git status --porcelain` and `git stash list` are the same before and after |
+| 3 `/copilot:adversarial-review --wait` | A verdict. The repo is unchanged |
+| 4 A background `task --background --write` (a small change), then `status` and `result` | The job completes, `result` shows its output, and `git status --porcelain` shows the change |
+| 5 A background task, then `cancel` while it runs | The job is `cancelled`. Its `pid` and `copilotPid` (from `status --json`, read while it ran) are gone: `process.kill(pid, 0)` in `node` throws with code `ESRCH`. A pid that still answers is `fail`; any other error is `unsure`. Where Copilot's sandbox refuses the shell command, cancel a running read-only task instead |
+| 6 Reset the throwaway repo to its first commit (`git reset --hard <first commit>`, `git clean -fd`), so the gate sees only the planted bug. `setup --enable-review-gate`, make a change with an obvious bug, write `{"session_id": "<id>", "cwd": "<repo>", "last_assistant_message": "<what changed>"}` to a file in the scratchpad (not in the repo) with the file tool, and run the Stop hook with `< <file>` | The hook prints `"decision":"block"` with a reason that names the planted bug. A block for another reason is `unsure` |
+| 7 Fix the bug, write a new hook input whose `last_assistant_message` describes the fix, and run the Stop hook again | The hook ran a review (a new job in `status --json`) and does not block. A block is `unsure`, because the review is the model's opinion |
+| 8 `setup --disable-review-gate` | `setup --json` shows the gate off |
+
+Judge each step by facts where they exist (the exit code, `git status`, the pids, the hook's
+decision), not only by the model's words. Run a step that fails on timing once more before it
+counts as failed. A step is `unsure` when the run cannot start (a missing CLI, no login, setup not
+ready), when a permission is denied, when the Stop hook writes a note on stderr that the gate did
+not run, or when Claude cannot read the fact.
+
+**Cleanup.** On every exit, also after a failure, before the table is posted:
+
+1. Turn the gate off and check it with `setup --json`. A gate that `setup --json` shows on is a
+   failed step. When the throwaway repo or the data folder is already gone, the gate is gone with
+   it; when it cannot be checked otherwise, the run is `unsure`.
+2. Cancel every job of this run that has not finished, and check that its pids are gone
+   (`ESRCH`). If a pid still answers (`fail`) or cannot be read (`unsure`), keep the folders and the
+   pids in the record, which stays `open`, and stop the cleanup here. The next run tries again.
+3. `git -C "$MAIN" worktree remove --force "$WT_ROOT/release-X.Y.Z"`, `git -C "$MAIN" worktree prune`,
+   and delete the throwaway repo and the data folder. A worktree still in `git worktree list`, or a
+   folder that is not empty, makes the run `unsure`. An empty folder that the OS locks is only
+   reported.
+4. Set the record to `closed`.
+
+**Table.** Post the table (step, `pass` / `fail` / `unsure`, a short note) once, as a comment on the
+merged PR with `gh pr comment <pr> --body-file <file>`, and mark it posted in the record. If the post
+fails, or the comment cannot be found, do not publish, and keep the table in the record. Delete a
+record that is `closed` and posted.
+
+**Result.**
+
+- CI runs on pull requests only, so the merged PR's passed checks (Step 9) count for the merge
+  commit. If a CI run on the merge commit exists, wait for it (`gh run watch <run id>`); if it is
+  red, do not publish: this is handled like a failed step.
+- Every step passed: the run allows publishing. Before
+  publishing, run `git ls-remote --tags origin "vX.Y.Z" "vX.Y.Z^{}"`. A tag that exists must point
+  to the merge commit; if not, do not publish, never move the tag, and the release waits for the
+  owner.
+- A step failed: do not publish. The fix is a new ticket and a new patch release (Principle VI).
+- A step is `unsure`: do not publish. The release waits for the owner, who does the open steps by
+  hand on the merge commit, updates the table on the PR, and publishes only when every step passed.
+  If a newer version has a release by then, add `--latest=false` to `gh release create`, so the
+  newer release stays the latest.
+- If `gh release create` fails, check `gh release view vX.Y.Z`. The release counts as published only
+  when it is not a draft and its tag points to the merge commit. If not, it waits for the owner,
+  with the error.
 
 ### Publishing
 
