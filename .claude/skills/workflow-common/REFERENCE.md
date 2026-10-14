@@ -390,7 +390,9 @@ Before a run, look at each `$WT_ROOT/release-run-*.md` whose last update is more
 own records of any age (after a summary, the summary or the `workflow-auto` report names the
 version). After a summary, first wait until this session's background calls of that run have
 ended; then go on with the run from the record if you can, without running Setup again. A record that is still `open` gets the
-cleanup below; its unfinished steps are `unsure`. A record in state `manual` is not cleaned again:
+cleanup below, but without any cancel: after a crash, a recorded pid can belong to another program
+by now, and a cancel would end it (`taskkill /T /F`). Only check the pids (step 2); if one answers,
+set the state to `manual`. Its unfinished steps are `unsure`. A record in state `manual` is not cleaned again:
 report it to the owner (`workflow-auto`: "For you"; `workflow-start`: the Step 9 report). If a
 record's table is not posted, post it.
 
