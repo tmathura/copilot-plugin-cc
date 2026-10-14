@@ -198,7 +198,9 @@ Invoke `workflow-pr`. The PR body gets a short **Review rounds** section from th
 bodies.
 
 A draft PR needs a check, because bot reviewers skip drafts and Step 9 needs a PR that is not a
-draft. Read it with `gh pr view <n> --json isDraft,comments`.
+draft. Read `isDraft` with `gh pr view <n> --json isDraft`, and the comments from all pages with
+`gh api --paginate repos/tmathura/copilot-plugin-cc/issues/<n>/comments --jq '.[] | {login: .user.login, created_at, body}'`
+(`gh pr view` gives only the first 100).
 
 - Look only at the comments `workflow-auto: made draft` and `workflow-auto: resumed` that the
   owner's login posted (`gh api user --jq .login`); anyone else can type them. If the PR is

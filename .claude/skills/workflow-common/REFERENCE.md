@@ -371,8 +371,11 @@ The run that Principle VI asks for before a release is published. The owner or C
 the merge, on the owner's system, on the merge commit. It covers what Principle VI lists, nothing
 more. Claude does it as in PR #24 ("Manual run (T083)"), with no new script.
 
-**Where.** Only on the owner's system, which is Windows today: if `node -p process.platform` does
-not print `win32`, the run is `unsure` and nothing is created.
+**Where.** Only on the owner's system, which is Windows today. If `node -p process.platform` does
+not print `win32`, the run is `unsure`: claim the version and write the record (Setup steps 1 and
+2, but create no path), with the result `waits`, so the release waits for the owner and later runs
+see it. Such a record (no paths, result `waits`) is the one record the owner may delete, so that a
+run on the owner's system can claim the version.
 
 **Safety.** Use the real `claude` and `copilot` CLIs and the logins already there. Never print or
 store a token. Never print the environment (`env` or `printenv` with no command, `set -x`). The
@@ -534,15 +537,16 @@ commit, `published` once the release counts as published, and `waits` for every 
   who finds the table in the record and posts it.
 - Every step passed, the cleanup state is `closed`, and the table is on the PR: the run allows
   publishing. (Cleanup that is not `closed` makes the run `unsure`.) Before publishing, run
-  `git -C "$MAIN" ls-remote --tags origin "vX.Y.Z" "vX.Y.Z^{}"` (the main checkout; the throwaway
-  repo has no `origin`). If the command fails, do not publish: the
-  release waits for the owner. Empty output from a command that worked means there is no tag. A tag
+  `git -C "$MAIN" ls-remote origin "refs/tags/vX.Y.Z" "refs/tags/vX.Y.Z^{}"` (full ref names, so a
+  tag such as `release/vX.Y.Z` does not match; the main checkout, because the throwaway repo has
+  no `origin`). If the command fails, do not publish: the release waits for the owner. Empty output from a command that worked means there is no tag. A tag
   that exists must point to the merge commit; if not, do not publish, never move the tag, and the
   release waits for the owner.
 - A step failed: do not publish. The fix is a new ticket and a new patch release (Principle VI).
   Write `fix ticket: creating` to the record, then create that ticket with `workflow-ticket`, with
-  the line `Release fix: vX.Y.Z, step <n>` in its body (`step ci` for a red CI run), and write its
-  number to the record. If it cannot be created, or a record still says `creating` with no number
+  the line `Release fix: vX.Y.Z, step <n>` in its body (`step ci` for a red CI run), and a note
+  that its `CHANGELOG.md` entry must also say what vX.Y.Z changed ("Release" in
+  `docs/development.md`). Write its number to the record. If it cannot be created, or a record still says `creating` with no number
   (a crash), the record is not finished: the owner looks for the ticket with
   `gh issue list --state all --author @me --search '"Release fix: vX.Y.Z" in:body'`, creates it if
   there is none, and writes its number to the record. When the PR's own ticket already
