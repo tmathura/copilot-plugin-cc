@@ -446,9 +446,12 @@ not run, or when Claude cannot read the fact.
 1. Turn the gate off and check it with `setup --json`. A gate that `setup --json` shows on is a
    failed step. When the throwaway repo or the data folder is already gone, the gate is gone with
    it; when it cannot be checked otherwise, the run is `unsure`.
-2. Cancel every job of this run that has not finished, and check that its pids are gone
-   (`ESRCH`). If a pid still answers (`fail`) or cannot be read (`unsure`), keep the folders and the
-   pids in the record, which stays `open`, and stop the cleanup here. The next run tries again.
+2. Cancel every job of this run that has not finished. Then read `status --all --json` from the
+   data folder (it also lists the Stop hook's jobs). A `cancelled` or `failed` job that still names
+   a pid has a stop that did not finish: cancel it again by job id. Every pid it names must then be
+   gone (`ESRCH`). If a pid still answers (`fail`) or cannot be read (`unsure`), keep the folders
+   and the pids in the record, which stays `open`, and stop the cleanup here. The next run tries
+   again.
 3. `git -C "$MAIN" worktree remove --force "$WT_ROOT/release-X.Y.Z"`, `git -C "$MAIN" worktree prune`,
    and delete the throwaway repo and the data folder. A worktree still in `git worktree list`, or a
    folder that is not empty, makes the run `unsure`: write what is left to the record, which stays
