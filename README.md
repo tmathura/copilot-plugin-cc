@@ -433,8 +433,9 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
   removes the session's finished jobs and the jobs it stopped. A job that another session, or the
   same session after `claude --resume`, starts in the meantime stays. A job whose processes could
   not be stopped keeps its record, so `/copilot:cancel` can try again. All of this ends inside the
-  hook's 5-second timeout. Codex removes the session's jobs from an earlier copy of the state, which
-  can drop a job that was added in the meantime.
+  hook's 5-second timeout. On Windows, the `taskkill` calls for all the jobs run at the same time;
+  each one takes about a second, and Codex runs them one after another. Codex removes the session's
+  jobs from an earlier copy of the state, which can drop a job that was added in the meantime.
 - The companion and the hooks read stdin in a way that waits when the pipe has no data yet. Codex
   reads it in one call, which can fail on a non-blocking pipe, for example on macOS, when the input
   is large.

@@ -3,7 +3,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -33,8 +33,12 @@ function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+// The pid of an exited child can go to a new process at once on Windows. Linux and macOS never hand
+// out this pid, and Windows pids stay far below it.
 function deadPid() {
-  return spawnSync(process.execPath, ["-e", ""]).pid;
+  const pid = 2147483644;
+  assert.throws(() => process.kill(pid, 0), { code: "ESRCH" });
+  return pid;
 }
 
 function writeLock(lockFile, owner) {

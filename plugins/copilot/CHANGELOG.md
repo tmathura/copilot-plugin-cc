@@ -2,6 +2,15 @@
 
 ## Copilot plugin
 
+### 1.0.13
+
+- On Windows, when a Claude session ends with several running jobs, the plugin stops them all at
+  the same time, in about a second. Before, it stopped them one after another, about a second
+  each, so with three jobs Claude Code could stop the hook at its 5-second limit before it removed
+  the stopped jobs.
+- On Windows, `/copilot:cancel` stops the companion and its Copilot process at the same time, so it
+  ends about a second sooner.
+
 ### 1.0.12
 
 - On Windows, when `/copilot:cancel` cannot stop a child process that the job does not track, and
