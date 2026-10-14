@@ -379,38 +379,71 @@ store a token. Never print the environment (`env` or `printenv` with no command,
 table notes are short summaries in your own words, not raw output.
 
 **Record.** Keep a record in `$WT_ROOT/release-run-X.Y.Z.md`. The record and the three paths below
-are under `$WT_ROOT`, not in a session's scratchpad, so a new session can find and delete them. The
-record holds: the PR, the version, the merge commit, the three paths, the throwaway repo's first
-commit, the companion session id, each job id with its pids as it starts, when each `claude -p`
-call starts and ends, each step's result as it ends, cancel messages, whether the table is posted, the state (`open`, `manual` or `closed`), and
-the time of the last update.
+are under `$WT_ROOT`, not in a session's scratchpad, so a new session can find them. The record is
+the version's claim and its history, so it is never deleted. It holds:
 
-Before a run, look at each `$WT_ROOT/release-run-*.md` whose last update is more than 2 hours old
-(a crash cut it off; a newer one can belong to a run in another session), and at this session's
-own records of any age (after a summary, the summary or the `workflow-auto` report names the
-version). After a summary, first wait until this session's background calls of that run have
-ended; then go on with the run from the record if you can, without running Setup again. A record that is still `open` gets the
-cleanup below, but without any cancel: after a crash, a recorded pid can belong to another program
-by now, and a cancel would end it (`taskkill /T /F`). Only check the pids (step 2); if one answers,
-set the state to `manual`. Its unfinished steps are `unsure`. A record in state `manual` is not cleaned again:
-report it to the owner (`workflow-auto`: "For you"; `workflow-start`: the Step 9 report). If a
-record's table is not posted, post it.
+- the PR and its ticket, the version and the merge commit;
+- the three paths, each marked `created` once this run made it, or `existed before` when Setup
+  found it there; and the throwaway repo's first commit;
+- the companion session id, each job id with its pids as it starts, and when each `claude -p` call
+  starts and ends;
+- each step's result as it ends, and cancel messages;
+- whether the table is posted;
+- the cleanup state: `open`, `manual` or `closed`;
+- the result, set by "Result": `failed`, `waits` or `published`;
+- the fix ticket's number, for a `failed` result;
+- the time of the last update.
+
+A record is finished when its cleanup state is `closed`, its table is posted, and one of these is
+true:
+
+- its result is `published`;
+- its result is `failed` and it names a fix ticket;
+- it has the line `checked by owner`. The owner adds it when nothing more is to be done, for
+  example for a `failed` release fix (which gets no new fix ticket, "Result") or a version the
+  owner decides not to publish.
+
+Claude never writes `checked by owner`, never sets a `manual` record to `closed`, and never sets
+`published` on a record whose run it did not do: those are the owner's.
+
+Before a run, read every record:
+
+- This session's own record (after a summary, the summary or the `workflow-auto` report names the
+  version) whose result is not set and whose cleanup state is not `manual`: wait until its
+  background calls have ended, then go on with the run from the record, without running Setup
+  again.
+- Any record whose table is not posted, whose PR is known, and whose run has ended (cleanup state
+  `closed` or `manual`, or a last update more than 2 hours old): post its table as "Table" says,
+  with unfinished steps as `unsure`. A run that may still be going posts its own.
+- Any other record that is not finished, this session's own too: do not touch it otherwise. Report it to the owner
+  (`workflow-auto`: "For you"; `workflow-start`: the Step 9 report), and say whether its last
+  update is less than 2 hours old: then it may be a live run in another session. `workflow-auto`
+  stops before the queue. The owner first checks that the run is not live (its last update and its
+  pids), then finishes it by hand: stops the leftover processes (check the name in Task Manager
+  first, because pids are reused), deletes only the paths this run created (a path that was
+  there before the run is resolved by hand, not deleted), posts the table, creates the fix ticket or
+  publishes, and updates the record.
 
 **Setup.**
 
-1. Claim the version by creating the record, in a way that fails when it exists:
-   `(set -o noclobber; : > "$WT_ROOT/release-run-X.Y.Z.md")`. Only one run can claim a version.
-   If the create fails, the run is `unsure`: report the error, and touch no path and no record.
+1. Run `gh release view vX.Y.Z`. If the command fails for another reason than "release not found",
+   stop: the release waits for the owner. If it shows a release that is not a draft and whose tag
+   points to the merge commit, there is nothing to run. A release that does not match waits for
+   the owner. Otherwise claim the version by creating the record, in a way that fails when it
+   exists: `(set -o noclobber; : > "$WT_ROOT/release-run-X.Y.Z.md")`. Only one run can claim a
+   version. If the create fails, touch no path and no record, and report it to the owner: the
+   version was claimed before (its record says how that run ended), or the file could not be made.
 2. Write the record. The three paths are the release worktree `$WT_ROOT/release-X.Y.Z`, the
    throwaway repo `$WT_ROOT/release-repo-X.Y.Z` and the data folder `$WT_ROOT/release-data-X.Y.Z`.
    Check that none of them exists. An empty folder that is not in `git worktree list` (one the OS
    locked after an earlier cleanup) counts as not there. If one exists, create nothing and run no
-   cleanup: the run is `unsure`, set the record's state to `manual` with the path that was there,
-   and post the table. Otherwise, whatever exists at those paths from now on belongs to this run.
+   cleanup: the run is `unsure`, mark that path `existed before`, set the record's state to
+   `manual`, and post the table. Otherwise mark each path `created` in the record right after
+   making it (steps 3 and 4).
 3. `git -C "$MAIN" worktree add --detach "$WT_ROOT/release-X.Y.Z" <merge commit>`. The main
    checkout is not touched.
 4. Make the throwaway repo: `git init`, one commit, one staged change and one untracked file. Write
-   the first commit's SHA to the record.
+   the first commit's SHA to the record. Make the data folder with `mkdir`.
 
 **Commands.** Run every command in the throwaway repo, with `env -u COPILOT_COMPANION_PLUGIN_DATA`,
 so nothing touches the installed plugin's jobs or gate. Use a subshell, `(cd "<repo>" && <command>)`,
@@ -470,20 +503,24 @@ not run, or when Claude cannot read the fact.
    - If a pid still answers or cannot be read, the run is `unsure`. Keep the folders, set the
      record's state to `manual`, and stop the cleanup here. The owner ends each listed process by
      hand, after checking its name in Task Manager (pids are reused). Then the owner deletes the
-     paths and the record.
-3. `git -C "$MAIN" worktree remove --force "$WT_ROOT/release-X.Y.Z"`, `git -C "$MAIN" worktree prune`,
-   and delete the throwaway repo and the data folder. A worktree still in `git worktree list`, or a
+     paths and sets the record to `closed`.
+3. For the paths the record marks `created` only: `git -C "$MAIN" worktree remove --force
+   "$WT_ROOT/release-X.Y.Z"`, `git -C "$MAIN" worktree prune`, and delete the throwaway repo and
+   the data folder. A worktree still in `git worktree list`, or a
    folder that is not empty, makes the run `unsure`: write what is left to the record, which stays
-   `open`, so the next run tries again (this needs no process to stop). An empty folder that the OS
-   locks is only reported.
+   `open`, and the owner removes it. An empty folder that the OS locks is only reported.
 4. When nothing is left but such empty folders, set the record to `closed`.
 
-**Table.** Post the table (step, `pass` / `fail` / `unsure`, a short note) once, as a comment on the
-merged PR with `gh pr comment <pr> --body-file <file>`, and mark it posted in the record. If the post
-fails, or the comment cannot be found, keep the table in the record ("Result" says what follows).
-Delete a record that is `closed` and posted.
+**Table.** The table (step, `pass` / `fail` / `unsure`, a short note) is a comment on the merged PR
+whose first line is `Release run vX.Y.Z`. Before posting, look for a comment by the owner's login
+that starts with that line (`gh pr view <pr> --json comments`). If there is one, edit it
+(`gh api -X PATCH repos/tmathura/copilot-plugin-cc/issues/comments/<id> -F body=@<file>`);
+otherwise post it with `gh pr comment <pr> --body-file <file>`. Then mark it posted in the record.
+If the post fails, or the comment cannot be found, keep the table in the record ("Result" says
+what follows).
 
-**Result.**
+**Result.** Write the result to the record: `failed` for a failed step or a red CI run on the merge
+commit, `published` once the release counts as published, and `waits` for every other outcome.
 
 - CI runs on pull requests only, so the merged PR's passed checks (Step 9) count for the merge
   commit. If a CI run on the merge commit exists, wait for it (`gh run watch <run id>`); if it is
@@ -496,14 +533,24 @@ Delete a record that is `closed` and posted.
   that exists must point to the merge commit; if not, do not publish, never move the tag, and the
   release waits for the owner.
 - A step failed: do not publish. The fix is a new ticket and a new patch release (Principle VI).
-  This holds also when the table post failed.
+  Write `fix ticket: creating` to the record, then create that ticket with `workflow-ticket`, with
+  the line `Release fix: vX.Y.Z, step <n>` in its body (`step ci` for a red CI run), and write its
+  number to the record. If it cannot be created, or a record still says `creating` with no number
+  (a crash), the record is not finished: the owner looks for the ticket with
+  `gh issue list --state all --author @me --search '"Release fix: vX.Y.Z" in:body'`, creates it if
+  there is none, and writes its number to the record. When the PR's own ticket already
+  has a `Release fix:` line, create none: the record stays not finished until the owner checks it
+  ("Record").
+  This rule wins over the one for a table that is not on the PR: a failed post alone does not
+  retire the version, but it does not save a version whose step failed.
 - A step is `unsure`: do not publish. The release waits for the owner, who does the open steps by
   hand on the merge commit, updates the table on the PR, and publishes only when every step passed.
   If a newer version has a release by then, add `--latest=false` to `gh release create`, so the
   newer release stays the latest.
 - After `gh release create`, whether it worked or failed, check `gh release view vX.Y.Z`. The
   release counts as published only when it is not a draft and its tag points to the merge commit.
-  If not, it waits for the owner, with what you found.
+  If not, it waits for the owner, with what you found. Once it counts as published, set the result
+  to `published` (the owner does the same after publishing by hand).
 
 ### Publishing
 

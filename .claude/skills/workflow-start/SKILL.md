@@ -251,9 +251,10 @@ To merge:
    result allows publishing, show the `CHANGELOG.md` summary and the generated notes preview, and
    ask: **Publish (Recommended)** / **Not now**. On **Publish**, run the publish command from
    REFERENCE.md. Otherwise follow "Result" in "Release run".
-8. Report the PR URL, the merge commit on `main`, the release URL if there is one, a release run
-   record left in state `manual` and what it asks of the owner, the rounds of
-   each loop, any rejected findings, and the issue that `Closes #<n>` closed. If the defect also
+8. Report the PR URL, the merge commit on `main`, the release URL if there is one, and the fix
+   ticket for a failed release. Report each release run record that is not finished ("Record" in
+   REFERENCE.md), with what it asks of the owner. Report the rounds
+   of each loop, any rejected findings, and the issue that `Closes #<n>` closed. If the defect also
    exists in codex-plugin-cc and upstream has not fixed it ("Tickets", Upstream), say so. The owner
    reports it upstream, or finds the upstream issue that already reports it. Give the owner the
    command to run with that upstream issue number:
