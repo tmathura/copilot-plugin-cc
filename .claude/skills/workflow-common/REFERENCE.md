@@ -482,7 +482,9 @@ counts as failed. A step is `unsure` when the run cannot start (a missing CLI, n
 ready), when a permission is denied, when the Stop hook writes a note on stderr that the gate did
 not run, or when Claude cannot read the fact.
 
-**Cleanup.** On every exit, also after a failure, before the table is posted:
+**Cleanup.** On every exit, also after a failure, before the table is posted. The one exception is
+a Setup that found a path that existed before: that run created nothing, so it runs no cleanup and
+does not touch the gate or any job.
 
 1. Turn the gate off and check it with `setup --json`. A gate that `setup --json` shows on is a
    failed step. When the throwaway repo or the data folder is already gone, the gate is gone with
@@ -513,7 +515,10 @@ not run, or when Claude cannot read the fact.
 
 **Table.** The table (step, `pass` / `fail` / `unsure`, a short note) is a comment on the merged PR
 whose first line is `Release run vX.Y.Z`. Before posting, look for a comment by the owner's login
-that starts with that line (`gh pr view <pr> --json comments`). If there is one, edit it
+that starts with that line, in all pages:
+`gh api --paginate repos/tmathura/copilot-plugin-cc/issues/<pr>/comments --jq '.[] | select(.user.login == "<owner login>" and (.body | startswith("Release run vX.Y.Z"))) | .id'`
+(the `id` is the number the edit needs). If there are several, use the newest (the last id). If
+there is one, edit it
 (`gh api -X PATCH repos/tmathura/copilot-plugin-cc/issues/comments/<id> -F body=@<file>`);
 otherwise post it with `gh pr comment <pr> --body-file <file>`. Then mark it posted in the record.
 If the post fails, or the comment cannot be found, keep the table in the record ("Result" says
