@@ -95,7 +95,7 @@ as a decision. With no decision, the ticket runs as before, and the same stop ho
 | Step 9 point 1: the head changed, or a check fails at merge time | Back to the review loops, then merge when Step 9 finds the new head ready. With `--ask-merge`, ask again. |
 | The plan's Constitution Check marks a principle "not met" (it needs the owner's approval) | Not done |
 | Step 9 point 3: the PR is not `MERGED` | Not done |
-| Publish the release | Do the release run (REFERENCE.md) without asking. If it allows publishing: publish; with `--ask-merge`, ask after the run. A step failed: create the fix ticket with `workflow-ticket`; in a backlog run it runs next, so a later release does not fail on the same defect. A step is `unsure`: list the release under "For you". |
+| Publish the release | Do the release run (REFERENCE.md) without asking. If it allows publishing: publish; with `--ask-merge`, ask after the run. A step failed: create the fix ticket with `workflow-ticket`; in a backlog run it runs next, so a later release does not fail on the same defect. When "Result" says the release waits for the owner (an `unsure` step, a table that is not on the PR, a tag on another commit): list the release under "For you". |
 | More than 3 hand-written files | Not done, with the proposed split into tickets |
 | A test would need changing, an environment problem, or a fix still fails after 3 tries | Not done |
 | An unclear review finding | Not done |

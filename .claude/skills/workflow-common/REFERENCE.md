@@ -433,7 +433,7 @@ repo, and Windows cannot delete a folder that a shell is in.
 | 2 `/copilot:review --wait` | A review. `git status --porcelain` and `git stash list` are the same before and after |
 | 3 `/copilot:adversarial-review --wait` | A verdict. The repo is unchanged |
 | 4 A background `task --background --write` (a small change), then `status` and `result` | The job completes, `result` shows its output, and `git status --porcelain` shows the change |
-| 5 A background task, then `cancel` while it runs | `cancel` exits 0 and the job is `cancelled`. A cancel that says the job already completed or already failed means the task ended first: run the step once more with a longer task; if it happens again, the step is `unsure`. Any other failed cancel is `fail`; write its message to the record. Its `pid` and `copilotPid` (from `status --json`, read while it ran) are gone: `process.kill(pid, 0)` in `node` throws with code `ESRCH`. A pid that still answers is `fail`; any other error is `unsure`. Where Copilot's sandbox refuses the shell command, cancel a running read-only task instead |
+| 5 A background task, then `cancel` while it runs | `cancel` exits 0 and the job is `cancelled`. A cancel that says the job already completed or already failed means the task ended first: run the step once more with a longer task; if it happens again, the step is `unsure`. Any other failed cancel is `fail`; write its message to the record. Its `pid` and `copilotPid` (from `status --json`, read while it ran, and written to the record) are gone: `process.kill(pid, 0)` in `node` throws with code `ESRCH`. A pid that still answers is `fail`; any other error is `unsure`. Where Copilot's sandbox refuses the shell command, cancel a running read-only task instead |
 | 6 Reset the throwaway repo to its first commit (`git reset --hard <first commit>`, `git clean -fd`), so the gate sees only the planted bug. `setup --enable-review-gate`, make a change with an obvious bug, write `{"session_id": "<id>", "cwd": "<repo>", "last_assistant_message": "<what changed>"}` to a file in the scratchpad (not in the repo) with the file tool, and run the Stop hook with `< <file>` | The hook prints `"decision":"block"` with a reason that names the planted bug. A block for another reason is `unsure` |
 | 7 Fix the bug, write a new hook input whose `last_assistant_message` describes the fix, and run the Stop hook again | The hook ran a review (a new job in `status --json`) and does not block. A block is `unsure`, because the review is the model's opinion |
 | 8 `setup --disable-review-gate` | `setup --json` shows the gate off |
@@ -449,16 +449,18 @@ not run, or when Claude cannot read the fact.
 1. Turn the gate off and check it with `setup --json`. A gate that `setup --json` shows on is a
    failed step. When the throwaway repo or the data folder is already gone, the gate is gone with
    it; when it cannot be checked otherwise, the run is `unsure`.
-2. Cancel every job of this run that has not finished. Then read `status --all --json` from the
-   data folder (it also lists the Stop hook's jobs). A `cancelled` or `failed` job that still names
-   a pid has a stop that did not finish: cancel it again by job id. A cancel that says the job
-   already completed or failed is fine. After the last cancel, check that the pids it names are
-   gone (`ESRCH`). If that cancel failed for another reason, or a pid still answers or cannot be
-   read, the run is `unsure`: keep the folders, set the record's state to `manual`, and write to it
-   the cancel messages and the command to retry the cancel (the companion command above, with the
-   data folder). Stop the cleanup here. The owner retries the cancel, ends a process by hand only
-   after checking its name in Task Manager (pids are reused), deletes the paths, and then deletes
-   the record.
+2. Stop the run's processes:
+   - Cancel every job of this run that has not finished.
+   - Read `status --all --json` from the data folder. It also lists the Stop hook's jobs. Cancel
+     again, by job id, each `cancelled` or `failed` job that still names a pid.
+   - A cancel that says the job already completed or failed is fine. Write the message of every
+     other failed cancel to the record, as step 5 does.
+   - Check every pid in the record: the job pids, and the pids that the cancel messages name. Each
+     must be gone (`ESRCH`).
+   - If a pid still answers or cannot be read, the run is `unsure`. Keep the folders, set the
+     record's state to `manual`, and stop the cleanup here. The owner ends each listed process by
+     hand, after checking its name in Task Manager (pids are reused). Then the owner deletes the
+     paths and the record.
 3. `git -C "$MAIN" worktree remove --force "$WT_ROOT/release-X.Y.Z"`, `git -C "$MAIN" worktree prune`,
    and delete the throwaway repo and the data folder. A worktree still in `git worktree list`, or a
    folder that is not empty, makes the run `unsure`: write what is left to the record, which stays
@@ -468,19 +470,21 @@ not run, or when Claude cannot read the fact.
 
 **Table.** Post the table (step, `pass` / `fail` / `unsure`, a short note) once, as a comment on the
 merged PR with `gh pr comment <pr> --body-file <file>`, and mark it posted in the record. If the post
-fails, or the comment cannot be found, do not publish, and keep the table in the record. Delete a
-record that is `closed` and posted.
+fails, or the comment cannot be found, keep the table in the record ("Result" says what follows).
+Delete a record that is `closed` and posted.
 
 **Result.**
 
 - CI runs on pull requests only, so the merged PR's passed checks (Step 9) count for the merge
   commit. If a CI run on the merge commit exists, wait for it (`gh run watch <run id>`); if it is
   red, do not publish: this is handled like a failed step.
-- Every step passed: the run allows publishing. Before
-  publishing, run `git ls-remote --tags origin "vX.Y.Z" "vX.Y.Z^{}"`. A tag that exists must point
+- The table is not on the PR (the post failed): do not publish. The release waits for the owner,
+  who finds the table in the record and posts it.
+- Every step passed and the table is on the PR: the run allows publishing. Before publishing, run `git ls-remote --tags origin "vX.Y.Z" "vX.Y.Z^{}"`. A tag that exists must point
   to the merge commit; if not, do not publish, never move the tag, and the release waits for the
   owner.
 - A step failed: do not publish. The fix is a new ticket and a new patch release (Principle VI).
+  This holds also when the table post failed.
 - A step is `unsure`: do not publish. The release waits for the owner, who does the open steps by
   hand on the merge commit, updates the table on the PR, and publishes only when every step passed.
   If a newer version has a release by then, add `--latest=false` to `gh release create`, so the
