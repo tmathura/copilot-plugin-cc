@@ -206,7 +206,9 @@ draft. Read `isDraft` with `gh pr view <n> --json isDraft`, and the comments fro
   owner's login posted (`gh api user --jq .login`); anyone else can type them. If the PR is
   a draft and the later of these is `made draft`, then `workflow-auto` made the draft. After the
   push, comment `workflow-auto: resumed`, then run `gh pr ready <n>`.
-- Leave any other draft as it is: the owner made it.
+- Leave any other draft as it is: the owner made it. Stop before Step 8b, because bot reviewers
+  skip drafts and the poll would only time out. Report that the PR is an owner's draft; the owner
+  marks it ready by hand. (Under `workflow-auto`, the ticket is Not done.)
 - A resume that starts after this step does this check at once.
 
 ## Step 8b. PR review loop
