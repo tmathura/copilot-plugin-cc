@@ -237,7 +237,8 @@ is `BEHIND` (`main` has moved on), or `mergeable` is `CONFLICTING`, "Fix first" 
 3. `git merge --no-commit --no-ff origin/main`, so the merge stays staged for Steps 5 and 6. If it
    stops on a conflict that needs a decision, run `git merge --abort`, then stop and ask. Resolve
    any other conflict and stage the result. If it says `Already up to date`, the branch has `main`
-   already: read the state again, and if it still shows `BEHIND` or `CONFLICTING`, stop and report.
+   already: read the state again. If it still shows `BEHIND` or `CONFLICTING`, stop and report.
+   Otherwise skip point 4 and run the readiness checks again.
 4. Steps 5 and 6 on the staged merge (`git diff --cached`). Stage each fix (`git add -u`, or
    `git add <path>` for a new file). Then commit with `git commit -F <file>`, with a message in the
    "Naming" format and the description `Merge origin/main` (as `workflow-commit` writes it). Git
