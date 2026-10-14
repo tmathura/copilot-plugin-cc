@@ -38,6 +38,10 @@ Do not end the turn between steps. Do not write "continue?" in chat. End the tur
 questions above, for a background wait (say in one line what you are waiting for), or at the end of
 the run. If the user says to stop at a step, ask at that step.
 
+When `workflow-auto` runs this skill, the answers in `workflow-auto` replace these questions, and
+the turn does not end to ask. With `--ask-merge`, the merge and release questions are still asked.
+Step 9's readiness checks and `--match-head-commit` still apply.
+
 ## Input
 
 `$ARGUMENTS` is a ticket id (`12` or `#12`), or empty, or `new`.
@@ -70,7 +74,7 @@ planning folder.
 2. Enter its worktree (see "Worktrees" in REFERENCE.md). If it has no worktree, invoke
    `workflow-branch` to add one.
 3. Find where the run stopped from `git status`, `git log origin/main..HEAD` and
-   `gh pr view --json number,state,url,reviewDecision`. Having no PR is fine.
+   `gh pr view --json number,state,url,reviewDecision,isDraft`. Having no PR is fine.
 4. If the worktree has no `.claude/skills/workflow-common/REFERENCE.md` (its branch was made
    before the workflow skills were in the repo under these names), bring them in before anything
    else:
@@ -193,11 +197,25 @@ the outcome of each finding.
 Invoke `workflow-pr`. The PR body gets a short **Review rounds** section from the Step 7b commit
 bodies.
 
+A draft PR needs a check, because bot reviewers skip drafts and Step 9 needs a PR that is not a
+draft. Read `isDraft` with `gh pr view <n> --json isDraft`, and the comments from all pages with
+`gh api --paginate repos/tmathura/copilot-plugin-cc/issues/<n>/comments --jq '.[] | {login: .user.login, created_at, body}'`
+(`gh pr view` gives only the first 100).
+
+- Look only at the comments `workflow-auto: made draft` and `workflow-auto: resumed` that the
+  owner's login posted (`gh api user --jq .login`); anyone else can type them. If the PR is
+  a draft and the later of these is `made draft`, then `workflow-auto` made the draft. After the
+  push, comment `workflow-auto: resumed`, then run `gh pr ready <n>`.
+- Leave any other draft as it is: the owner made it. Stop before Step 8b, because bot reviewers
+  skip drafts and the poll would only time out. Report that the PR is an owner's draft; the owner
+  marks it ready by hand. (Under `workflow-auto`, the ticket is Not done.)
+- A resume that starts after this step does this check at once.
+
 ## Step 8b. PR review loop
 
 Run the PR review loop (REFERENCE.md) until it ends.
 
-## Step 9. Merge (always ask)
+## Step 9. Merge (always ask, unless `workflow-auto` answers)
 
 The PR is ready when all of these are true:
 
@@ -232,11 +250,15 @@ To merge:
 5. Run the "Cleanup" commands in `workflow-branch`. `git branch -D` is safe only after the check
    in point 3. A squash merge makes the branch look unmerged to `git branch -d`.
 6. Run `git -C "$MAIN" pull --ff-only origin main`.
-7. If the PR raised the plugin version, it is a release (see "Release" in REFERENCE.md). Show the
-   `CHANGELOG.md` summary and the generated notes preview, and ask: **Publish (Recommended)** /
-   **Not now**. On **Publish**, run the publish command from REFERENCE.md.
-8. Report the PR URL, the merge commit on `main`, the release URL if there is one, the rounds of
-   each loop, any rejected findings, and the issue that `Closes #<n>` closed. If the defect also
+7. If the PR raised the plugin version, it is a release (see "Release" in REFERENCE.md). Do the
+   release run ("Release run" in REFERENCE.md) on the merge commit, without asking. Only when its
+   result allows publishing, show the `CHANGELOG.md` summary and the generated notes preview, and
+   ask: **Publish (Recommended)** / **Not now**. On **Publish**, run the publish command from
+   REFERENCE.md. Otherwise follow "Result" in "Release run".
+8. Report the PR URL, the merge commit on `main`, the release URL if there is one, and the fix
+   ticket for a failed release. Report each release run record that is not finished ("Record" in
+   REFERENCE.md), with what it asks of the owner. Report the rounds
+   of each loop, any rejected findings, and the issue that `Closes #<n>` closed. If the defect also
    exists in codex-plugin-cc and upstream has not fixed it ("Tickets", Upstream), say so. The owner
    reports it upstream, or finds the upstream issue that already reports it. Give the owner the
    command to run with that upstream issue number:
