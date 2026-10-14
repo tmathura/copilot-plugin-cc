@@ -507,8 +507,8 @@ does not touch the gate or any job.
      hand, after checking its name in Task Manager (pids are reused). Then the owner deletes the
      paths and sets the record to `closed`.
 3. For the paths the record marks `created` only: `git -C "$MAIN" worktree remove --force
-   "$WT_ROOT/release-X.Y.Z"`, `git -C "$MAIN" worktree prune`, and delete the throwaway repo and
-   the data folder. A worktree still in `git worktree list`, or a
+   "$WT_ROOT/release-X.Y.Z"` (no `worktree prune`: it acts on every worktree of the repo), and
+   delete the throwaway repo and the data folder. A worktree still in `git worktree list`, or a
    folder that is not empty, makes the run `unsure`: write what is left to the record, which stays
    `open`, and the owner removes it. An empty folder that the OS locks is only reported.
 4. When nothing is left but such empty folders, set the record to `closed`.
@@ -534,7 +534,8 @@ commit, `published` once the release counts as published, and `waits` for every 
   who finds the table in the record and posts it.
 - Every step passed, the cleanup state is `closed`, and the table is on the PR: the run allows
   publishing. (Cleanup that is not `closed` makes the run `unsure`.) Before publishing, run
-  `git ls-remote --tags origin "vX.Y.Z" "vX.Y.Z^{}"`. If the command fails, do not publish: the
+  `git -C "$MAIN" ls-remote --tags origin "vX.Y.Z" "vX.Y.Z^{}"` (the main checkout; the throwaway
+  repo has no `origin`). If the command fails, do not publish: the
   release waits for the owner. Empty output from a command that worked means there is no tag. A tag
   that exists must point to the merge commit; if not, do not publish, never move the tag, and the
   release waits for the owner.
