@@ -355,6 +355,39 @@ test("terminateProcessTree on Windows rejects when taskkill runs out of time, un
   assert.deepEqual([outcome.delivered, outcome.method, outcome.result.error], [true, "taskkill", timedOut]);
 });
 
+test("a timed-out taskkill whose root has exited still names a child it reported that stays alive", async () => {
+  const timedOut = Object.assign(new Error("taskkill /PID 1234 /T /F did not end within 1000 ms."), { code: "ETIMEDOUT" });
+  const stop = (living) =>
+    terminateProcessTree(1234, {
+      platform: "win32",
+      deadline: Date.now() + 1000,
+      runCommandImpl: async (command, args) => ({
+        command,
+        args,
+        status: null,
+        signal: null,
+        stdout: "",
+        stderr: TASKKILL_CHILD_FAILURE,
+        error: timedOut
+      }),
+      killImpl(pid) {
+        if (living.includes(pid)) {
+          return true;
+        }
+        throw Object.assign(new Error("no such process"), { code: "ESRCH" });
+      }
+    });
+
+  await assert.rejects(stop([5678]), (error) => {
+    assert.equal(error.orphans, true);
+    assert.deepEqual(error.stillRunning, [5678]);
+    assert.match(error.message, /did not end within 1000 ms\.\nStill running: PID 5678\.$/);
+    return true;
+  });
+  const outcome = await stop([]);
+  assert.equal(outcome.delivered, true);
+});
+
 test("terminateProcessTree on Windows starts no taskkill when its deadline has passed", async () => {
   for (const deadline of [Date.now(), Date.now() - 1000]) {
     await assert.rejects(
@@ -511,7 +544,8 @@ test("runCommandAsync stops a command that runs past its time limit", async () =
     }
   }
 
-  const none = await runCommandAsync(process.execPath, forever, { timeoutMs: 0 });
+  // Node takes longer than 0 ms to start, and this command ends by itself if the kill misses it.
+  const none = await runCommandAsync(process.execPath, ["-e", ""], { timeoutMs: 0 });
   assert.equal(none.error?.code, "ETIMEDOUT");
 });
 

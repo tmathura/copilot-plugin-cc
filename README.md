@@ -381,7 +381,8 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
 - On Windows, each `taskkill` has a time limit: 5 seconds for cancel, and the hook's own deadline
   when a Claude session ends. A `taskkill` that does not end in time is stopped. If the process it
   was stopping is still alive, the stop did not finish, so the job keeps its process id and you can
-  run `/copilot:cancel <job id>` again; a process that has exited counts as stopped. Codex waits
+  run `/copilot:cancel <job id>` again. A process that has exited counts as stopped, but a child
+  that `taskkill` named and that is still alive is named, as above. Codex waits
   for `taskkill` with no limit, so a `taskkill` that stalls holds cancel or the hook. The reason is
   correctness.
 - A background task's record is written before its worker starts. Codex starts the worker first, and

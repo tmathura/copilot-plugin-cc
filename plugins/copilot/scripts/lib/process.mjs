@@ -221,6 +221,17 @@ function killLeaderOrThrow(pid, killImpl) {
   }
 }
 
+// The processes that taskkill could not stop. Each line names its process first; a later PID is its
+// parent, which can be the caller itself.
+function namedByTaskkill(result) {
+  return `${result.stderr}\n${result.stdout}`
+    .split(/\r?\n/)
+    .filter((line) => !/^SUCCESS/i.test(line.trim()))
+    .map((line) => /\bPID\s+(\d+)/i.exec(line)?.[1])
+    .filter(Boolean)
+    .map(Number);
+}
+
 function hasDeadline(options) {
   return Number.isFinite(options.deadline);
 }
@@ -298,9 +309,17 @@ export async function terminateProcessTree(pid, options = {}) {
       }
     }
 
-    // A root that has exited is stopped, and its pid may be reused, so a retry must not get it.
+    // A root that has exited is stopped, and its pid may be reused, so a retry must not get it. Only
+    // the children that taskkill named before it ran out of time can be checked, and with no wait.
     if (result.error?.code === "ETIMEDOUT" && !isAlive(pid, killImpl)) {
-      return { attempted: true, delivered: true, method: "taskkill", result };
+      const stillRunning = namedByTaskkill(result).filter((candidate) => isAlive(candidate, killImpl));
+      if (stillRunning.length === 0) {
+        return { attempted: true, delivered: true, method: "taskkill", result };
+      }
+      throw Object.assign(
+        new Error(`${result.error.message}\nStill running: ${stillRunning.map((candidate) => `PID ${candidate}`).join(", ")}.`),
+        { stillRunning, orphans: true }
+      );
     }
 
     if (result.error) {
@@ -308,15 +327,9 @@ export async function terminateProcessTree(pid, options = {}) {
     }
 
     // taskkill /T also fails on short-lived children, such as gh.exe at Copilot's start, that exit
-    // while it walks the tree. Only a process that is still alive after the wait is a failure. Each
-    // line names its process first; a later PID is its parent, which can be this process itself.
+    // while it walks the tree. Only a process that is still alive after the wait is a failure.
     const combinedOutput = `${result.stderr}\n${result.stdout}`.trim();
-    const named = combinedOutput
-      .split(/\r?\n/)
-      .filter((line) => !/^SUCCESS/i.test(line.trim()))
-      .map((line) => /\bPID\s+(\d+)/i.exec(line)?.[1])
-      .filter(Boolean)
-      .map(Number);
+    const named = namedByTaskkill(result);
     // Output that names no process cannot show that the tree stopped, unless the root was already gone.
     if (named.length === 0) {
       if (looksLikeMissingProcessMessage(combinedOutput)) {

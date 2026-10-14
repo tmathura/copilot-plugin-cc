@@ -72,6 +72,14 @@ const stopDeadline = Date.now() + Math.max(0, Math.min(STOP_WAIT_MS, timeLeft() 
   runs out of time" became "rejects when taskkill runs out of time, unless the root has exited",
   and the runner time-limit test uses 3000 ms, not 1500 ms, so a slow runner can start `node`.
   `runCommandAsync` builds its result in one `finish` helper.
+- 2026-10-14, Step 7b Codex and Copilot round 1: a timed-out `taskkill` whose root has exited now
+  also checks the children that `taskkill` named in its output before it ran out of time, with no
+  wait. If one is still alive, the stop rejects with the existing `orphans` / `stillRunning` error,
+  so the caller clears the root's pid and keeps the note that names the child. Reason: the first
+  version reported success and lost that note. The parsing of named processes moved into one
+  helper, `namedByTaskkill`, used by both paths. New test: "a timed-out taskkill whose root has
+  exited still names a child it reported that stays alive". Children that `taskkill` never named
+  cannot be known (assessment, Risks).
 
 ## Follow-ups
 
