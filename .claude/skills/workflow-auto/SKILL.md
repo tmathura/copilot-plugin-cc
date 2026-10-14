@@ -70,6 +70,24 @@ handle the release run records as "Release run", "Record", in REFERENCE.md says.
 not finished (and is not this session's run that it goes on with), report it, and stop: at the
 start, before the queue; later, before the next ticket.
 
+At the start, also run `git fetch origin main` (stop if it fails) and read the plugin version on
+`origin/main` (`git show origin/main:package.json`). If that version has no GitHub release and no
+record, its release run may never have run (a crash, or a `gh` query error). Find the commit that
+set it: the newest commit on `origin/main`, following first parents only (`--first-parent`),
+whose `package.json` has that version while its first parent's has another. Do the release run
+for it before the queue only when:
+
+- its commit date (`git log -1 --format=%cI <sha>`) is more than 2 hours old, because a newer one
+  may still be claimed by another session (the `noclobber` claim is what prevents a double
+  release; this only avoids getting in its way); and
+- `gh api repos/tmathura/copilot-plugin-cc/commits/<sha>/pulls` returns exactly one merged PR
+  whose `merge_commit_sha` is that commit (a search by SHA can also return later PRs).
+
+In every other case, stop and report it: no matching commit, a `gh` call that fails twice, or a
+PR count other than one (this repo only squash-merges, so a release PR's `merge_commit_sha` is the
+landed commit). A release that exists with no record gets the `waits` record that Setup step 1
+writes, and is reported as waiting for the owner.
+
 ## Order
 
 At the start, read every issue that "Input" takes, and rank them:
@@ -102,7 +120,7 @@ as a decision. With no decision, the ticket runs as before, and the same stop ho
 | Step 9 point 1: the head changed, or a check fails at merge time | Back to the review loops, then merge when Step 9 finds the new head ready. With `--ask-merge`, ask again. |
 | The plan's Constitution Check marks a principle "not met" (it needs the owner's approval) | Not done |
 | Step 9 point 3: the PR is not `MERGED` | Not done |
-| Publish the release | Do the release run (REFERENCE.md) without asking. If it allows publishing: publish; with `--ask-merge`, ask after the run. A step failed (or the CI run on the merge commit is red): "Result" creates the fix ticket, with a `Release fix:` line; in a backlog run it runs next, so a later release does not fail on the same defect. An open ticket with that line that cannot run (Not done, held, or skipped) stops a backlog run early, also at the start of a later run, because later releases would fail on the same defect. If the release run of a ticket with that line fails again, "Result" creates the new ticket with the `question` label, so no run takes it: list the release under "For you" (the failure may come from the environment, not the code) and stop the run early. When the release waits for the owner (an `unsure` step, a table that is not on the PR, a tag on another commit, or a published release with no finished record, as Setup step 1 says): list the release under "For you" and stop the run early, because later releases must wait for it. |
+| Publish the release | Do the release run (REFERENCE.md) without asking. If it allows publishing: publish; with `--ask-merge`, ask after the run. A step failed (or the CI run on the merge commit is red): "Result" creates the fix ticket, with a `Release fix:` line; in a backlog run it runs next, so a later release does not fail on the same defect. An open ticket with that line that cannot run (Not done, held, or skipped) stops a backlog run early, also at the start of a later run, because later releases would fail on the same defect. If the release run of a ticket with that line fails again, "Result" creates the new ticket with the `question` label, so no run takes it: list the release under "For you" (the failure may come from the environment, not the code) and stop the run early. When the release waits for the owner (an `unsure` step, a table that is not on the PR, a tag on another commit, a published release with no finished record, or a `gh release view` that fails twice, as Setup step 1 says): list the release under "For you" and stop the run early, because later releases must wait for it. |
 | More than 3 hand-written files | Not done, with the proposed split into tickets |
 | A test would need changing, an environment problem, or a fix still fails after 3 tries | Not done |
 | An unclear review finding | Not done |

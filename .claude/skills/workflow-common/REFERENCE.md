@@ -398,7 +398,7 @@ the version's claim and its history, so it is never deleted. It holds:
 - the time of the last update.
 
 A record is finished when it has no `hold:` line (the owner removes it), its cleanup state is
-`closed`, its table is posted, and one of these is true:
+`closed`, its table is posted (a record with no paths needs none), and one of these is true:
 
 - its result is `published`;
 - its result is `failed` and it names a fix ticket. When the failed version was itself a release
@@ -433,22 +433,29 @@ Before a run, read every record:
 **Setup.**
 
 1. Run `gh release view vX.Y.Z`:
-   - The command fails for another reason than "release not found": stop. The release waits for
-     the owner.
+   - The command fails for another reason than "release not found": run it once more. If it fails
+     again, stop and report the version to the owner (`workflow-auto`: "For you", and it stops
+     the run early). A query error is no fault in the release, so write no record and no `hold:`
+     line: the next run asks again.
    - A release exists: there is nothing to run when it is not a draft, its tag points to the merge
-     commit, and the record for vX.Y.Z is finished ("Record"). In every other case (no record, so
-     no proof of a release run; a record that is not finished; or a release that does not match),
-     the release waits for the owner: report it. When there is no record, create one with the
-     `noclobber` command below, with the result `waits` and no paths, so later runs see the hold.
-     When the record is finished but the release does not match, append the line
-     `hold: <what is wrong>` to it. An unfinished record already blocks later runs: only report it.
-     The owner clears it by completing the record by hand until it is finished, for example with
-     `checked by owner`.
+     commit, and the record for vX.Y.Z is finished ("Record") with the result `published` or the
+     line `checked by owner`. A finished `failed` record without `checked by owner` does not
+     count: a failed version gets no release. In every other case, the release waits for the
+     owner.
    - No release exists: claim the version by creating the record, in a way that fails when it
      exists: `(set -o noclobber; : > "$WT_ROOT/release-run-X.Y.Z.md")`. Only one run can claim a
      version. If the create fails, touch no path and no record, and report it to the owner: the
      version was claimed before (its record says how that run ended), or the file could not be
      made.
+
+   When a release exists and waits for the owner, report it, and keep the hold for later runs:
+   - no record: create one with the `noclobber` command above, with the result `waits` and no
+     paths;
+   - a finished record: append the line `hold: <what is wrong>` to it;
+   - a record that is not finished: it already blocks later runs, so only report it.
+
+   The owner clears the hold by completing the record by hand until it is finished, for example
+   with `checked by owner`.
 2. Write the record. The three paths are the release worktree `$WT_ROOT/release-X.Y.Z`, the
    throwaway repo `$WT_ROOT/release-repo-X.Y.Z` and the data folder `$WT_ROOT/release-data-X.Y.Z`.
    Check that none of them exists; any folder that exists, also an empty one, did not come from
@@ -507,8 +514,9 @@ does not touch the gate or any job.
    it; when it cannot be checked otherwise, the run is `unsure`.
 2. Stop the run's processes:
    - Cancel every job of this run that has not finished.
-   - Read `status --all --json` from the data folder. It also lists the Stop hook's jobs. Cancel
-     again, by job id, each `cancelled` or `failed` job that still names a pid.
+   - Read `status --all --json` from the data folder. It also lists the Stop hook's jobs. Do not
+     cancel a `cancelled` or `failed` job again: its stored pid may belong to another program by
+     now, and cancel ends it with `taskkill /T /F`. Write the pids it still names to the record.
    - A cancel that says the job already completed or failed is fine. Write the message of every
      other failed cancel to the record, as step 5 does.
    - Check every pid in the record: the job pids, and the pids that the cancel messages name. Each
