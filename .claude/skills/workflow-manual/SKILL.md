@@ -258,9 +258,9 @@ To merge:
    and ask again.
 2. Run `gh pr merge <n> --squash --delete-branch --match-head-commit <approved headRefOid>`. GitHub
    then refuses the merge if anything was pushed after the approval.
-3. Whatever exit code point 2 gave, check that `gh pr view <n> --json state,mergeStateStatus` shows
-   `MERGED`. If it is `BEHIND`, bring the branch up to date and ask again. Otherwise, if it is not
-   `MERGED`, stop and report.
+3. Whatever exit code point 2 gave, check that `gh pr view <n> --json state,mergeable,mergeStateStatus`
+   shows `MERGED`. If it is `BEHIND` or `CONFLICTING`, bring the branch up to date and ask again.
+   Otherwise, if it is not `MERGED`, stop and report.
 4. `ExitWorktree` with `action: "keep"`.
 5. Run the "Cleanup" commands in `workflow-branch`. `git branch -D` is safe only after the check
    in point 3. A squash merge makes the branch look unmerged to `git branch -d`.
