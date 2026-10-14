@@ -195,10 +195,16 @@ the outcome of each finding.
 ## Step 8. Push and PR
 
 Invoke `workflow-pr`. The PR body gets a short **Review rounds** section from the Step 7b commit
-bodies. If `workflow-auto` made the PR a draft (the PR is a draft and has a comment that starts
-`workflow-auto: waits for the owner`), mark it ready after the push with `gh pr ready <n>`: bot reviewers skip
-drafts, and Step 9 needs a PR that is not a draft. A resume that starts after this step does this at
-once. Leave a draft that someone else made as it is.
+bodies.
+
+A draft PR needs a check, because bot reviewers skip drafts and Step 9 needs a PR that is not a
+draft. Read it with `gh pr view <n> --json isDraft,comments`.
+
+- Look only at the comments `workflow-auto: made draft` and `workflow-auto: resumed`. If the PR is
+  a draft and the later of these is `made draft`, then `workflow-auto` made the draft. After the
+  push, comment `workflow-auto: resumed`, then run `gh pr ready <n>`.
+- Leave any other draft as it is: the owner made it.
+- A resume that starts after this step does this check at once.
 
 ## Step 8b. PR review loop
 

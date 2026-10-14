@@ -117,13 +117,15 @@ as a decision. With no decision, the ticket runs as before, and the same stop ho
 For the ticket this run was working on:
 
 1. Leave its branch and worktree as they are.
-2. If it has an open PR, make it a draft with `gh pr ready <n> --undo`.
+2. If it has an open PR that is not a draft, make it a draft with `gh pr ready <n> --undo`, and
+   comment `workflow-auto: made draft`. Do not post that comment for a PR that was a draft
+   already: `workflow-start` Step 8 makes a PR ready again only when that comment is later than
+   its last `workflow-auto: resumed` comment.
 3. Comment `workflow-auto: waits for the owner` with the reason and the decision needed, on the PR
    if there is one, or else on the issue. The comment asks the owner to answer with a comment that
    starts `decision:` and then remove the label, and says that only the owner's comment counts.
    Add the `question` label to the issue: later runs skip it until the owner removes the label
    ("Tickets" in `docs/development.md`).
-   `workflow-start` Step 8 marks the PR ready again when the ticket is picked up.
 4. If the session is in its worktree, leave it with `ExitWorktree` (`action: "keep"`), so the next
    ticket's commands run from the main checkout.
 5. Add it to the report, then go on with the next ticket that does not depend on it.
