@@ -384,8 +384,8 @@ record holds: the PR, the version, the merge commit, the three paths, the throwa
 commit, the companion session id, each job id with its pids as it starts, each step's result as it
 ends, whether the table is posted, the state `open`, and the time of the last update. Before a
 run, look at each `$WT_ROOT/release-run-*.md` whose last update is more than 2 hours old (a crash
-cut it off; a newer one can belong to a run in another session), and at this session's own record
-after a summary (the summary or the `workflow-auto` report names the version). After a summary,
+cut it off; a newer one can belong to a run in another session), and at this session's own records
+of any age (after a summary, the summary or the `workflow-auto` report names the version). After a summary,
 first wait until this session's background calls of that run have ended; then go on with the run
 from the record if you can, and otherwise clean it up. If a record is still
 `open`, clean it up with the cleanup below; its unfinished steps are `unsure`. If its table is not
@@ -451,9 +451,9 @@ not run, or when Claude cannot read the fact.
    pids in the record, which stays `open`, and stop the cleanup here. The next run tries again.
 3. `git -C "$MAIN" worktree remove --force "$WT_ROOT/release-X.Y.Z"`, `git -C "$MAIN" worktree prune`,
    and delete the throwaway repo and the data folder. A worktree still in `git worktree list`, or a
-   folder that is not empty, makes the run `unsure`. An empty folder that the OS locks is only
-   reported.
-4. Set the record to `closed`.
+   folder that is not empty, makes the run `unsure`: write what is left to the record, which stays
+   `open`, so the next run tries again. An empty folder that the OS locks is only reported.
+4. When nothing is left but such empty folders, set the record to `closed`.
 
 **Table.** Post the table (step, `pass` / `fail` / `unsure`, a short note) once, as a comment on the
 merged PR with `gh pr comment <pr> --body-file <file>`, and mark it posted in the record. If the post

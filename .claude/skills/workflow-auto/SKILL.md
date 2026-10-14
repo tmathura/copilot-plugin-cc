@@ -23,12 +23,8 @@ gives the answers to their questions, so later changes to the workflow apply her
 
 Take only open issues that the owner opened (`gh issue list --author @me --state open --limit 1000`).
 The run merges and publishes without a person reading the change, so an issue from anyone else
-could steer it. Skip:
-
-- issues labelled `question`, `wontfix`, `duplicate` or `invalid`;
-- a ticket that waits for the owner: its last comment that starts `workflow-auto: waits for the
-  owner` (on the issue or its PR) has no later comment from the owner.
-
+could steer it. Skip issues labelled `question`, `wontfix`, `duplicate` or `invalid`. A `question`
+issue waits for the owner; this skill also adds that label to the tickets it holds ("Not done").
 List each skipped issue under "For you", with the reason. A one-ticket run on an issue that is
 skipped, closed or missing does nothing and reports why; the owner can run `/workflow-start` on it.
 Check these rules again just before each ticket starts, because a long run can outlive them.
@@ -49,14 +45,15 @@ an old one) whose first lines give the argument and the mode from `$ARGUMENTS` (
 2. **To verify:** each choice the run made for the owner, with the ticket and the reason.
 3. **For you:** a release run in progress (its version, so it can be found after a summary);
    releases that wait for the owner, with the merge commit, the PR and the link to the run table;
-   PRs the owner holds; upstream reports, with the command from `workflow-start` Step 9, point 8;
+   PRs the owner holds (remove the `question` label when you have decided, also if you merge the
+   PR yourself); upstream reports, with the command from `workflow-start` Step 9, point 8;
    the issues this run skipped, with the reason; and review comments from other people.
 4. **Done:** the issue, PR, merge commit, the release URL (or "not published" and why) and the
    run-table link if any, the rounds of each loop, and rejected findings with their reasons.
 5. **New tickets:** also the fix ticket of a failed release run.
 6. **Order (current).**
 7. **Watch.**
-8. **Leftover folders.**
+8. **Leftover folders:** also the paths that an `open` release run record still lists.
 
 After a summary of the conversation, read the report again. Its first lines give the mode. If you
 cannot read the mode, use `--ask-merge`.
@@ -79,15 +76,18 @@ created or changed tickets.
 ## Each ticket
 
 Invoke `workflow-start` with the issue number. Answer each of its questions from the table below.
-Never end the turn to ask, except for the merge and release questions with `--ask-merge`. When the
-owner commented after an earlier `workflow-auto: waits for the owner`, that comment is the owner's
-decision: follow it.
+Never end the turn to ask, except for the merge and release questions with `--ask-merge`. For a
+ticket that was held before, the owner's decision is a comment that starts `decision:`, on the
+issue, the PR or a review thread, written after the last `workflow-auto: waits for the owner`
+comment. Follow it. The run posts with the owner's account too, so it never starts a comment with
+`decision:`, and no other comment counts as a decision. With no decision, the ticket runs as
+before, and the same stop holds it again.
 
 | Question | Answer |
 | --- | --- |
 | Planning mode | The mode that REFERENCE.md "Planning mode" picks. For Claude plan mode, do not call `EnterPlanMode`: write the plan to `<scratchpad>/plan-review-<n>.md` and run the Codex and Copilot loop on it with `task --prompt-file`. If the rule cannot pick a row: Not done. |
 | Approve the plan and create the issue (Step 1) | Not reached: this skill always passes an issue number. A ticket that the run finds itself is approved by the run ("After each merge"). |
-| Step 9, the PR is ready | **Merge now**. With `--ask-merge`, ask. If the owner answers **I'll review it myself first** or **Stop**, comment `workflow-auto: waits for the owner (held for review)` on the PR, list it under "For you", leave the worktree (`ExitWorktree`, `keep`), and go on. A release that the owner answers **Not now** goes under "For you". |
+| Step 9, the PR is ready | **Merge now**. With `--ask-merge`, ask. If the owner answers **I'll review it myself first** or **Stop**, comment `workflow-auto: waits for the owner (held for review)` on the PR, add the `question` label to the issue, list it under "For you", leave the worktree (`ExitWorktree`, `keep`), and go on. A release that the owner answers **Not now** goes under "For you". |
 | Step 9, the PR is not ready | First check again: GitHub can still be computing `mergeable` (`UNKNOWN`) after a push. Then **Fix first**; for a PR that conflicts with `main`, that is `git merge origin/main` in the worktree. Not done when the cause is not in the PR (after the one CI rerun below), when the merge conflict needs a decision, or when a Fix first pass changes nothing. |
 | Step 9 point 1: the head changed, or a check fails at merge time | Back to the review loops, then merge when Step 9 finds the new head ready. With `--ask-merge`, ask again. |
 | The plan's Constitution Check marks a principle "not met" (it needs the owner's approval) | Not done |
@@ -116,8 +116,10 @@ For the ticket this run was working on:
 1. Leave its branch and worktree as they are.
 2. If it has an open PR, make it a draft with `gh pr ready <n> --undo`.
 3. Comment `workflow-auto: waits for the owner` with the reason and the decision needed, on the PR
-   if there is one, or else on the issue. Later runs skip the ticket until the owner comments after
-   it ("Input"), and `workflow-start` Step 8 marks the PR ready again when the ticket is picked up.
+   if there is one, or else on the issue. The comment asks the owner to answer with a comment that
+   starts `decision:` and then remove the label. Add the `question` label to the issue: later runs
+   skip it until the owner removes the label ("Tickets" in `docs/development.md`).
+   `workflow-start` Step 8 marks the PR ready again when the ticket is picked up.
 4. If the session is in its worktree, leave it with `ExitWorktree` (`action: "keep"`), so the next
    ticket's commands run from the main checkout.
 5. Add it to the report, then go on with the next ticket that does not depend on it.
@@ -167,7 +169,7 @@ Fix what is missing before the next ticket. Then:
   stops, because later tickets would start from a bad state.
 
 Before any early stop, list every ticket left in the queue under "Not done", waiting for the
-blocker. Do not change their branches, PRs or comments.
+blocker. Do not change their branches, PRs, comments or labels.
 
 ## Stop
 
