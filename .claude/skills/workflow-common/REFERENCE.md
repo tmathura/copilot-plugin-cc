@@ -381,8 +381,8 @@ table notes are short summaries in your own words, not raw output.
 **Record.** Keep a record in `$WT_ROOT/release-run-X.Y.Z.md`. The record and the three paths below
 are under `$WT_ROOT`, not in a session's scratchpad, so a new session can find and delete them. The
 record holds: the PR, the version, the merge commit, the three paths, the throwaway repo's first
-commit, the companion session id, each job id with its pids as it starts, each step's result as it
-ends, cancel messages, whether the table is posted, the state (`open`, `manual` or `closed`), and
+commit, the companion session id, each job id with its pids as it starts, when each `claude -p`
+call starts and ends, each step's result as it ends, cancel messages, whether the table is posted, the state (`open`, `manual` or `closed`), and
 the time of the last update.
 
 Before a run, look at each `$WT_ROOT/release-run-*.md` whose last update is more than 2 hours old
@@ -457,6 +457,11 @@ not run, or when Claude cannot read the fact.
      other failed cancel to the record, as step 5 does.
    - Check every pid in the record: the job pids, and the pids that the cancel messages name. Each
      must be gone (`ESRCH`).
+   - The jobs of the `claude -p` steps live in Claude Code's own data folder, which cleanup does not
+     read. The record notes when each `claude -p` call starts and ends. A call that was stopped
+     (`TaskStop`), that gave no result, or that has no end in the record may leave `claude`, `node`
+     and `copilot` processes: treat it like a pid that still answers. The owner finds them in Task
+     Manager by their start time, after the record's start.
    - If a pid still answers or cannot be read, the run is `unsure`. Keep the folders, set the
      record's state to `manual`, and stop the cleanup here. The owner ends each listed process by
      hand, after checking its name in Task Manager (pids are reused). Then the owner deletes the
