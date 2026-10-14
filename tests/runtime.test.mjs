@@ -2164,6 +2164,40 @@ test("SessionEnd keeps a job whose stop fails, and an older job whose stop never
   });
 });
 
+test("SessionEnd ends inside its budget when taskkill never ends, and keeps the job with its pids", async () => {
+  const tasks = setUpTasks();
+  await withCompanionEnv(tasks.env, async () => {
+    const { cleanupSessionJobs } = await import(pathToFileURL(SESSION_HOOK).href);
+    const { updateState } = await import("../plugins/copilot/scripts/lib/state.mjs");
+    const { runCommandAsync, terminateProcessTree } = await import("../plugins/copilot/scripts/lib/process.mjs");
+    const sessionId = "stalled-taskkill-session";
+    updateState(tasks.cwd, (state) => {
+      state.jobs.unshift({ id: "task-stalled", status: "running", jobClass: "task", sessionId, pid: 111111, copilotPid: 222222 });
+    });
+    // The real runner, with its time limit, on a command that never ends in place of taskkill.
+    const stalledTaskkill = (command, args, options) =>
+      runCommandAsync(process.execPath, ["-e", "setInterval(() => {}, 1000)"], options);
+
+    const started = Date.now();
+    await cleanupSessionJobs(tasks.cwd, sessionId, {
+      terminateImpl: (pid, options) =>
+        terminateProcessTree(pid, {
+          ...options,
+          platform: "win32",
+          runCommandImpl: stalledTaskkill,
+          // Both processes are still alive after the stalled stop.
+          killImpl: () => true
+        })
+    });
+    const elapsed = Date.now() - started;
+
+    // The budget is 3500 ms; the stops end about 2000 ms after they start.
+    assert.ok(elapsed < 3500, `${elapsed} ms`);
+    const job = findJob(tasks.dataDir, "task-stalled");
+    assert.deepEqual([job.status, job.pid, job.copilotPid], ["cancelled", 111111, 222222]);
+  });
+});
+
 test("SessionEnd clears a pid whose stop shows it has exited, keeps one that can still be stopped, and names a child it left", async () => {
   const tasks = setUpTasks();
   await withCompanionEnv(tasks.env, async () => {

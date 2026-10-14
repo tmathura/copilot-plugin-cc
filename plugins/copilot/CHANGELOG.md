@@ -2,6 +2,14 @@
 
 ## Copilot plugin
 
+### 1.0.14
+
+- On Windows, when a Claude session ends, a slow or stuck `taskkill` can no longer make the hook
+  pass its 5-second limit. Each `taskkill` now ends by the hook's deadline. A job whose stop did not
+  finish in time keeps its process ids, so you can run `/copilot:cancel <job id>` again.
+- On Windows, `/copilot:cancel` gives up on a `taskkill` that takes more than 5 seconds and says
+  that the stop failed, so you can run it again. Before, it could wait with no end.
+
 ### 1.0.13
 
 - On Windows, when a Claude session ends with several running jobs, the plugin stops them all at

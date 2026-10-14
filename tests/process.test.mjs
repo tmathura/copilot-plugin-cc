@@ -2,7 +2,8 @@
 // no shell, resolveLauncher and the process tree kill.
 import fs from "node:fs";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 import assert from "node:assert/strict";
 
@@ -315,6 +316,94 @@ test("terminateProcessTree reports a failed taskkill whose output names no proce
   );
 });
 
+test("terminateProcessTree on Windows gives taskkill the time to its deadline, or 5 s without one", async () => {
+  const limits = [];
+  const runCommandImpl = (command, args, options) => {
+    limits.push(options.timeoutMs);
+    return { command, args, status: 0, signal: null, stdout: "", stderr: "", error: null };
+  };
+
+  await terminateProcessTree(1234, { platform: "win32", deadline: Date.now() + 1000, forceKillAfterMs: 10, runCommandImpl });
+  await terminateProcessTree(1234, { platform: "win32", forceKillAfterMs: 10, runCommandImpl });
+  await terminateProcessTree(1234, { platform: "win32", deadline: Number.NaN, runCommandImpl });
+
+  assert.ok(limits[0] > 0 && limits[0] <= 1000, `${limits[0]} ms`);
+  assert.deepEqual(limits.slice(1), [5000, 5000]);
+});
+
+test("terminateProcessTree on Windows rejects when taskkill runs out of time, unless the root has exited", async () => {
+  const timedOut = Object.assign(new Error("taskkill /PID 1234 /T /F did not end within 1000 ms."), { code: "ETIMEDOUT" });
+  const stop = (killImpl) =>
+    terminateProcessTree(1234, {
+      platform: "win32",
+      deadline: Date.now() + 1000,
+      runCommandImpl: async (command, args) => ({ command, args, status: null, signal: null, stdout: "", stderr: "", error: timedOut }),
+      killImpl
+    });
+
+  await assert.rejects(
+    stop((pid, signal) => {
+      assert.deepEqual([pid, signal], [1234, 0]);
+      return true;
+    }),
+    timedOut
+  );
+  // The pid may be reused, so a retry must not get it.
+  const outcome = await stop(() => {
+    throw Object.assign(new Error("no such process"), { code: "ESRCH" });
+  });
+  assert.deepEqual([outcome.delivered, outcome.method, outcome.result.error], [true, "taskkill", timedOut]);
+});
+
+test("terminateProcessTree on Windows starts no taskkill when its deadline has passed", async () => {
+  for (const deadline of [Date.now(), Date.now() - 1000]) {
+    await assert.rejects(
+      terminateProcessTree(1234, {
+        platform: "win32",
+        deadline,
+        runCommandImpl() {
+          throw new Error("taskkill should not start");
+        },
+        killImpl() {
+          throw new Error("kill fallback should not run");
+        }
+      }),
+      (error) => {
+        assert.equal(error.code, "ETIMEDOUT");
+        assert.equal(error.message, "taskkill /PID 1234 /T /F was not started: no time was left.");
+        assert.equal(error.orphans, undefined);
+        return true;
+      }
+    );
+  }
+});
+
+test("terminateProcessTree on Windows ends the wait after a slow taskkill at its deadline", async () => {
+  const started = Date.now();
+  await assert.rejects(
+    terminateProcessTree(1234, {
+      platform: "win32",
+      deadline: started + 1800,
+      forceKillAfterMs: 5000,
+      runCommandImpl: async (command, args) => {
+        await delay(1500);
+        return failedTaskkill(command, args);
+      },
+      killImpl(pid) {
+        if (pid === 5678) {
+          return true;
+        }
+        throw Object.assign(new Error("no such process"), { code: "ESRCH" });
+      }
+    }),
+    /Still running: PID 5678\.$/
+  );
+  const elapsed = Date.now() - started;
+
+  // A wait that started after taskkill would end at 3300 ms; one with no deadline at 6500 ms.
+  assert.ok(elapsed < 3000, `${elapsed} ms`);
+});
+
 test("runCommand passes spaces and shell characters unchanged and ignores a shell option", () => {
   const args = ["a b", "x&y", "p|q", "s;t", "$HOME", "%PATH%", "say \"hi\"", "it's", "c^d"];
 
@@ -399,6 +488,52 @@ test("runCommandAsync does not block the event loop while the command runs", asy
 
   assert.equal(result.status, 0);
   assert.equal(ticked, true);
+});
+
+test("runCommandAsync stops a command that runs past its time limit", async () => {
+  const forever = ["-e", "console.log(process.pid); setInterval(() => {}, 1000)"];
+  const started = Date.now();
+  // Long enough for a slow runner to start node, which prints the pid.
+  const result = await runCommandAsync(process.execPath, forever, { timeoutMs: 3000 });
+  const elapsed = Date.now() - started;
+  const pid = Number(result.stdout.trim());
+  try {
+    assert.equal(result.status, null);
+    assert.equal(result.error?.code, "ETIMEDOUT");
+    assert.match(result.error.message, /did not end within 3000 ms\.$/);
+    // Timers can fire a little early.
+    assert.ok(elapsed >= 2950 && elapsed < 8000, `${elapsed} ms`);
+    assert.ok(pid > 0, result.stdout);
+    await waitFor(() => !isAlive(pid));
+  } finally {
+    if (pid > 0 && isAlive(pid)) {
+      process.kill(pid, "SIGKILL");
+    }
+  }
+
+  const none = await runCommandAsync(process.execPath, forever, { timeoutMs: 0 });
+  assert.equal(none.error?.code, "ETIMEDOUT");
+});
+
+test("runCommandAsync leaves nothing that keeps its caller alive after it settles", () => {
+  const moduleUrl = new URL("../plugins/copilot/scripts/lib/process.mjs", import.meta.url).href;
+  const source = `
+import { runCommandAsync } from ${JSON.stringify(moduleUrl)};
+const results = [
+  await runCommandAsync(process.execPath, ["-e", ""], { timeoutMs: 60000 }),
+  await runCommandAsync("copilot-plugin-missing-command", [], { timeoutMs: 60000 }),
+  await runCommandAsync(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { timeoutMs: 200 })
+];
+console.log(JSON.stringify(results.map((result) => result.error?.code ?? result.status)));
+`;
+  const started = Date.now();
+  // A timer or a pipe left behind would keep the caller running for the full 60 s.
+  const caller = spawnSync(process.execPath, ["--input-type=module", "-e", source], { encoding: "utf8", timeout: 30000 });
+  const elapsed = Date.now() - started;
+
+  assert.equal(caller.status, 0, caller.stderr);
+  assert.deepEqual(JSON.parse(caller.stdout), [0, "ENOENT", "ETIMEDOUT"]);
+  assert.ok(elapsed < 15000, `${elapsed} ms`);
 });
 
 test("terminateProcessTree never signals for a pid that is not a positive integer", async () => {
@@ -542,6 +677,29 @@ test("terminateProcessTree sends SIGKILL when the group outlives the wait", asyn
 
   assert.deepEqual(calls[0], [-1234, "SIGTERM"]);
   assert.deepEqual(calls.at(-1), [-1234, "SIGKILL"]);
+});
+
+test("terminateProcessTree on macOS and Linux sends SIGKILL at its deadline", async () => {
+  // With no deadline, the wait would last the default 5 s.
+  for (const [offset, limit] of [
+    [300, 3000],
+    [-1000, 1000]
+  ]) {
+    const calls = [];
+    const started = Date.now();
+    await terminateProcessTree(1234, {
+      platform: "linux",
+      deadline: started + offset,
+      killImpl(target, signal) {
+        calls.push([target, signal]);
+      }
+    });
+    const elapsed = Date.now() - started;
+
+    assert.deepEqual(calls[0], [-1234, "SIGTERM"]);
+    assert.deepEqual(calls.at(-1), [-1234, "SIGKILL"]);
+    assert.ok(elapsed < limit, `${elapsed} ms`);
+  }
 });
 
 test("terminateProcessTree kills a detached child and its grandchild", { skip: isWindows }, async () => {

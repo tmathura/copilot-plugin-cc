@@ -3,8 +3,8 @@
 // Copilot CLI, with no broker and no transcript path. SessionStart exports the data folder under the
 // companion's own name, not CLAUDE_PLUGIN_DATA, and both events use Claude Code's own
 // CLAUDE_PLUGIN_DATA over an inherited export. SessionEnd closes the session and marks its
-// active jobs cancelled in one locked update, stops their companions and Copilot processes with one
-// shared wait, and then removes the session's finished jobs and the jobs it stopped, all inside the
+// active jobs cancelled in one locked update, stops their companions and Copilot processes by one
+// shared deadline, and then removes the session's finished jobs and the jobs it stopped, all inside the
 // hook's 5 s timeout. A pid whose stop shows it has exited counts as stopped.
 
 import fs from "node:fs";
@@ -120,13 +120,14 @@ export async function cleanupSessionJobs(cwd, sessionId, options = {}) {
 
   // One shared wait, then SIGKILL, so three jobs cost no more time than one. A job keeps its record
   // while one of its own pids may still be alive, so /copilot:cancel can try again; as in cancel, a pid
-  // that stopped or has exited is cleared, because it can be reused.
-  const forceKillAfterMs = Math.max(0, Math.min(STOP_WAIT_MS, timeLeft() - FINAL_UPDATE_RESERVE_MS));
+  // that stopped or has exited is cleared, because it can be reused. The deadline also bounds each
+  // taskkill, and a stop that runs out of time keeps its pids.
+  const stopDeadline = Date.now() + Math.max(0, Math.min(STOP_WAIT_MS, timeLeft() - FINAL_UPDATE_RESERVE_MS));
   const stoppedPids = new Map();
   await Promise.all(
     stopping.map(async (job) => {
       const keys = ["pid", "copilotPid"].filter((key) => job[key]);
-      const outcomes = await Promise.allSettled(keys.map((key) => terminate(job[key], { forceKillAfterMs })));
+      const outcomes = await Promise.allSettled(keys.map((key) => terminate(job[key], { deadline: stopDeadline })));
       // A stop that leaves only children of an exited pid is done with that pid: a cancel cannot reach
       // the children, and the pid may be reused. The job then keeps a note that names those children.
       const done = outcomes.map((outcome) => outcome.status === "fulfilled" || Boolean(outcome.reason?.orphans));
