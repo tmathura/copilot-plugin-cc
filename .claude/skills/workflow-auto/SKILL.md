@@ -18,7 +18,8 @@ gives the answers to their questions, so later changes to the workflow apply her
 
 - No number: fix every open issue that this skill takes (a backlog run).
 - A number: fix that issue only (a one-ticket run).
-- `--ask-merge`: ask before each merge and each release, as `workflow-start` does.
+- `--ask-merge`: ask before each merge and before each release is published, as `workflow-start`
+  does. The release run itself publishes nothing, so it runs without a question.
 - Any other argument: stop and say so before you do anything.
 
 First check that `gh` is logged in as the repo owner: `gh api user --jq .login` must equal
@@ -86,7 +87,8 @@ or a `gh` query error) is not lost:
      this commit as the merge commit. When it says the release waits for the owner, keep the hold
      as it says, report it, and stop the run.
    - No release and no record: when the commit date (`git log -1 --format=%cI <sha>`) is more
-     than 2 hours old, do the release run for this commit and PR before the queue. A newer one
+     than 2 hours old, do the release run for this commit and PR before the queue (the "Publish
+     the release" row below applies, also its `--ask-merge` question before publishing). A newer one
      may still be claimed by another session: report it and stop. (The `noclobber` claim is what
      prevents a double release; the wait only avoids getting in its way.)
    - No release but a record: the record rules above handle it.
@@ -183,8 +185,9 @@ scope, CI failures the PR did not cause, and docs that no longer match. For each
 and closed issues for a duplicate. Add it to a related open ticket if one exists, or else draft a
 ticket in the ticket standard and create it with `workflow-ticket`. This run approves its own
 draft, so pass the draft to `workflow-ticket` as approved. Put something only suspected under
-"Watch". In a backlog run, new tickets join the queue. In a one-ticket run, they are created but
-not fixed.
+"Watch". In a backlog run, new tickets join the queue, and so do issues the owner opened during
+the run: list the issues "Input" takes again after each merge. In a one-ticket run, new tickets
+are created but not fixed.
 
 **Ready for the next ticket.** Check:
 

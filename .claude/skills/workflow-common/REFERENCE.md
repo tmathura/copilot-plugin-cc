@@ -445,7 +445,7 @@ Before a run, read every record:
      release must still be no draft with its tag on the merge commit. In every other case, the
      release waits for the owner.
    - No release exists: claim the version by creating the record, in a way that fails when it
-     exists: `(set -o noclobber; : > "$WT_ROOT/release-run-X.Y.Z.md")`. Only one run can claim a
+     exists: `mkdir -p "$WT_ROOT"`, then `(set -o noclobber; : > "$WT_ROOT/release-run-X.Y.Z.md")`. Only one run can claim a
      version. If the create fails, touch no path and no record, and report it to the owner: the
      version was claimed before (its record says how that run ended), or the file could not be
      made.
@@ -567,10 +567,14 @@ commit, `published` once the release counts as published, and `waits` for every 
   that exists must point to the merge commit; if not, do not publish, never move the tag, and the
   release waits for the owner.
 - A step failed: do not publish. The fix is a new ticket and a new patch release (Principle VI).
-  Write `fix ticket: creating` to the record, then create that ticket with `workflow-ticket`, with
-  the line `Release fix: vX.Y.Z, step <n>` in its body (`step ci` for a red CI run), and a note
-  that its `CHANGELOG.md` entry must also say what vX.Y.Z changed ("Release" in
-  `docs/development.md`). Write its number to the record. If it cannot be created, or a record
+  Write `fix ticket: creating` to the record, then create that ticket with `workflow-ticket`. The
+  draft is approved by this rule, so pass it as approved: the `bug` type label (plus `question` in
+  the case at the end of this item); the title
+  `Fix release run step <n> of vX.Y.Z`; the four sections of "Tickets" in `docs/development.md`,
+  filled from the run table (Problem: the failed step and what it showed); the line
+  `Release fix: vX.Y.Z, step <n>` (`step ci` for a red CI run); and a note that its `CHANGELOG.md`
+  entry must also say what vX.Y.Z changed ("Release" in `docs/development.md`). Write its number
+  to the record. If it cannot be created, or a record
   still says `creating` with no number (a crash), the record is not finished: the owner looks for
   the ticket with
   `gh issue list --state all --author @me --search '"Release fix: vX.Y.Z" in:body'`, creates it if
