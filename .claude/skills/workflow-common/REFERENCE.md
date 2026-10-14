@@ -401,10 +401,10 @@ A record is finished when its cleanup state is `closed`, its table is posted, an
 true:
 
 - its result is `published`;
-- its result is `failed` and it names a fix ticket;
+- its result is `failed` and it names a fix ticket. When the failed version was itself a release
+  fix ("Result"), it also needs the line `checked by owner`;
 - it has the line `checked by owner`. The owner adds it when nothing more is to be done, for
-  example for a `failed` release fix (which gets no new fix ticket, "Result") or a version the
-  owner decides not to publish.
+  example for a version the owner decides not to publish.
 
 Claude never writes `checked by owner`, never sets a `manual` record to `closed`, and never sets
 `published` on a record whose run it did not do: those are the owner's.
@@ -519,7 +519,8 @@ does not touch the gate or any job.
 **Table.** The table (step, `pass` / `fail` / `unsure`, a short note) is a comment on the merged PR
 whose first line is `Release run vX.Y.Z`. Before posting, look for a comment by the owner's login
 that starts with that line, in all pages:
-`gh api --paginate repos/tmathura/copilot-plugin-cc/issues/<pr>/comments --jq '.[] | select(.user.login == "<owner login>" and (.body | startswith("Release run vX.Y.Z"))) | .id'`
+`gh api --paginate repos/tmathura/copilot-plugin-cc/issues/<pr>/comments --jq '.[] | select(.user.login == "<owner login>" and ((.body | split("\n")[0] | rtrimstr("\r")) == "Release run vX.Y.Z")) | .id'`
+(the whole first line must match, so `v1.2.3` does not find `v1.2.30`)
 (the `id` is the number the edit needs). If there are several, use the newest (the last id). If
 there is one, edit it
 (`gh api -X PATCH repos/tmathura/copilot-plugin-cc/issues/comments/<id> -F body=@<file>`);
@@ -546,12 +547,14 @@ commit, `published` once the release counts as published, and `waits` for every 
   Write `fix ticket: creating` to the record, then create that ticket with `workflow-ticket`, with
   the line `Release fix: vX.Y.Z, step <n>` in its body (`step ci` for a red CI run), and a note
   that its `CHANGELOG.md` entry must also say what vX.Y.Z changed ("Release" in
-  `docs/development.md`). Write its number to the record. If it cannot be created, or a record still says `creating` with no number
-  (a crash), the record is not finished: the owner looks for the ticket with
+  `docs/development.md`). Write its number to the record. If it cannot be created, or a record
+  still says `creating` with no number (a crash), the record is not finished: the owner looks for
+  the ticket with
   `gh issue list --state all --author @me --search '"Release fix: vX.Y.Z" in:body'`, creates it if
-  there is none, and writes its number to the record. When the PR's own ticket already
-  has a `Release fix:` line, create none: the record stays not finished until the owner checks it
-  ("Record").
+  there is none, and writes its number to the record. When the PR's own ticket already has a
+  `Release fix:` line (a fix that failed again, maybe because of the environment), still create the
+  ticket, but add the `question` label to it: no run takes it until the owner has looked, and the
+  record also needs `checked by owner` ("Record").
   This rule wins over the one for a table that is not on the PR: a failed post alone does not
   retire the version, but it does not save a version whose step failed.
 - A step is `unsure`: do not publish. The release waits for the owner, who does the open steps by
