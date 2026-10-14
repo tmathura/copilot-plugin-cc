@@ -95,7 +95,7 @@ as a decision. With no decision, the ticket runs as before, and the same stop ho
 | Step 9 point 1: the head changed, or a check fails at merge time | Back to the review loops, then merge when Step 9 finds the new head ready. With `--ask-merge`, ask again. |
 | The plan's Constitution Check marks a principle "not met" (it needs the owner's approval) | Not done |
 | Step 9 point 3: the PR is not `MERGED` | Not done |
-| Publish the release | Do the release run (REFERENCE.md) without asking. If it allows publishing: publish; with `--ask-merge`, ask after the run. A step failed (or the CI run on the merge commit is red): create the fix ticket with `workflow-ticket`, and name the version and the failed step in it; in a backlog run it runs next, so a later release does not fail on the same defect. If the release run of a fix ticket fails again, at any step, create no new ticket: list its release under "For you" (the failure may come from the environment, not the code) and stop the run early. When "Result" says the release waits for the owner (an `unsure` step, a table that is not on the PR, a tag on another commit): list the release under "For you". |
+| Publish the release | Do the release run (REFERENCE.md) without asking. If it allows publishing: publish; with `--ask-merge`, ask after the run. A step failed (or the CI run on the merge commit is red): create the fix ticket with `workflow-ticket`, with the line `Release fix: vX.Y.Z, step <n>` in its body; in a backlog run it runs next, so a later release does not fail on the same defect. If the release run of a ticket with that line fails again, at any step, create no new ticket: list its release under "For you" (the failure may come from the environment, not the code) and stop the run early. When "Result" says the release waits for the owner (an `unsure` step, a table that is not on the PR, a tag on another commit): list the release under "For you". |
 | More than 3 hand-written files | Not done, with the proposed split into tickets |
 | A test would need changing, an environment problem, or a fix still fails after 3 tries | Not done |
 | An unclear review finding | Not done |
@@ -130,7 +130,9 @@ For the ticket this run was working on:
    ticket's commands run from the main checkout.
 5. Add it to the report, then go on with the next ticket that does not depend on it.
 
-A ticket that only waits in the queue, or that has no branch, is only listed in the report.
+A ticket that only waits in the queue, or that has no branch, is only listed in the report. A
+merged ticket gets none of the steps above: the report says which cleanup is left and which step
+to retry.
 
 ## Reviews
 
