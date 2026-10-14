@@ -15,7 +15,8 @@ labels.
 | Default branch | `main` |
 | Merge style | squash: `gh pr merge --squash --delete-branch` |
 | PR template | none; use "PR body" below |
-| Branch rules | Changes to `main` go through a PR. No force-push to `main`, and no deleting it. 0 approvals needed. Bot reviewers (see "PR review loop") review each push. |
+| Branch rules | Changes to `main` go through a PR. No force-push to `main`, and no deleting it. 0 approvals needed. Bot reviewers (see "PR review loop") review each push. A PR merges only when the CI jobs `CI (ubuntu-latest)`, `CI (macos-latest)` and `CI (windows-latest)` passed and its branch has the latest `main` (ruleset "Protect main + Copilot review"). |
+| CI | `.github/workflows/pull-request-ci.yml`, on each PR and on each push to `main`, so each merge commit gets its own run |
 | Labels | `bug`, `enhancement`, `documentation`, `duplicate`, `good first issue`, `help wanted`, `invalid`, `question`, `wontfix`, `accessibility`. When to use each: "Tickets" in the repo's `docs/development.md`. |
 
 ## Shell and paths
@@ -500,6 +501,7 @@ repo, and Windows cannot delete a folder that a shell is in.
 | 6 Reset the throwaway repo to its first commit (`git reset --hard <first commit>`, `git clean -fd`), so the gate sees only the planted bug. `setup --enable-review-gate`, make a change with an obvious bug, write `{"session_id": "<id>", "cwd": "<repo>", "last_assistant_message": "<what changed>"}` to a file in the scratchpad (not in the repo) with the file tool, and run the Stop hook with `< <file>` | The hook prints `"decision":"block"` with a reason that names the planted bug. A block for another reason is `unsure` |
 | 7 Fix the bug, write a new hook input whose `last_assistant_message` describes the fix, and run the Stop hook again | The hook ran a review (a new job in `status --json`) and does not block. A block is `unsure`, because the review is the model's opinion |
 | 8 `setup --disable-review-gate` | `setup --json` shows the gate off |
+| 9 The CI run on the merge commit ("CI" in "Repo"). Run its commands from the main checkout, because the throwaway repo has no `origin` | Find the push run: `gh run list --workflow pull-request-ci.yml --branch main --event push --commit <merge commit> --json databaseId,status,conclusion,url` (the full 40-character SHA). If none is listed yet, wait with a background `sleep 30` (`run_in_background`) and look again, up to 20 times. Wait for the run with a background `gh run watch <run id> --exit-status`, stopped (`TaskStop`) after 30 minutes. Then read `gh run view <run id> --json status,conclusion`, because the exit code does not say why the watch ended. `success`: pass. Any other conclusion: note the `attempt` from `gh run view <run id> --json attempt`, rerun it once with `gh run rerun <run id> --failed`, wait until `attempt` is higher (as for a missing run), then watch and read it again. After the rerun, `success` is pass and `failure` is `fail` (a red CI run). Anything else (no run, a run that did not finish, another conclusion, a `gh` error) is `unsure`. The note gives the run link |
 
 Judge each step by facts where they exist (the exit code, `git status`, the pids, the hook's
 decision), not only by the model's words. Run a step that fails on timing once more before it
@@ -551,12 +553,10 @@ otherwise post it with `gh pr comment <pr> --body-file <file>`. Then mark it pos
 If the post fails, or the comment cannot be found, keep the table in the record ("Result" says
 what follows).
 
-**Result.** Write the result to the record: `failed` for a failed step or a red CI run on the merge
-commit, `published` once the release counts as published, and `waits` for every other outcome.
+**Result.** Write the result to the record: `failed` for a failed step (step 9 failing is a red CI
+run on the merge commit), `published` once the release counts as published, and `waits` for every
+other outcome.
 
-- CI runs on pull requests only, so the merged PR's passed checks (Step 9) count for the merge
-  commit. If a CI run on the merge commit exists, wait for it (`gh run watch <run id>`); if it is
-  red, do not publish: this is handled like a failed step.
 - The table is not on the PR (the post failed): do not publish. The release waits for the owner,
   who finds the table in the record and posts it.
 - Every step passed, the cleanup state is `closed`, and the table is on the PR: the run allows
@@ -572,7 +572,7 @@ commit, `published` once the release counts as published, and `waits` for every 
   the case at the end of this item); the title
   `Fix release run step <n> of vX.Y.Z`; the four sections of "Tickets" in `docs/development.md`,
   filled from the run table (Problem: the failed step and what it showed); the line
-  `Release fix: vX.Y.Z, step <n>` (`step ci` for a red CI run); and a note that its `CHANGELOG.md`
+  `Release fix: vX.Y.Z, step <n>` (`step 9` for a red CI run); and a note that its `CHANGELOG.md`
   entry must also say what vX.Y.Z changed ("Release" in `docs/development.md`). Write its number
   to the record. If it cannot be created, or a record
   still says `creating` with no number (a crash), the record is not finished: the owner looks for

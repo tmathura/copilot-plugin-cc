@@ -224,8 +224,20 @@ The PR is ready when all of these are true:
 - `gh pr checks <n>` shows every check passed, or there are no checks. Wait for running checks in the
   background with `gh pr checks <n> --watch --interval 30`.
 - `gh pr view <n> --json state,isDraft,mergeable,mergeStateStatus,headRefOid` shows `OPEN`, not a
-  draft, `MERGEABLE`, `CLEAN`, and a `headRefOid` equal to `git rev-parse HEAD`.
+  draft, `MERGEABLE`, `CLEAN`, and a `headRefOid` equal to `git rev-parse HEAD`. Read it after the
+  checks have ended: while a required check runs, the state is `BLOCKED`.
 - The working tree is clean.
+
+**Bring the branch up to date.** The ruleset on `main` ("Branch rules" in REFERENCE.md) merges a PR
+only when its branch has the latest `main` and its CI passed on that code. When `mergeStateStatus`
+is `BEHIND` (`main` has moved on), or `mergeable` is `CONFLICTING`, "Fix first" is:
+
+1. `git status --porcelain` must be empty. If not, stop and ask.
+2. `git fetch origin`. If it fails, stop and report.
+3. `git merge origin/main`. If it stops on a conflict that needs a decision, run `git merge --abort`,
+   then stop and ask. Resolve any other conflict, but do not commit it yet.
+4. Steps 5 and 6 (Step 6 reviews the conflict fixes, if any). Then commit the merge, if it is not
+   committed yet, and do Steps 7b, 8 and 8b on the new head. Then run the readiness checks again.
 
 Report the PR URL, the rounds of each loop, any rejected findings, and whether the PR is ready. Then
 ask:
@@ -242,10 +254,13 @@ To merge:
 
 1. Keep the `headRefOid` that the readiness check saw; the user approved that commit. Run the
    readiness checks above again. If `headRefOid` changed, or a check now fails, do not merge: report
-   it, go back to the review loops for the new head, and ask again.
+   it, go back to the review loops for the new head (for `BEHIND`: "Bring the branch up to date"),
+   and ask again.
 2. Run `gh pr merge <n> --squash --delete-branch --match-head-commit <approved headRefOid>`. GitHub
    then refuses the merge if anything was pushed after the approval.
-3. Check that `gh pr view <n> --json state` shows `MERGED`. If not, stop and report.
+3. Whatever exit code point 2 gave, check that `gh pr view <n> --json state,mergeStateStatus` shows
+   `MERGED`. If it is `BEHIND`, bring the branch up to date and ask again. Otherwise, if it is not
+   `MERGED`, stop and report.
 4. `ExitWorktree` with `action: "keep"`.
 5. Run the "Cleanup" commands in `workflow-branch`. `git branch -D` is safe only after the check
    in point 3. A squash merge makes the branch look unmerged to `git branch -d`.
