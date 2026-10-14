@@ -234,10 +234,15 @@ is `BEHIND` (`main` has moved on), or `mergeable` is `CONFLICTING`, "Fix first" 
 
 1. `git status --porcelain` must be empty. If not, stop and ask.
 2. `git fetch origin`. If it fails, stop and report.
-3. `git merge origin/main`. If it stops on a conflict that needs a decision, run `git merge --abort`,
-   then stop and ask. Resolve any other conflict, but do not commit it yet.
-4. Steps 5 and 6 (Step 6 reviews the conflict fixes, if any). Then commit the merge, if it is not
-   committed yet, and do Steps 7b, 8 and 8b on the new head. Then run the readiness checks again.
+3. `git merge --no-commit --no-ff origin/main`, so the merge stays staged for Steps 5 and 6. If it
+   stops on a conflict that needs a decision, run `git merge --abort`, then stop and ask. Resolve
+   any other conflict and stage the result. If it says `Already up to date`, the branch has `main`
+   already: read the state again, and if it still shows `BEHIND` or `CONFLICTING`, stop and report.
+4. Steps 5 and 6 on the staged merge (`git diff --cached`). Stage each fix (`git add -u`, or
+   `git add <path>` for a new file). Then commit with `git commit -F <file>`, with a message in the
+   "Naming" format and the description `Merge origin/main` (as `workflow-commit` writes it). Git
+   makes the merge commit even when the merge changes no file. Then do Steps 7b, 8 and 8b on the
+   new head, and run the readiness checks again.
 
 Report the PR URL, the rounds of each loop, any rejected findings, and whether the PR is ready. Then
 ask:
