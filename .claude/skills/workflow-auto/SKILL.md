@@ -1,6 +1,6 @@
 ---
 name: workflow-auto
-description: Fix every open copilot-plugin-cc ticket, or one, from plan to merge without asking, by running workflow-start for each ticket and giving the answers to its questions. After a merge that raises the plugin version, do the release run and publish when every step passed. Ends with a report of what is not done and every choice made for the owner. --ask-merge asks before each merge and each release.
+description: Fix every open copilot-plugin-cc ticket, or one, from plan to merge without asking, by running workflow-manual for each ticket and giving the answers to its questions. After a merge that raises the plugin version, do the release run and publish when every step passed. Ends with a report of what is not done and every choice made for the owner. --ask-merge asks before each merge and each release.
 argument-hint: "[issue number] [--ask-merge]"
 disable-model-invocation: true
 ---
@@ -8,7 +8,7 @@ disable-model-invocation: true
 # workflow: auto
 
 First read the repo's `.claude/skills/workflow-common/REFERENCE.md` and
-`.claude/skills/workflow-start/SKILL.md`. This skill does not repeat their steps or rules. It only
+`.claude/skills/workflow-manual/SKILL.md`. This skill does not repeat their steps or rules. It only
 gives the answers to their questions, so later changes to the workflow apply here too.
 
 ## Input
@@ -18,7 +18,7 @@ gives the answers to their questions, so later changes to the workflow apply her
 
 - No number: fix every open issue that this skill takes (a backlog run).
 - A number: fix that issue only (a one-ticket run).
-- `--ask-merge`: ask before each merge and before each release is published, as `workflow-start`
+- `--ask-merge`: ask before each merge and before each release is published, as `workflow-manual`
   does. The release run itself publishes nothing, so it runs without a question.
 - Any other argument: stop and say so before you do anything.
 
@@ -32,7 +32,7 @@ could steer it. Skip issues labelled `question`, `wontfix`, `duplicate` or `inva
 issue waits for the owner; this skill also adds that label to the tickets it holds ("Not done").
 List each skipped issue under "For you", with the reason. A skipped `question` issue also goes under
 "Not done", with its hold reason and the decision it waits for. A one-ticket run on an issue that is
-skipped, closed or missing does nothing and reports why; the owner can run `/workflow-start` on it.
+skipped, closed or missing does nothing and reports why; the owner can run `/workflow-manual` on it.
 Check these rules again just before each ticket starts, because a long run can outlive them.
 
 Before the queue, run `setup --json` for Codex and Copilot (REFERENCE.md "Codex and Copilot review
@@ -53,7 +53,7 @@ an old one) whose first lines give the argument and the mode from `$ARGUMENTS` (
    release run record in state `manual`, with what its record asks the owner to do;
    releases that wait for the owner, with the merge commit, the PR and the link to the run table;
    PRs the owner holds (remove the `question` label when you have decided, also if you merge the
-   PR yourself); upstream reports, with the command from `workflow-start` Step 9, point 8;
+   PR yourself); upstream reports, with the command from `workflow-manual` Step 9, point 8;
    the issues this run skipped, with the reason; and review comments and `decision:` comments from
    other people.
 4. **Done:** the issue, PR, merge commit, the release URL (or "not published" and why) and the
@@ -107,7 +107,7 @@ created or changed tickets.
 
 ## Each ticket
 
-Invoke `workflow-start` with the issue number. Answer each of its questions from the table below.
+Invoke `workflow-manual` with the issue number. Answer each of its questions from the table below.
 Never end the turn to ask, except for the merge and release questions with `--ask-merge`. For a
 ticket that was held before, the owner's decision is a comment that starts `decision:`, on the
 issue, the PR or a review thread, written by the owner (its author is the login from
@@ -126,7 +126,7 @@ as a decision. With no decision, the ticket runs as before, and the same stop ho
 | The plan's Constitution Check marks a principle "not met" (it needs the owner's approval) | Not done |
 | Step 9 point 3: the PR is not `MERGED` | Not done |
 | Publish the release | Do the release run (REFERENCE.md) without asking. If it allows publishing: publish; with `--ask-merge`, ask after the run. A step failed (or the CI run on the merge commit is red): "Result" creates the fix ticket, with a `Release fix:` line; in a backlog run it runs next, so a later release does not fail on the same defect. An open ticket with that line that cannot run (Not done, held, or skipped) stops a backlog run early, also at the start of a later run, because later releases would fail on the same defect. If the release run of a ticket with that line fails again, "Result" creates the new ticket with the `question` label, so no run takes it: list the release under "For you" (the failure may come from the environment, not the code) and stop the run early. When the release waits for the owner (an `unsure` step, a table that is not on the PR, a tag on another commit, a published release with no finished record, or a `gh release view` that fails twice, as Setup step 1 says): list the release under "For you" and stop the run early, because later releases must wait for it. |
-| More than 3 hand-written files | Not done, with the proposed split into tickets |
+| More than 3 hand-written files | Go on. The limit holds only when the owner runs `workflow-manual` alone. |
 | A test would need changing, an environment problem, or a fix still fails after 3 tries | Not done |
 | An unclear review finding | Not done |
 | A review loop reaches its round limit | One more round. There is no cap. |
@@ -149,7 +149,7 @@ For the ticket this run was working on:
 1. Leave its branch and worktree as they are.
 2. If it has an open PR that is not a draft, make it a draft with `gh pr ready <n> --undo`, and
    comment `workflow-auto: made draft`. Do not post that comment for a PR that was a draft
-   already: `workflow-start` Step 8 makes a PR ready again only when that comment is later than
+   already: `workflow-manual` Step 8 makes a PR ready again only when that comment is later than
    its last `workflow-auto: resumed` comment.
 3. Comment `workflow-auto: waits for the owner` with the reason and the decision needed, on the PR
    if there is one, or else on the issue. The comment asks the owner to answer with a comment that

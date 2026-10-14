@@ -1,10 +1,10 @@
 ---
-name: workflow-start
+name: workflow-manual
 description: Run the copilot-plugin-cc ticket workflow end to end (plan, GitHub issue, worktree branch, implement, test, review, commit, Codex and Copilot loop, PR, PR review loop, merge). Asks only for the planning mode, to approve the plan and issue, before merging the PR into main, and before publishing a version's GitHub release; everything in between runs without asking unless something needs a decision. Use to start new work or resume a ticket in copilot-plugin-cc.
 argument-hint: "[issue number to resume or start from | new]"
 ---
 
-# workflow: start
+# workflow: manual
 
 First read the repo's `.claude/skills/workflow-common/REFERENCE.md`. It holds the repo facts, the names,
 the commands and the loop rules. This file does not repeat them.

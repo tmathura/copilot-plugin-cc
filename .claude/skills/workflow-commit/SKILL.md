@@ -19,7 +19,7 @@ round, for example, passes its findings and their outcomes as the body.
    branch name `<type>/<n>-<slug>`. If the name does not match, stop and report.
 2. **Look at the changes** with `git status` and `git diff --staged`.
 3. **If nothing is staged:**
-   - When `workflow-start` passed a file list, stage those files by name
+   - When `workflow-manual` passed a file list, stage those files by name
      (`git add -- <files>`). Leave any other changed or untracked files alone, and ask whether they
      belong to this ticket.
    - Otherwise ask: **Stage tracked changes with `git add -u` (Recommended)** / **Pick files** /
