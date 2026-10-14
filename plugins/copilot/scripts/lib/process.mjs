@@ -3,7 +3,8 @@
 // sends SIGKILL to what is still alive after a wait, and accepts the macOS EPERM for a group whose
 // members have exited; a failed taskkill counts only for processes still alive after a wait, and
 // its error marks children whose root has exited; taskkill runs through runCommandAsync, so stops
-// started together run at the same time.
+// started together run at the same time; taskkill has a time limit, and a deadline option bounds the
+// whole stop.
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -11,6 +12,8 @@ import process from "node:process";
 import { setTimeout as delay } from "node:timers/promises";
 
 const DEFAULT_FORCE_KILL_AFTER_MS = 5000;
+// Not forceKillAfterMs: a caller that asks for a short wait must not stop a healthy taskkill.
+const TASKKILL_TIMEOUT_MS = 5000;
 const EXIT_POLL_MS = 50;
 
 export function runCommand(command, args = [], options = {}) {
@@ -52,9 +55,33 @@ export function runCommandAsync(command, args = [], options = {}) {
     });
     let stdout = "";
     let stderr = "";
+    let timer = null;
+    const finish = (status, signal, error) => {
+      clearTimeout(timer);
+      resolve({ command, args, status, signal, stdout, stderr, error });
+    };
+    if (options.timeoutMs !== undefined) {
+      timer = setTimeout(() => {
+        const error = Object.assign(new Error(`${command} ${args.join(" ")} did not end within ${options.timeoutMs} ms.`), {
+          code: "ETIMEDOUT"
+        });
+        // Settled first: kill can throw, or emit error from inside the call.
+        finish(null, null, error);
+        try {
+          child.kill();
+        } catch {
+          // The result is already given.
+        } finally {
+          // A stopped command's pipes must not keep the caller, such as the SessionEnd hook, alive.
+          child.stdout?.destroy();
+          child.stderr?.destroy();
+          child.unref();
+        }
+      }, options.timeoutMs);
+    }
     // A spawn failure emits error before close, and close may not follow, so the first one settles.
-    child.on("error", (error) => resolve({ command, args, status: null, signal: null, stdout, stderr, error }));
-    child.on("close", (status, signal) => resolve({ command, args, status, signal, stdout, stderr, error: null }));
+    child.on("error", (error) => finish(null, null, error));
+    child.on("close", (status, signal) => finish(status, signal, null));
     // With no file handles left (EMFILE), Node makes no pipes and reports the error on the next tick.
     child.stdout?.setEncoding("utf8");
     child.stderr?.setEncoding("utf8");
@@ -194,10 +221,30 @@ function killLeaderOrThrow(pid, killImpl) {
   }
 }
 
+// The processes that taskkill could not stop. Each line names its process first; a later PID is its
+// parent, which can be the caller itself.
+function namedByTaskkill(result) {
+  return `${result.stderr}\n${result.stdout}`
+    .split(/\r?\n/)
+    .filter((line) => !/^SUCCESS/i.test(line.trim()))
+    .map((line) => /\bPID\s+(\d+)/i.exec(line)?.[1])
+    .filter(Boolean)
+    .map(Number);
+}
+
+function hasDeadline(options) {
+  return Number.isFinite(options.deadline);
+}
+
+// A deadline ends the whole stop; forceKillAfterMs counts from the signal or the taskkill.
+function stopDeadline(options) {
+  return hasDeadline(options) ? options.deadline : Date.now() + (options.forceKillAfterMs ?? DEFAULT_FORCE_KILL_AFTER_MS);
+}
+
 // A process that ignores SIGTERM would otherwise outlive cancel. The wait must not block the event
 // loop: Node reaps the caller's own exited child only from the loop, and until then it looks alive.
 async function forceKillAfterWait(target, options, killImpl) {
-  const deadline = Date.now() + (options.forceKillAfterMs ?? DEFAULT_FORCE_KILL_AFTER_MS);
+  const deadline = stopDeadline(options);
   const darwin = (options.platform ?? process.platform) === "darwin";
   while (isAlive(target, killImpl, darwin)) {
     const remaining = deadline - Date.now();
@@ -228,11 +275,26 @@ export async function terminateProcessTree(pid, options = {}) {
   const killImpl = options.killImpl ?? process.kill.bind(process);
 
   if (platform === "win32") {
+    // A caller with a deadline (the SessionEnd hook) must end by then, taskkill included.
+    let timeoutMs = TASKKILL_TIMEOUT_MS;
+    if (hasDeadline(options)) {
+      timeoutMs = options.deadline - Date.now();
+      if (timeoutMs <= 0) {
+        // An exited pid may be reused, so the caller must clear it, not keep it for a retry.
+        if (!isAlive(pid, killImpl)) {
+          return { attempted: false, delivered: false, method: null };
+        }
+        throw Object.assign(new Error(`taskkill /PID ${pid} /T /F was not started: no time was left.`), {
+          code: "ETIMEDOUT"
+        });
+      }
+    }
     // One taskkill /T takes about a second; a blocking call would make stops started together run
     // one after another.
     const result = await runCommandImpl("taskkill", ["/PID", String(pid), "/T", "/F"], {
       cwd: options.cwd,
-      env: options.env
+      env: options.env,
+      timeoutMs
     });
 
     if (!result.error && result.status === 0) {
@@ -251,20 +313,31 @@ export async function terminateProcessTree(pid, options = {}) {
       }
     }
 
+    // A root that has exited is stopped, and its pid may be reused, so a retry must not get it. Only
+    // the children that taskkill named before it ran out of time can be checked, and with no wait.
+    if (result.error?.code === "ETIMEDOUT" && !isAlive(pid, killImpl)) {
+      // A line cut off by the stop could hold a short, wrong PID.
+      const wholeLines = (text) => text.slice(0, text.lastIndexOf("\n") + 1);
+      const stillRunning = namedByTaskkill({ stdout: wholeLines(result.stdout), stderr: wholeLines(result.stderr) }).filter(
+        (candidate) => isAlive(candidate, killImpl)
+      );
+      if (stillRunning.length === 0) {
+        return { attempted: true, delivered: true, method: "taskkill", result };
+      }
+      throw Object.assign(
+        new Error(`${result.error.message}\nStill running: ${stillRunning.map((candidate) => `PID ${candidate}`).join(", ")}.`),
+        { stillRunning, orphans: true }
+      );
+    }
+
     if (result.error) {
       throw result.error;
     }
 
     // taskkill /T also fails on short-lived children, such as gh.exe at Copilot's start, that exit
-    // while it walks the tree. Only a process that is still alive after the wait is a failure. Each
-    // line names its process first; a later PID is its parent, which can be this process itself.
+    // while it walks the tree. Only a process that is still alive after the wait is a failure.
     const combinedOutput = `${result.stderr}\n${result.stdout}`.trim();
-    const named = combinedOutput
-      .split(/\r?\n/)
-      .filter((line) => !/^SUCCESS/i.test(line.trim()))
-      .map((line) => /\bPID\s+(\d+)/i.exec(line)?.[1])
-      .filter(Boolean)
-      .map(Number);
+    const named = namedByTaskkill(result);
     // Output that names no process cannot show that the tree stopped, unless the root was already gone.
     if (named.length === 0) {
       if (looksLikeMissingProcessMessage(combinedOutput)) {
@@ -273,7 +346,7 @@ export async function terminateProcessTree(pid, options = {}) {
       throw new Error(formatCommandFailure(result));
     }
     let alive = [...new Set([pid, ...named])];
-    const deadline = Date.now() + (options.forceKillAfterMs ?? DEFAULT_FORCE_KILL_AFTER_MS);
+    const deadline = stopDeadline(options);
     for (;;) {
       alive = alive.filter((candidate) => isAlive(candidate, killImpl));
       if (alive.length === 0) {

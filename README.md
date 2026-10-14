@@ -370,13 +370,22 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
   can keep running. If one of the job's own processes cannot be stopped, by cancel or at the end of
   a run, the job keeps that process id, and you can run `/copilot:cancel <job id>` again.
 - On Windows, when `taskkill` fails, the plugin checks whether the process and each process that
-  `taskkill` could not stop are still alive, for up to 5 seconds. Only one that is still alive
+  `taskkill` could not stop are still alive, for up to 5 seconds (when a Claude session ends, until
+  the hook's deadline). Only one that is still alive
   counts as a failed stop. When a child that the job does not track is left after its parent
   exited, a new cancel cannot reach it, so cancel names it and says to end it in Task Manager if
   it is still a Copilot or gh process. The job then keeps no pid for that stop. When this happens
   as a Claude session ends, the job stays, and `/copilot:result` shows the same note. Copilot starts
   short-lived `gh.exe` children that exit while `taskkill` stops the tree, and Codex reports such a
   cancel as failed. The reason is correctness.
+- On Windows, each `taskkill` has a time limit: the hook's own deadline when a Claude session ends,
+  and 5 seconds for every other stop, such as cancel or the stop of Copilot after a run. A
+  `taskkill` that does not end in time is stopped. When the hook has no time left, no `taskkill`
+  starts. If the process is still alive, the stop did not finish, so the job keeps its process id
+  and you can run `/copilot:cancel <job id>` again. A process that has exited counts as stopped,
+  but a child that `taskkill` named and that is still alive is named, as above. Codex waits for
+  `taskkill` with no limit, so a `taskkill` that stalls holds cancel or the hook. The reason is
+  correctness.
 - A background task's record is written before its worker starts. Codex starts the worker first, and
   a worker that finds no record leaves the job queued forever. If the worker cannot start, or stops
   with an error before its run ends, the job is marked failed.
@@ -429,7 +438,7 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
 - If a review gate hook is killed outright, a later gate deletes the patch folder that it left.
 - When a Claude session ends, the plugin first marks the session closed and its active jobs
   cancelled, in one step. A companion that started before the session ended cannot start a job for
-  it, and neither can a companion that a review gate hook from before that time starts later. Then the plugin stops the jobs' processes, with one shared wait of up to 2 seconds, and
+  it, and neither can a companion that a review gate hook from before that time starts later. Then the plugin stops the jobs' processes by one shared deadline, up to 2 seconds away, which also bounds each `taskkill` on Windows, and
   removes the session's finished jobs and the jobs it stopped. A job that another session, or the
   same session after `claude --resume`, starts in the meantime stays. A job whose processes could
   not be stopped keeps its record, so `/copilot:cancel` can try again. All of this ends inside the
