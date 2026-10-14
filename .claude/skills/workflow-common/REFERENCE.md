@@ -490,18 +490,20 @@ Delete a record that is `closed` and posted.
   red, do not publish: this is handled like a failed step.
 - The table is not on the PR (the post failed): do not publish. The release waits for the owner,
   who finds the table in the record and posts it.
-- Every step passed and the table is on the PR: the run allows publishing. Before publishing, run `git ls-remote --tags origin "vX.Y.Z" "vX.Y.Z^{}"`. A tag that exists must point
-  to the merge commit; if not, do not publish, never move the tag, and the release waits for the
-  owner.
+- Every step passed and the table is on the PR: the run allows publishing. Before publishing, run
+  `git ls-remote --tags origin "vX.Y.Z" "vX.Y.Z^{}"`. If the command fails, do not publish: the
+  release waits for the owner. Empty output from a command that worked means there is no tag. A tag
+  that exists must point to the merge commit; if not, do not publish, never move the tag, and the
+  release waits for the owner.
 - A step failed: do not publish. The fix is a new ticket and a new patch release (Principle VI).
   This holds also when the table post failed.
 - A step is `unsure`: do not publish. The release waits for the owner, who does the open steps by
   hand on the merge commit, updates the table on the PR, and publishes only when every step passed.
   If a newer version has a release by then, add `--latest=false` to `gh release create`, so the
   newer release stays the latest.
-- If `gh release create` fails, check `gh release view vX.Y.Z`. The release counts as published only
-  when it is not a draft and its tag points to the merge commit. If not, it waits for the owner,
-  with the error.
+- After `gh release create`, whether it worked or failed, check `gh release view vX.Y.Z`. The
+  release counts as published only when it is not a draft and its tag points to the merge commit.
+  If not, it waits for the owner, with what you found.
 
 ### Publishing
 
