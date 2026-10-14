@@ -440,8 +440,10 @@ Before a run, read every record:
    - A release exists: there is nothing to run when it is not a draft, its tag points to the merge
      commit, and the record for vX.Y.Z is finished ("Record") with the result `published` or the
      line `checked by owner`. A finished `failed` record without `checked by owner` does not
-     count: a failed version gets no release. In every other case, the release waits for the
-     owner.
+     count: a failed version gets no release. Versions up to 1.0.12 (by version order) were
+     released before release-run records existed: for them only the record is not needed; the
+     release must still be no draft with its tag on the merge commit. In every other case, the
+     release waits for the owner.
    - No release exists: claim the version by creating the record, in a way that fails when it
      exists: `(set -o noclobber; : > "$WT_ROOT/release-run-X.Y.Z.md")`. Only one run can claim a
      version. If the create fails, touch no path and no record, and report it to the owner: the

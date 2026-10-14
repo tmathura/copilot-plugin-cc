@@ -70,23 +70,26 @@ handle the release run records as "Release run", "Record", in REFERENCE.md says.
 not finished (and is not this session's run that it goes on with), report it, and stop: at the
 start, before the queue; later, before the next ticket.
 
-At the start, also run `git fetch origin main` (stop if it fails) and read the plugin version on
-`origin/main` (`git show origin/main:package.json`). If that version has no GitHub release and no
-record, its release run may never have run (a crash, or a `gh` query error). Find the commit that
-set it: the newest commit on `origin/main`, following first parents only (`--first-parent`),
-whose `package.json` has that version while its first parent's has another. Do the release run
-for it before the queue only when:
+At the start, also check the plugin version on `main`, so a release run that never ran (a crash,
+or a `gh` query error) is not lost:
 
-- its commit date (`git log -1 --format=%cI <sha>`) is more than 2 hours old, because a newer one
-  may still be claimed by another session (the `noclobber` claim is what prevents a double
-  release; this only avoids getting in its way); and
-- `gh api repos/tmathura/copilot-plugin-cc/commits/<sha>/pulls` returns exactly one merged PR
-  whose `merge_commit_sha` is that commit (a search by SHA can also return later PRs).
-
-In every other case, stop and report it: no matching commit, a `gh` call that fails twice, or a
-PR count other than one (this repo only squash-merges, so a release PR's `merge_commit_sha` is the
-landed commit). A release that exists with no record gets the `waits` record that Setup step 1
-writes, and is reported as waiting for the owner.
+1. Run `git fetch origin main` (stop if it fails) and read the version from
+   `git show origin/main:package.json`.
+2. Find the commit that set it: the newest commit on `origin/main`, following first parents only
+   (`--first-parent`), whose `package.json` has that version while its first parent's has
+   another. Find its PR: `gh api repos/tmathura/copilot-plugin-cc/commits/<sha>/pulls` must return
+   exactly one merged PR whose `merge_commit_sha` is that commit (this repo only squash-merges).
+   If there is no such commit or exactly-one PR, or a `gh` call fails twice, stop and report it.
+3. Run `gh release view vX.Y.Z`. "Release not found" means no release (the branches below). Any
+   other failure: try once more, then stop and report it.
+   - A release exists: apply the "A release exists" case of Setup step 1 in REFERENCE.md, with
+     this commit as the merge commit. When it says the release waits for the owner, keep the hold
+     as it says, report it, and stop the run.
+   - No release and no record: when the commit date (`git log -1 --format=%cI <sha>`) is more
+     than 2 hours old, do the release run for this commit and PR before the queue. A newer one
+     may still be claimed by another session: report it and stop. (The `noclobber` claim is what
+     prevents a double release; the wait only avoids getting in its way.)
+   - No release but a record: the record rules above handle it.
 
 ## Order
 
