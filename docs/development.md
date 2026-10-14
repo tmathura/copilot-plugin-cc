@@ -56,7 +56,7 @@ How work moves from an idea to `main`. The rules behind these steps are in the
     release run and, only if it passes, publish the release ("Release", below).
 
 The `workflow-*` Claude Code skills in `.claude/skills/` run these steps. Start with
-`/workflow-start`. `/workflow-auto` runs the open tickets, or one, from plan to merge without asking,
+`/workflow-manual`. `/workflow-auto` runs the open tickets, or one, from plan to merge without asking,
 and reports what is not done; which tickets it takes and its options are in its skill. The skills'
 shared rules are in `.claude/skills/workflow-common/REFERENCE.md`.
 The skills load only when this repo is open as the project in Claude Code. You can also follow the

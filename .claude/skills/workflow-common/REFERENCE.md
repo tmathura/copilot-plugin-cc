@@ -178,7 +178,7 @@ fix and test only for a ticket that used bug triage.
 
 ## Commit and push rules
 
-- Starting `workflow-start` counts as permission for every commit, push and PR it makes. It does
+- Starting `workflow-manual` counts as permission for every commit, push and PR it makes. It does
   **not** give permission to merge into `main`. Merge only after the user answers the Step 9 question.
   It does not give permission to publish a release either. Publish only after the user answers the
   Step 9 release question. The one exception: starting `workflow-auto` without `--ask-merge` gives
@@ -309,7 +309,7 @@ Each round:
    (nothing to push), and check the loop's end rule below.
 4. **Run a Codex and Copilot round on the fixes** with `--scope working-tree` and the findings as the focus.
    Check its findings too. If you fix any of them, run the commands from "Commands" again.
-5. **Review the diff** as in Step 6 of `workflow-start` (`code-review`, then the docs check).
+5. **Review the diff** as in Step 6 of `workflow-manual` (`code-review`, then the docs check).
    Then **commit** with `workflow-commit`. The body lists each finding and what happened to it.
 6. **Push and rewrite the PR body** with `workflow-pr`.
 7. **Reply to every thread and resolve it.** Say what was done, or why the finding was rejected. Write
@@ -422,7 +422,7 @@ Before a run, read every record:
   `closed` or `manual`, or a last update more than 2 hours old): post its table as "Table" says,
   with unfinished steps as `unsure`. A run that may still be going posts its own.
 - Any other record that is not finished, this session's own too: do not touch it otherwise. Report it to the owner
-  (`workflow-auto`: "For you"; `workflow-start`: the Step 9 report), and say whether its last
+  (`workflow-auto`: "For you"; `workflow-manual`: the Step 9 report), and say whether its last
   update is less than 2 hours old: then it may be a live run in another session. `workflow-auto`
   stops before the queue. The owner first checks that the run is not live (its last update and its
   pids), then finishes it by hand: stops the leftover processes (check the name in Task Manager

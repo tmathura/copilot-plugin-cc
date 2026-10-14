@@ -7,7 +7,7 @@ argument-hint: "<drafted ticket, or nothing to use the draft in the conversation
 # workflow: ticket
 
 First read the repo's `.claude/skills/workflow-common/REFERENCE.md`. Act at once: the user already
-approved the draft in `workflow-start`.
+approved the draft in `workflow-manual`.
 
 ## Input
 
