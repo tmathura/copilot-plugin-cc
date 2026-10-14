@@ -435,8 +435,8 @@ repo, and Windows cannot delete a folder that a shell is in.
 | Step | Pass when |
 | --- | --- |
 | 1 `/copilot:setup` | It says ready |
-| 2 `/copilot:review --wait` | A review. `git status --porcelain` and `git stash list` are the same before and after |
-| 3 `/copilot:adversarial-review --wait` | A verdict. The repo is unchanged |
+| 2 `/copilot:review --wait` | A review. The repo is unchanged: `git status --porcelain`, `git stash list`, `git rev-parse HEAD`, `git ls-files -s` (the index) and `git hash-object` of each file in the working tree (also the untracked one) are the same before and after |
+| 3 `/copilot:adversarial-review --wait` | A verdict. The repo is unchanged, checked as in step 2 |
 | 4 A background `task --background --write` (a small change), then `status` and `result` | The job completes, `result` shows its output, and `git status --porcelain` shows the change |
 | 5 A background task, then `cancel` while it runs | `cancel` exits 0 and the job is `cancelled`. A cancel that says the job already completed or already failed means the task ended first: run the step once more with a longer task; if it happens again, the step is `unsure`. Any other failed cancel is `fail`; write its message to the record. Its `pid` and `copilotPid` (from `status --json`, read while it ran, and written to the record) are gone: `process.kill(pid, 0)` in `node` throws with code `ESRCH`. A pid that still answers is `fail`; any other error is `unsure`. Where Copilot's sandbox refuses the shell command, cancel a running read-only task instead |
 | 6 Reset the throwaway repo to its first commit (`git reset --hard <first commit>`, `git clean -fd`), so the gate sees only the planted bug. `setup --enable-review-gate`, make a change with an obvious bug, write `{"session_id": "<id>", "cwd": "<repo>", "last_assistant_message": "<what changed>"}` to a file in the scratchpad (not in the repo) with the file tool, and run the Stop hook with `< <file>` | The hook prints `"decision":"block"` with a reason that names the planted bug. A block for another reason is `unsure` |
