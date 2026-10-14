@@ -397,14 +397,17 @@ the version's claim and its history, so it is never deleted. It holds:
 - the fix ticket's number, for a `failed` result;
 - the time of the last update.
 
-A record is finished when its cleanup state is `closed`, its table is posted, and one of these is
-true:
+A record is finished when it has no `hold:` line (the owner removes it), its cleanup state is
+`closed`, its table is posted, and one of these is true:
 
 - its result is `published`;
 - its result is `failed` and it names a fix ticket. When the failed version was itself a release
   fix ("Result"), it also needs the line `checked by owner`;
 - it has the line `checked by owner`. The owner adds it when nothing more is to be done, for
   example for a version the owner decides not to publish.
+
+A record with no paths (no run happened: "Where", or a release found by Setup step 1) has the
+cleanup state `closed` from the start and needs no table.
 
 Claude never writes `checked by owner`, never sets a `manual` record to `closed`, and never sets
 `published` on a record whose run it did not do: those are the owner's.
@@ -415,7 +418,7 @@ Before a run, read every record:
   version) whose result is not set and whose cleanup state is not `manual`: wait until its
   background calls have ended, then go on with the run from the record, without running Setup
   again.
-- Any record whose table is not posted, whose PR is known, and whose run has ended (cleanup state
+- Any record with paths (a run happened) whose table is not posted, whose PR is known, and whose run has ended (cleanup state
   `closed` or `manual`, or a last update more than 2 hours old): post its table as "Table" says,
   with unfinished steps as `unsure`. A run that may still be going posts its own.
 - Any other record that is not finished, this session's own too: do not touch it otherwise. Report it to the owner
@@ -429,13 +432,23 @@ Before a run, read every record:
 
 **Setup.**
 
-1. Run `gh release view vX.Y.Z`. If the command fails for another reason than "release not found",
-   stop: the release waits for the owner. If it shows a release that is not a draft and whose tag
-   points to the merge commit, there is nothing to run. A release that does not match waits for
-   the owner. Otherwise claim the version by creating the record, in a way that fails when it
-   exists: `(set -o noclobber; : > "$WT_ROOT/release-run-X.Y.Z.md")`. Only one run can claim a
-   version. If the create fails, touch no path and no record, and report it to the owner: the
-   version was claimed before (its record says how that run ended), or the file could not be made.
+1. Run `gh release view vX.Y.Z`:
+   - The command fails for another reason than "release not found": stop. The release waits for
+     the owner.
+   - A release exists: there is nothing to run when it is not a draft, its tag points to the merge
+     commit, and the record for vX.Y.Z is finished ("Record"). In every other case (no record, so
+     no proof of a release run; a record that is not finished; or a release that does not match),
+     the release waits for the owner: report it. When there is no record, create one with the
+     `noclobber` command below, with the result `waits` and no paths, so later runs see the hold.
+     When the record is finished but the release does not match, append the line
+     `hold: <what is wrong>` to it. An unfinished record already blocks later runs: only report it.
+     The owner clears it by completing the record by hand until it is finished, for example with
+     `checked by owner`.
+   - No release exists: claim the version by creating the record, in a way that fails when it
+     exists: `(set -o noclobber; : > "$WT_ROOT/release-run-X.Y.Z.md")`. Only one run can claim a
+     version. If the create fails, touch no path and no record, and report it to the owner: the
+     version was claimed before (its record says how that run ended), or the file could not be
+     made.
 2. Write the record. The three paths are the release worktree `$WT_ROOT/release-X.Y.Z`, the
    throwaway repo `$WT_ROOT/release-repo-X.Y.Z` and the data folder `$WT_ROOT/release-data-X.Y.Z`.
    Check that none of them exists; any folder that exists, also an empty one, did not come from

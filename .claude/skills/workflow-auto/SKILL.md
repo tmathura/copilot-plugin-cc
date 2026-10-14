@@ -29,7 +29,8 @@ Take only open issues that the owner opened (`gh issue list --author @me --state
 The run merges and publishes without a person reading the change, so an issue from anyone else
 could steer it. Skip issues labelled `question`, `wontfix`, `duplicate` or `invalid`. A `question`
 issue waits for the owner; this skill also adds that label to the tickets it holds ("Not done").
-List each skipped issue under "For you", with the reason. A one-ticket run on an issue that is
+List each skipped issue under "For you", with the reason. A skipped `question` issue also goes under
+"Not done", with its hold reason and the decision it waits for. A one-ticket run on an issue that is
 skipped, closed or missing does nothing and reports why; the owner can run `/workflow-start` on it.
 Check these rules again just before each ticket starts, because a long run can outlive them.
 
@@ -101,7 +102,7 @@ as a decision. With no decision, the ticket runs as before, and the same stop ho
 | Step 9 point 1: the head changed, or a check fails at merge time | Back to the review loops, then merge when Step 9 finds the new head ready. With `--ask-merge`, ask again. |
 | The plan's Constitution Check marks a principle "not met" (it needs the owner's approval) | Not done |
 | Step 9 point 3: the PR is not `MERGED` | Not done |
-| Publish the release | Do the release run (REFERENCE.md) without asking. If it allows publishing: publish; with `--ask-merge`, ask after the run. A step failed (or the CI run on the merge commit is red): "Result" creates the fix ticket, with a `Release fix:` line; in a backlog run it runs next, so a later release does not fail on the same defect. An open ticket with that line that cannot run (Not done, held, or skipped) stops a backlog run early, also at the start of a later run, because later releases would fail on the same defect. If the release run of a ticket with that line fails again, "Result" creates the new ticket with the `question` label, so no run takes it: list the release under "For you" (the failure may come from the environment, not the code) and stop the run early. When "Result" says the release waits for the owner (an `unsure` step, a table that is not on the PR, a tag on another commit): list the release under "For you" and stop the run early, because its record is not finished and later releases must wait for it. |
+| Publish the release | Do the release run (REFERENCE.md) without asking. If it allows publishing: publish; with `--ask-merge`, ask after the run. A step failed (or the CI run on the merge commit is red): "Result" creates the fix ticket, with a `Release fix:` line; in a backlog run it runs next, so a later release does not fail on the same defect. An open ticket with that line that cannot run (Not done, held, or skipped) stops a backlog run early, also at the start of a later run, because later releases would fail on the same defect. If the release run of a ticket with that line fails again, "Result" creates the new ticket with the `question` label, so no run takes it: list the release under "For you" (the failure may come from the environment, not the code) and stop the run early. When the release waits for the owner (an `unsure` step, a table that is not on the PR, a tag on another commit, or a published release with no finished record, as Setup step 1 says): list the release under "For you" and stop the run early, because later releases must wait for it. |
 | More than 3 hand-written files | Not done, with the proposed split into tickets |
 | A test would need changing, an environment problem, or a fix still fails after 3 tries | Not done |
 | An unclear review finding | Not done |
