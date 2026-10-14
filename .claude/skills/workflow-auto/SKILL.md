@@ -43,7 +43,8 @@ an old one) whose first lines give the argument and the mode from `$ARGUMENTS` (
    worktree and PR; why, in one or two sentences; the decision the owner must make, the options and
    the recommendation; and the ticket it waits for.
 2. **To verify:** each choice the run made for the owner, with the ticket and the reason.
-3. **For you:** a release run in progress (its version, so it can be found after a summary);
+3. **For you:** a release run in progress (its version, so it can be found after a summary); each
+   release run record in state `manual`, with what its record asks the owner to do;
    releases that wait for the owner, with the merge commit, the PR and the link to the run table;
    PRs the owner holds (remove the `question` label when you have decided, also if you merge the
    PR yourself); upstream reports, with the command from `workflow-start` Step 9, point 8;

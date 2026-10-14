@@ -382,14 +382,17 @@ table notes are short summaries in your own words, not raw output.
 are under `$WT_ROOT`, not in a session's scratchpad, so a new session can find and delete them. The
 record holds: the PR, the version, the merge commit, the three paths, the throwaway repo's first
 commit, the companion session id, each job id with its pids as it starts, each step's result as it
-ends, whether the table is posted, the state `open`, and the time of the last update. Before a
-run, look at each `$WT_ROOT/release-run-*.md` whose last update is more than 2 hours old (a crash
-cut it off; a newer one can belong to a run in another session), and at this session's own records
-of any age (after a summary, the summary or the `workflow-auto` report names the version). After a summary,
-first wait until this session's background calls of that run have ended; then go on with the run
-from the record if you can, and otherwise clean it up. If a record is still
-`open`, clean it up with the cleanup below; its unfinished steps are `unsure`. If its table is not
-posted, post it.
+ends, cancel messages, whether the table is posted, the state (`open`, `manual` or `closed`), and
+the time of the last update.
+
+Before a run, look at each `$WT_ROOT/release-run-*.md` whose last update is more than 2 hours old
+(a crash cut it off; a newer one can belong to a run in another session), and at this session's
+own records of any age (after a summary, the summary or the `workflow-auto` report names the
+version). After a summary, first wait until this session's background calls of that run have
+ended; then go on with the run from the record if you can. A record that is still `open` gets the
+cleanup below; its unfinished steps are `unsure`. A record in state `manual` is not cleaned again:
+report it to the owner (`workflow-auto`: "For you"; `workflow-start`: the Step 9 report). If a
+record's table is not posted, post it.
 
 **Setup.**
 
@@ -430,7 +433,7 @@ repo, and Windows cannot delete a folder that a shell is in.
 | 2 `/copilot:review --wait` | A review. `git status --porcelain` and `git stash list` are the same before and after |
 | 3 `/copilot:adversarial-review --wait` | A verdict. The repo is unchanged |
 | 4 A background `task --background --write` (a small change), then `status` and `result` | The job completes, `result` shows its output, and `git status --porcelain` shows the change |
-| 5 A background task, then `cancel` while it runs | The job is `cancelled`. Its `pid` and `copilotPid` (from `status --json`, read while it ran) are gone: `process.kill(pid, 0)` in `node` throws with code `ESRCH`. A pid that still answers is `fail`; any other error is `unsure`. Where Copilot's sandbox refuses the shell command, cancel a running read-only task instead |
+| 5 A background task, then `cancel` while it runs | `cancel` exits 0 and the job is `cancelled`. A cancel that says the job already completed or already failed means the task ended first: run the step once more with a longer task; if it happens again, the step is `unsure`. Any other failed cancel is `fail`; write its message to the record. Its `pid` and `copilotPid` (from `status --json`, read while it ran) are gone: `process.kill(pid, 0)` in `node` throws with code `ESRCH`. A pid that still answers is `fail`; any other error is `unsure`. Where Copilot's sandbox refuses the shell command, cancel a running read-only task instead |
 | 6 Reset the throwaway repo to its first commit (`git reset --hard <first commit>`, `git clean -fd`), so the gate sees only the planted bug. `setup --enable-review-gate`, make a change with an obvious bug, write `{"session_id": "<id>", "cwd": "<repo>", "last_assistant_message": "<what changed>"}` to a file in the scratchpad (not in the repo) with the file tool, and run the Stop hook with `< <file>` | The hook prints `"decision":"block"` with a reason that names the planted bug. A block for another reason is `unsure` |
 | 7 Fix the bug, write a new hook input whose `last_assistant_message` describes the fix, and run the Stop hook again | The hook ran a review (a new job in `status --json`) and does not block. A block is `unsure`, because the review is the model's opinion |
 | 8 `setup --disable-review-gate` | `setup --json` shows the gate off |
@@ -448,14 +451,19 @@ not run, or when Claude cannot read the fact.
    it; when it cannot be checked otherwise, the run is `unsure`.
 2. Cancel every job of this run that has not finished. Then read `status --all --json` from the
    data folder (it also lists the Stop hook's jobs). A `cancelled` or `failed` job that still names
-   a pid has a stop that did not finish: cancel it again by job id. Every pid it names must then be
-   gone (`ESRCH`). If a pid still answers (`fail`) or cannot be read (`unsure`), keep the folders
-   and the pids in the record, which stays `open`, and stop the cleanup here. The next run tries
-   again.
+   a pid has a stop that did not finish: cancel it again by job id. A cancel that says the job
+   already completed or failed is fine. After the last cancel, check that the pids it names are
+   gone (`ESRCH`). If that cancel failed for another reason, or a pid still answers or cannot be
+   read, the run is `unsure`: keep the folders, set the record's state to `manual`, and write to it
+   the cancel messages and the command to retry the cancel (the companion command above, with the
+   data folder). Stop the cleanup here. The owner retries the cancel, ends a process by hand only
+   after checking its name in Task Manager (pids are reused), deletes the paths, and then deletes
+   the record.
 3. `git -C "$MAIN" worktree remove --force "$WT_ROOT/release-X.Y.Z"`, `git -C "$MAIN" worktree prune`,
    and delete the throwaway repo and the data folder. A worktree still in `git worktree list`, or a
    folder that is not empty, makes the run `unsure`: write what is left to the record, which stays
-   `open`, so the next run tries again. An empty folder that the OS locks is only reported.
+   `open`, so the next run tries again (this needs no process to stop). An empty folder that the OS
+   locks is only reported.
 4. When nothing is left but such empty folders, set the record to `closed`.
 
 **Table.** Post the table (step, `pass` / `fail` / `unsure`, a short note) once, as a comment on the
