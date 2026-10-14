@@ -532,7 +532,8 @@ commit, `published` once the release counts as published, and `waits` for every 
   red, do not publish: this is handled like a failed step.
 - The table is not on the PR (the post failed): do not publish. The release waits for the owner,
   who finds the table in the record and posts it.
-- Every step passed and the table is on the PR: the run allows publishing. Before publishing, run
+- Every step passed, the cleanup state is `closed`, and the table is on the PR: the run allows
+  publishing. (Cleanup that is not `closed` makes the run `unsure`.) Before publishing, run
   `git ls-remote --tags origin "vX.Y.Z" "vX.Y.Z^{}"`. If the command fails, do not publish: the
   release waits for the owner. Empty output from a command that worked means there is no tag. A tag
   that exists must point to the merge commit; if not, do not publish, never move the tag, and the

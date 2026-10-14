@@ -136,9 +136,10 @@ For the ticket this run was working on:
    ticket's commands run from the main checkout.
 5. Add it to the report, then go on with the next ticket that does not depend on it.
 
-A ticket that only waits in the queue, or that has no branch, is only listed in the report. A
-merged ticket gets none of the steps above: the report says which cleanup is left and which step
-to retry.
+A ticket that only waited in the queue, or that waits for another issue ("Depends on"), is only
+listed in the report. A ticket that this run worked on gets the steps above even when it stopped
+before its branch was made. A merged ticket gets none of the steps above: the report says which
+cleanup is left and which step to retry.
 
 ## Reviews
 
