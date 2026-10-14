@@ -269,8 +269,9 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
 - There is no shared broker process (upstream `app-server-broker.mjs`, `broker-endpoint.mjs` and
   `broker-lifecycle.mjs`). Each `copilot` run stands alone, so there is nothing to share.
 - CI runs the tests on Ubuntu, macOS and Windows, not only Ubuntu, because the plugin must work the
-  same on all three. CI does not install a real CLI. The tests use a fake `copilot`. The checkout
-  does not keep the GitHub token, so code under test cannot read it.
+  same on all three. It also runs on each push to `main`, not only on pull requests, so the merge
+  commit that a release tag points to is tested. CI does not install a real CLI. The tests use a
+  fake `copilot`. The checkout does not keep the GitHub token, so code under test cannot read it.
 - The plugin never starts a command through a shell, on any system. On Windows it starts `npm` and
   `copilot` from their npm `.cmd` files by running the script inside with `node`. Codex uses a
   shell on Windows, which could run text from the repo as a command. The tests start their commands

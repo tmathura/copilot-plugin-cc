@@ -51,9 +51,14 @@ How work moves from an idea to `main`. The rules behind these steps are in the
     fixes, test, commit and push. Answer and resolve every thread, then wait for the next reviews.
     Stop when no reviewer has findings and no thread is open, or when every finding left was
     rejected in an earlier round.
-11. Squash-merge when every CI check passes.
-12. Remove the worktree and the branch, and pull `main`. If the PR raised the plugin version, do the
-    release run and, only if it passes, publish the release ("Release", below).
+11. Squash-merge when every CI check passes. The ruleset on `main` ("Protect main + Copilot review")
+    enforces this: a PR merges only when the jobs `CI (ubuntu-latest)`, `CI (macos-latest)` and
+    `CI (windows-latest)` passed, and its branch has the latest `main`. When `main` has moved on,
+    merge `origin/main` into the branch, test, review, push, and wait for the reviews and CI again.
+12. Remove the worktree and the branch, and pull `main`. CI
+    (`.github/workflows/pull-request-ci.yml`) also runs on each push to `main`, so the merge commit
+    gets its own run. If the PR raised the plugin version, do the release run and, only if it and
+    that CI run pass, publish the release ("Release", below).
 
 The `workflow-*` Claude Code skills in `.claude/skills/` run these steps. Start with
 `/workflow-manual`. `/workflow-auto` runs the open tickets, or one, from plan to merge without asking,
@@ -325,6 +330,9 @@ system, on a detached checkout of the merge commit, with `claude --plugin-dir` i
 repo. The owner or Claude does it. The steps are in "Release run" in
 `.claude/skills/workflow-common/REFERENCE.md`. Its table (each step, pass, fail or unsure, and a
 note) is a comment on the merged PR.
+
+The CI run on the merge commit on `main` must pass too. It is the last step of the release run, so
+its result is in the same table.
 
 If a step fails, do not publish. The version stays on `main` with no tag. The fix is a new ticket
 and a new patch release, with a new, higher number. Its `CHANGELOG.md` entry also says what the

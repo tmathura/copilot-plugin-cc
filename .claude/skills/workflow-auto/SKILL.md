@@ -121,10 +121,10 @@ as a decision. With no decision, the ticket runs as before, and the same stop ho
 | Planning mode | The mode that REFERENCE.md "Planning mode" picks. For Claude plan mode, do not call `EnterPlanMode`: write the plan to `<scratchpad>/plan-review-<n>.md` and run the Codex and Copilot loop on it with `task --prompt-file`. If the rule cannot pick a row: Not done. |
 | Approve the plan and create the issue (Step 1) | Not reached: this skill always passes an issue number. A ticket that the run finds itself is approved by the run ("After each merge"). |
 | Step 9, the PR is ready | **Merge now**. With `--ask-merge`, ask. If the owner answers **I'll review it myself first** or **Stop**, the ticket is Not done, held for the owner's review: follow "Not done" below, and also list it under "For you". A release that the owner answers **Not now** goes under "For you". |
-| Step 9, the PR is not ready | First check again: GitHub can still be computing `mergeable` (`UNKNOWN`) after a push. Then **Fix first**; for a PR that conflicts with `main`, that is `git merge origin/main` in the worktree. Not done when the cause is not in the PR (after the one CI rerun below), when the merge conflict needs a decision, or when a Fix first pass changes nothing. |
+| Step 9, the PR is not ready | First check again: GitHub can still be computing `mergeable` (`UNKNOWN`) after a push. Then **Fix first**; for a PR that is behind `main` (`BEHIND`) or conflicts with it, that is "Bring the branch up to date" in Step 9. Not done when the cause is not in the PR (after the one CI rerun below), when the merge conflict needs a decision, or when a Fix first pass changes nothing. |
 | Step 9 point 1: the head changed, or a check fails at merge time | Back to the review loops, then merge when Step 9 finds the new head ready. With `--ask-merge`, ask again. |
 | The plan's Constitution Check marks a principle "not met" (it needs the owner's approval) | Not done |
-| Step 9 point 3: the PR is not `MERGED` | Not done |
+| Step 9 point 3: the PR is not `MERGED` | If it is `BEHIND` or `CONFLICTING`: "Bring the branch up to date", then merge when Step 9 finds the new head ready. With `--ask-merge`, ask again. Otherwise: Not done |
 | Publish the release | Do the release run (REFERENCE.md) without asking. If it allows publishing: publish; with `--ask-merge`, ask after the run. A step failed (or the CI run on the merge commit is red): "Result" creates the fix ticket, with a `Release fix:` line; in a backlog run it runs next, so a later release does not fail on the same defect. An open ticket with that line that cannot run (Not done, held, or skipped) stops a backlog run early, also at the start of a later run, because later releases would fail on the same defect. If the release run of a ticket with that line fails again, "Result" creates the new ticket with the `question` label, so no run takes it: list the release under "For you" (the failure may come from the environment, not the code) and stop the run early. When the release waits for the owner (an `unsure` step, a table that is not on the PR, a tag on another commit, a published release with no finished record, or a `gh release view` that fails twice, as Setup step 1 says): list the release under "For you" and stop the run early, because later releases must wait for it. |
 | More than 3 hand-written files | Go on. The limit holds only when the owner runs `workflow-manual` alone. |
 | A test would need changing, an environment problem, or a fix still fails after 3 tries | Not done |
@@ -195,14 +195,15 @@ are created but not fixed.
 - the worktree is removed;
 - the branch is deleted locally and on the remote;
 - `main` is pulled and clean;
-- the CI run on `main` after the merge is green, if there is one (CI runs on pull requests only
-  today, so the PR's checks in Step 9 stand in for it);
+- the CI run on `main` for the merge commit ended with `success`. For a release, step 9 of its
+  release run already says so. Otherwise check it as that step does, with its one rerun. A run that
+  is missing or did not finish cannot be fixed here;
 - no review thread is open.
 
 Fix what is missing before the next ticket. Then:
 
 - An empty folder that the OS locks goes under "Leftover folders".
-- A red CI run on `main` caused by the PR gets a fix ticket, unless the PR's release run record
+- A CI run on `main` that is still red after its one rerun gets a fix ticket, unless the PR's release run record
   already handles it (it names a fix ticket, as REFERENCE.md "Result" says). In a backlog run the fix ticket runs
   next, and if it is Not done, the run stops. A one-ticket run creates it, reports the red check and
   stops.
