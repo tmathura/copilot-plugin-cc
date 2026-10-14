@@ -435,8 +435,8 @@ Before a run, read every record:
    version was claimed before (its record says how that run ended), or the file could not be made.
 2. Write the record. The three paths are the release worktree `$WT_ROOT/release-X.Y.Z`, the
    throwaway repo `$WT_ROOT/release-repo-X.Y.Z` and the data folder `$WT_ROOT/release-data-X.Y.Z`.
-   Check that none of them exists. An empty folder that is not in `git worktree list` (one the OS
-   locked after an earlier cleanup) counts as not there. If one exists, create nothing and run no
+   Check that none of them exists; any folder that exists, also an empty one, did not come from
+   this run. If one exists, create nothing and run no
    cleanup: the run is `unsure`, mark that path `existed before`, set the record's state to
    `manual`, and post the table. Otherwise mark each path `created` in the record right after
    making it (steps 3 and 4).
