@@ -389,19 +389,22 @@ Before a run, look at each `$WT_ROOT/release-run-*.md` whose last update is more
 (a crash cut it off; a newer one can belong to a run in another session), and at this session's
 own records of any age (after a summary, the summary or the `workflow-auto` report names the
 version). After a summary, first wait until this session's background calls of that run have
-ended; then go on with the run from the record if you can. A record that is still `open` gets the
+ended; then go on with the run from the record if you can, without running Setup again. A record that is still `open` gets the
 cleanup below; its unfinished steps are `unsure`. A record in state `manual` is not cleaned again:
 report it to the owner (`workflow-auto`: "For you"; `workflow-start`: the Step 9 report). If a
 record's table is not posted, post it.
 
 **Setup.**
 
-1. The three paths are the release worktree `$WT_ROOT/release-X.Y.Z`, the throwaway repo
-   `$WT_ROOT/release-repo-X.Y.Z` and the data folder `$WT_ROOT/release-data-X.Y.Z`. Check
-   that none of them exists. An empty folder that is not in `git worktree list` (one the OS locked
-   after an earlier cleanup) counts as not there. If one exists, create nothing and run no cleanup:
-   the run is `unsure`, report the path, and post the table.
-2. Write the record. Whatever exists at those paths from now on belongs to this run.
+1. Claim the version by creating the record, in a way that fails when it exists:
+   `(set -o noclobber; : > "$WT_ROOT/release-run-X.Y.Z.md")`. Only one run can claim a version.
+   If the create fails, the run is `unsure`: report the error, and touch no path and no record.
+2. Write the record. The three paths are the release worktree `$WT_ROOT/release-X.Y.Z`, the
+   throwaway repo `$WT_ROOT/release-repo-X.Y.Z` and the data folder `$WT_ROOT/release-data-X.Y.Z`.
+   Check that none of them exists. An empty folder that is not in `git worktree list` (one the OS
+   locked after an earlier cleanup) counts as not there. If one exists, create nothing and run no
+   cleanup: the run is `unsure`, set the record's state to `manual` with the path that was there,
+   and post the table. Otherwise, whatever exists at those paths from now on belongs to this run.
 3. `git -C "$MAIN" worktree add --detach "$WT_ROOT/release-X.Y.Z" <merge commit>`. The main
    checkout is not touched.
 4. Make the throwaway repo: `git init`, one commit, one staged change and one untracked file. Write
