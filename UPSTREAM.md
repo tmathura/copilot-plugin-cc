@@ -83,7 +83,7 @@ The details of each change are in
 | `tests/helpers.mjs` | ported | #14 |
 | `tests/process.test.mjs` | ported | #15 |
 | `tests/render.test.mjs` | ported | #15 |
-| `tests/runtime.test.mjs` | ported | #19 |
+| `tests/runtime.test.mjs` | ported | `tests/runtime-*.test.mjs` and `tests/runtime-helpers.mjs`, #19 |
 | `tests/state.test.mjs` | ported | #15 |
 | `tsconfig.app-server.json` | ported | `tsconfig.prompt-mode.json`, #19 |
 
