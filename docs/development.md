@@ -18,6 +18,10 @@ How work moves from an idea to `main`. The rules behind these steps are in the
    made in Claude plan mode is not saved in the repo. If it is not clear which row fits, ask the
    owner. If a plan-mode ticket grows into plugin files, stop and plan it again with Spec Kit.
 
+   Before your plan is shown, Codex and Copilot each write their own plan from the issue text alone,
+   while you plan. Compare the three plans, take what is better into yours, and keep the comparison
+   in the issue as `## Plan comparison`. A difference that needs a decision goes to the owner.
+
    The bug triage plan is `assessment.md` plus a Constitution Check that you write in it, because
    the assessment has none. Run the plan's Constitution Check. Have Codex and Copilot review the
    plan (for the spec flow: `spec.md`, `plan.md` and `tasks.md`), and apply their confirmed findings.
@@ -36,26 +40,26 @@ How work moves from an idea to `main`. The rules behind these steps are in the
    the same commit ("Keeping the spec current", below). If the change is a release, raise the
    version and add the `CHANGELOG.md` entry ("Release", below).
 5. Run `npm run build`, `npm test`, `npm run check-version` and `claude plugin validate .`. They
-   must pass.
-6. Review the diff, and check it against `CLAUDE.md` and the docs it links to. Fix what you find,
-   then test again. Do steps 5 and 6 before every commit, also in the review rounds below.
-7. Commit with the subject `[#n] Imperative description`.
-8. Review the branch with `/codex:adversarial-review` and `/copilot:adversarial-review`, both with
-   `--scope branch --base origin/main`, in rounds. In each round, fix the confirmed findings, record
-   rejected ones with the reason, test, and commit. Stop when both reviewers approve, or when every
-   finding left was rejected in an earlier round. If one reviewer is not set up, run this step and
-   step 10 with the other one, and say so in the PR.
-9. Open a PR into `main`. The bot reviewers (today Copilot and CodeRabbit) review each push.
-10. Review the PR in rounds. In each round, read every review, including findings that are only in a
-    review body or summary comment. Fix the confirmed findings, have Codex and Copilot review the
-    fixes, test, commit and push. Answer and resolve every thread, then wait for the next reviews.
-    Stop when no reviewer has findings and no thread is open, or when every finding left was
-    rejected in an earlier round.
-11. Squash-merge when every CI check passes. The ruleset on `main` ("Protect main + Copilot review")
+   must pass. Do this before every commit, also in the review rounds below.
+6. Commit with the subject `[#n] Imperative description`.
+7. Review the branch in rounds. In each round, run three reviews of `origin/main...HEAD` at the
+   same time: a code review of the diff with its check against `CLAUDE.md` and the docs it links to,
+   `/codex:adversarial-review` and `/copilot:adversarial-review`, both with
+   `--scope branch --base origin/main`. Fix the confirmed findings, record rejected ones with the
+   reason, test, and commit. Stop when all three approve, or when every finding left was rejected
+   in an earlier round. If one reviewer is not set up, run this step and step 9 with the other one,
+   and say so in the PR.
+8. Open a PR into `main`. The bot reviewers (today Copilot and CodeRabbit) review each push.
+9. Review the PR in rounds. In each round, read every review, including findings that are only in a
+   review body or summary comment. Fix the confirmed findings, have Codex and Copilot review the
+   fixes, review the diff and check it against `CLAUDE.md`, test, commit and push. Answer and
+   resolve every thread, then wait for the next reviews. Stop when no reviewer has findings and no
+   thread is open, or when every finding left was rejected in an earlier round.
+10. Squash-merge when every CI check passes. The ruleset on `main` ("Protect main + Copilot review")
     enforces this: a PR merges only when the jobs `CI (ubuntu-latest)`, `CI (macos-latest)` and
     `CI (windows-latest)` passed, and its branch has the latest `main`. When `main` has moved on,
     merge `origin/main` into the branch, test, review, push, and wait for the reviews and CI again.
-12. Remove the worktree and the branch, and pull `main`. CI
+11. Remove the worktree and the branch, and pull `main`. CI
     (`.github/workflows/pull-request-ci.yml`) also runs on each push to `main`, so the merge commit
     gets its own run. If the PR raised the plugin version, do the release run and, only if it and
     that CI run pass, publish the release ("Release", below).

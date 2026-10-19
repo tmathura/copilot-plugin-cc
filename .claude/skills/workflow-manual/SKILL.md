@@ -1,6 +1,6 @@
 ---
 name: workflow-manual
-description: Run the copilot-plugin-cc ticket workflow end to end (plan, GitHub issue, worktree branch, implement, test, review, commit, Codex and Copilot loop, PR, PR review loop, merge). Asks only for the planning mode, to approve the plan and issue, before merging the PR into main, and before publishing a version's GitHub release; everything in between runs without asking unless something needs a decision. Use to start new work or resume a ticket in copilot-plugin-cc.
+description: Run the copilot-plugin-cc ticket workflow end to end (blind plans and plan, GitHub issue, worktree branch, implement, test, commit, one review round of code-review, Codex and Copilot, PR, PR review loop, merge). Asks only for the planning mode, to approve the plan and issue, before merging the PR into main, and before publishing a version's GitHub release; everything in between runs without asking unless something needs a decision. Use to start new work or resume a ticket in copilot-plugin-cc.
 argument-hint: "[issue number to resume or start from | new]"
 ---
 
@@ -24,7 +24,7 @@ Also stop and ask when:
 - more than 3 hand-written files must change (Step 4);
 - a test failure needs a test changed, is an environment problem, or still fails after 3 fixes
   (Step 5);
-- a review finding is unclear;
+- a review finding is unclear, or the blind plans differ in a way that needs a decision;
 - a loop reaches its round limit;
 - untracked files appear that this ticket did not create;
 - a step skill fails.
@@ -32,7 +32,7 @@ Also stop and ask when:
 Do everything else without asking: the branch, tests, review, commits, the Codex and Copilot loop, applying
 confirmed findings, push, PR, the PR review loop, and cleanup after the merge.
 
-At each step, print one status line, for example "Step 6: code-review found nothing; committing."
+At each step, print one status line, for example "Step 7: round 1 found nothing; opening the PR."
 
 Do not end the turn between steps. Do not write "continue?" in chat. End the turn only for one of the
 questions above, for a background wait (say in one line what you are waiting for), or at the end of
@@ -57,8 +57,9 @@ Step 9's readiness checks and `--match-head-commit` still apply.
   / **Spec flow** if it touches the plugin, otherwise **Claude plan mode**. Plan once, in the
   worktree, with the issue text. With Spec Kit, the folder has the issue number from the start
   (`slug=NNN-<slug>` or `SPECIFY_FEATURE_DIRECTORY=specs/NNN-<name>`), and you add its `Bug notes:` or
-  `Spec:` line to the issue (REFERENCE.md "Planning mode"). Write the Constitution Check, and run the
-  Codex and Copilot loop on the plan, as in Step 1, before the code.
+  `Spec:` line to the issue (REFERENCE.md "Planning mode"). Run the blind plan, write the
+  Constitution Check, and run the Codex and Copilot loop on the merged plan, as in Step 1, before the
+  code.
 - **Empty or `new`:** start at Step 1. If no task was described, ask: **Describe and plan
   (Recommended)** / **Give an issue number** / **Abort**.
 
@@ -82,7 +83,7 @@ planning folder.
    - Run `git fetch origin`, then `git merge origin/main`. If the merge stops on a conflict, run
      `git merge --abort`, then stop and report.
    - Check that the file now exists. If not, stop and report.
-5. Say in one line where you resume, for example "Resuming #12 at Step 7b: 2 commits, no PR yet."
+5. Say in one line where you resume, for example "Resuming #12 at Step 7: 2 commits, no PR yet."
    Then go on from that step. If the work touches the plugin and has no planning notes, stop and ask
    (REFERENCE.md "Planning mode").
 
@@ -96,8 +97,12 @@ Ask which planning mode to use. Mark the mode that REFERENCE.md "Planning mode" 
 (Recommended), and give the reason in one line. For a change that touches the plugin, offer only the
 two Spec Kit modes.
 
-- **Claude plan mode**: `EnterPlanMode`, read the code, write the plan, then `ExitPlanMode` for
-  approval.
+Then start the blind plan (REFERENCE.md) with the task description, and plan in the chosen mode
+while it runs. Before you show the plan, write the comparison and merge what you take into the plan
+(Spec Kit files by hand). Show the comparison with the plan for approval.
+
+- **Claude plan mode**: start the blind plan, then `EnterPlanMode`, read the code, write the plan,
+  then `ExitPlanMode` for approval.
 - **Spec Kit spec flow**: offer it only when REFERENCE.md "Spec Kit" allows it. Run the skills in
   the main checkout, as REFERENCE.md "Planning mode" says. The spec files stay untracked;
   `workflow-branch` moves them into the worktree.
@@ -112,8 +117,8 @@ prompt file, as a plan-mode plan does. Apply confirmed findings to the plan. Cor
 by hand.
 
 Draft the ticket from the plan: its title, body and one type label, as "Tickets" in the repo's
-`docs/development.md` says. Pass the type label to `workflow-ticket` apart from the body,
-not as a line in it.
+`docs/development.md` says, with the `## Plan comparison` section. Pass the type label to
+`workflow-ticket` apart from the body, not as a line in it.
 
 With Spec Kit, also pass the planning folder (`specs/<name>/` or `.specify/bugs/<slug>/`, still
 without the issue number). `workflow-ticket` adds the number to the folder and the `Spec:` or
@@ -135,7 +140,7 @@ Read the root `CLAUDE.md` in the worktree and the docs it links to. Read
 ## Step 4. Implement
 
 - For an existing issue that has not been planned yet, plan it first (see "Input", a ticket id with
-  no branch).
+  no branch), and append the comparison to the issue (REFERENCE.md "Blind plan").
 - Before you write code, say in a few lines which files you will change and why.
 - With Spec Kit feature planning, work through `tasks.md` and tick each task when it is done.
 - With bug triage, run `/speckit-bug-fix slug=NNN-<slug>`, then handle its result (REFERENCE.md "Bug
@@ -169,33 +174,33 @@ If something fails, decide which kind of failure it is **before you touch a test
 
 Never hide a timing problem with a sleep or a retry in a test.
 
-## Step 6. Review before commit
-
-1. Invoke the `code-review` skill on the working diff.
-2. Check the diff against `CLAUDE.md` and the docs it links to. With Spec Kit feature planning, also
-   check it against `spec.md` and `plan.md`. With bug triage, check it against `assessment.md` and
-   the "Deviations from Assessment" in `fix.md` (only `assessment.md` for an `invalid` port).
-3. Report the checks that ran and the findings, with `path:lines`, or "No deviations found".
-4. Check the findings (REFERENCE.md). Fix the confirmed ones, then repeat Steps 4, 5 and 6 until
-   no confirmed finding is left.
-
-## Step 7. Commit
+## Step 6. Commit
 
 Invoke `workflow-commit` with a one-line description of the diff and the list of files this
 ticket changed. With bug triage, the list includes `.specify/bugs/NNN-<slug>/`, the path in the
 issue's `Bug notes:` line.
 
-## Step 7b. Codex and Copilot loop on the code
+## Step 7. Review round
 
-Run the Codex and Copilot loop (REFERENCE.md) with branch scope and the plan in the focus text. After each round
-that changed files, run Steps 5 and 6 again before the commit. With bug triage, a round that changed the fix also updates `fix.md` (REFERENCE.md
-"Bug triage", Edits). Commit with the description `Address Codex and Copilot review round <k>` and a body that gives
-the outcome of each finding.
+Run the code review round (REFERENCE.md) with the plan in the focus text. A resume at this step
+starts a new round on the current head.
+
+1. The docs check: check the branch diff against `CLAUDE.md` and the docs it links to. With Spec
+   Kit feature planning, also check it against `spec.md` and `plan.md`. With bug triage, check it
+   against `assessment.md` and the "Deviations from Assessment" in `fix.md` (only `assessment.md`
+   for an `invalid` port).
+2. Report the checks that ran and the findings, with `path:lines` and their source, or "No
+   deviations found".
+3. Check the findings of all three together (REFERENCE.md). Fix the confirmed ones and run Step 5
+   again. With bug triage, a round that changed the fix also updates `fix.md` (REFERENCE.md "Bug
+   triage", Edits). Commit with `workflow-commit`, the description `Address review round <k>` and a
+   body that gives the outcome of each finding. Then run the next round, until the loop ends by its
+   rules.
 
 ## Step 8. Push and PR
 
-Invoke `workflow-pr`. The PR body gets a short **Review rounds** section from the Step 7b commit
-bodies.
+Invoke `workflow-pr`. The PR body gets a short **Review rounds** section from the Step 7 commit
+bodies, and the **Plan comparison** from the issue.
 
 A draft PR needs a check, because bot reviewers skip drafts and Step 9 needs a PR that is not a
 draft. Read `isDraft` with `gh pr view <n> --json isDraft`, and the comments from all pages with
@@ -234,16 +239,16 @@ is `BEHIND` (`main` has moved on), or `mergeable` is `CONFLICTING`, "Fix first" 
 
 1. `git status --porcelain` must be empty. If not, stop and ask.
 2. `git fetch origin`. If it fails, stop and report.
-3. `git merge --no-commit --no-ff origin/main`, so the merge stays staged for Steps 5 and 6. If it
+3. `git merge --no-commit --no-ff origin/main`, so the merge stays staged for Step 5. If it
    stops on a conflict that needs a decision, run `git merge --abort`, then stop and ask. Resolve
    any other conflict and stage the result. If it says `Already up to date`, the branch has `main`
    already: read the state again. If it still shows `BEHIND` or `CONFLICTING`, stop and report.
    Otherwise skip point 4 and run the readiness checks again.
-4. Steps 5 and 6 on the staged merge (`git diff --cached`). Stage each fix (`git add -u`, or
-   `git add <path>` for a new file). Then commit with `git commit -F <file>`, with a message in the
-   "Naming" format and the description `Merge origin/main` (as `workflow-commit` writes it). Git
-   makes the merge commit even when the merge changes no file. Then do Steps 7b, 8 and 8b on the
-   new head, and run the readiness checks again.
+4. Step 5 on the staged merge. Stage each fix (`git add -u`, or `git add <path>` for a new file).
+   Then commit with `git commit -F <file>`, with a message in the "Naming" format and the
+   description `Merge origin/main` (as `workflow-commit` writes it). Git makes the merge commit even
+   when the merge changes no file. Then do Steps 7, 8 and 8b on the new head: Step 7 reviews the
+   merge commit with the rest of the branch. Run the readiness checks again.
 
 Report the PR URL, the rounds of each loop, any rejected findings, and whether the PR is ready. Then
 ask:
