@@ -1,7 +1,7 @@
 # copilot-plugin-cc
 
-A Claude Code plugin that hands code reviews and coding tasks to the GitHub Copilot CLI. It is a port
-of OpenAI's codex-plugin-cc and stays close to it.
+A Claude Code plugin that uses the GitHub Copilot CLI to review code or to hand off coding tasks. It is
+a port of OpenAI's codex-plugin-cc and stays close to it.
 
 This file only gives directions. The rules live in the files below.
 

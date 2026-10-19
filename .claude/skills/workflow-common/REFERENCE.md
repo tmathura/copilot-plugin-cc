@@ -13,10 +13,12 @@ labels.
 | Repo | `tmathura/copilot-plugin-cc` on GitHub |
 | Remote | `origin` = `https://github.com/tmathura/copilot-plugin-cc.git` |
 | Default branch | `main` |
-| Merge style | squash: `gh pr merge --squash --delete-branch` |
+| Merge style | squash: `gh pr merge --squash --delete-branch`. The repo settings and the ruleset allow no other merge method, and GitHub deletes the head branch after a merge. |
 | PR template | none; use "PR body" below |
-| Branch rules | Changes to `main` go through a PR. No force-push to `main`, and no deleting it. 0 approvals needed. Bot reviewers (see "PR review loop") review each push. A PR merges only when the CI jobs `CI (ubuntu-latest)`, `CI (macos-latest)` and `CI (windows-latest)` passed and its branch has the latest `main` (ruleset "Protect main + Copilot review"). |
+| Branch rules | Changes to `main` go through a PR. No force-push to `main`, and no deleting it. 0 approvals needed. Bot reviewers (see "PR review loop") review each push. A PR merges only when the CI jobs `CI (ubuntu-latest)`, `CI (macos-latest)` and `CI (windows-latest)` passed, CodeQL found no error alert and no security alert of high or critical level, every review thread is resolved, and its branch has the latest `main` (ruleset "Protect main + Copilot review"). |
 | CI | `.github/workflows/pull-request-ci.yml`, on each PR and on each push to `main`, so each merge commit gets its own run |
+| Security | CodeQL default setup (no workflow file) scans each PR and each push to `main`. Dependabot alerts and security updates are on, and `.github/dependabot.yml` asks for npm and GitHub Actions updates once a week. Private vulnerability reporting is on (`SECURITY.md`). |
+| Features | Wiki and Projects are off. Issues are on, with the bug form `.github/ISSUE_TEMPLATE/bug_report.yml`. Blank issues stay allowed, because `workflow-ticket` makes issues from its own body. |
 | Labels | `bug`, `enhancement`, `documentation`, `duplicate`, `good first issue`, `help wanted`, `invalid`, `question`, `wontfix`, `accessibility`. When to use each: "Tickets" in the repo's `docs/development.md`. |
 
 ## Shell and paths
