@@ -14,4 +14,5 @@ vulnerability**, or go to
 Say which plugin version and which Copilot CLI version you use, and how to see the problem. Do not
 put tokens, passwords or other secrets in the report.
 
-A problem in the GitHub Copilot CLI itself, not in this plugin, goes to GitHub.
+A problem in the GitHub Copilot CLI itself, not in this plugin, goes to GitHub, as its
+[security policy](https://github.com/github/.github/blob/main/SECURITY.md) says.
