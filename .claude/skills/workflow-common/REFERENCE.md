@@ -203,8 +203,8 @@ fix and test only for a ticket that used bug triage.
 A finding from Codex, Copilot or a bot reviewer is a claim, not a fact. Check each one against the code. Mark it:
 
 - **confirmed**: it is true. Apply it without asking.
-- **rejected**: it is not true, or it would change the behaviour before the ticket (below). Write the
-  reason in one line.
+- **rejected**: it is not true, or the rule on the old behaviour below rejects it. Write the reason in
+  one line.
 - **unclear**: you cannot tell. Ask: **Apply the confirmed findings, skip the unclear (Recommended)** /
   **Choose which** / **Stop the loop**.
 
