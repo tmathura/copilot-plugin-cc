@@ -97,18 +97,19 @@ Ask which planning mode to use. Mark the mode that REFERENCE.md "Planning mode" 
 (Recommended), and give the reason in one line. For a change that touches the plugin, offer only the
 two Spec Kit modes.
 
-Then start the blind plan (REFERENCE.md) with the task description, and plan in the chosen mode
-while it runs; REFERENCE.md says what you may write in the checkout before it ends. Before you show
-the plan, write the comparison and merge what you take into the plan (Spec Kit files by hand). Show
-the comparison with the plan for approval.
+Pull `main` in the main checkout (`git -C "$MAIN" pull --ff-only origin main`; if it fails, stop
+and report). Then start the blind plan (REFERENCE.md) with the task description, and plan in the
+chosen mode while it runs; REFERENCE.md says what you may write in the checkout before it ends.
+Before you show the plan, write the comparison and merge what you take into the plan (Spec Kit files
+by hand). Show the comparison with the plan for approval.
 
 - **Claude plan mode**: once the blind plan has started, `EnterPlanMode`, read the code, write the
   plan, then `ExitPlanMode` for approval.
 - **Spec Kit spec flow**: offer it only when REFERENCE.md "Spec Kit" allows it. Run the skills in
   the main checkout, as REFERENCE.md "Planning mode" says. The spec files stay untracked;
   `workflow-branch` moves them into the worktree.
-- **Spec Kit bug triage**: offer it for a bug, when REFERENCE.md "Bug triage" allows it. Pull `main`,
-  check the slug, then run `/speckit-bug-assess "<symptom>" slug=<slug>` in the main checkout. Write
+- **Spec Kit bug triage**: offer it for a bug, when REFERENCE.md "Bug triage" allows it. Check the
+  slug, then run `/speckit-bug-assess "<symptom>" slug=<slug>` in the main checkout. Write
   a Constitution Check at the end of `assessment.md`. The approved plan is `assessment.md` with that
   check.
   The notes stay untracked; `workflow-branch` moves them into the worktree.
@@ -192,11 +193,11 @@ starts a new round on the current head.
    for an `invalid` port).
 2. Report the checks that ran and the findings, with `path:lines` and their source, or "No
    deviations found".
-3. Check the findings of all three together (REFERENCE.md). Fix the confirmed ones, with the spec
-   sweep and the docs update of Step 4, and run Step 5 again. With bug triage, a round that changed
-   the fix also updates `fix.md` (REFERENCE.md "Bug triage", Edits). Commit with `workflow-commit`, the description `Address review round <k>` and a
-   body that gives the outcome of each finding. Then run the next round, until the loop ends by its
-   rules.
+3. Check the findings of all three together (REFERENCE.md). Fix the confirmed ones by the rules of
+   Step 4, and run Step 5 again. With bug triage, a round that changed the fix also updates
+   `fix.md` (REFERENCE.md "Bug triage", Edits). Commit with `workflow-commit`, the description
+   `Address review round <k>` and a body that gives the outcome of each finding. Then run the next
+   round, until the loop ends by its rules.
 
 ## Step 8. Push and PR
 

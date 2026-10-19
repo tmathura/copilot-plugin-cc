@@ -229,15 +229,15 @@ per ticket, in every planning mode.
    `## Plan comparison` was planned before: do not run the blind plan again.
 2. Start each ready reviewer with `node "$CODEX" task --prompt-file "<file>"` (`$CODEX` and the
    Copilot script as in "Codex and Copilot review loop"; "Background calls" there), then plan while
-   they run. In Step 1, first pull `main` in the main checkout
-   (`git -C "$MAIN" pull --ff-only origin main`). `task` without `--write` is read-only, and it
-   starts a fresh thread, so it cannot see this session. Until both calls have ended, write nothing
+   they run. `task` without `--write` is read-only, and it starts a fresh thread, so it cannot see
+   this session. Until both calls have ended, write nothing
    in the checkout that shows Claude's plan: in the Spec Kit modes, read the code, and start the
    skill that writes the planning folder only after the calls end. A plan-mode plan lives outside
    the checkout. Install and ready checks are as in "Codex and Copilot review loop": plan with the
-   ready ones, or skip this step when none is ready. A blind-plan call that fails twice or is
-   stopped only leaves out that reviewer's plan; it does not make the reviewer not ready for the
-   review loops. Say in the comparison which plan is missing and why.
+   ready ones, or skip this step when none is ready. A blind-plan call that fails twice only leaves
+   out that reviewer's plan. A call that is stopped (it may have left a process) makes that
+   reviewer not ready for the rest of the ticket, as in the code review round. Say in the
+   comparison which plan is missing and why.
 3. When the plans are done, write a short comparison: where they agree, where they differ and why,
    and what Claude took from them. Claude's plan with those changes (the merged plan) is the plan
    for the review loop. A difference that needs the owner's decision is asked like an unclear
@@ -307,9 +307,9 @@ The blind plan and the code review round start Codex and Copilot as background B
 - A call that ended with an error, or with no plan or no verdict, runs once more.
 - A call that still runs when its timer ends is stopped with `TaskStop` and does not run again,
   because its reviewer process may still run. Name it in the report as a possible leftover process.
-- In the code review round, a reviewer whose call failed twice, or was stopped, is not ready for the
-  rest of the ticket, and the rules for a reviewer that is not ready apply. (For the blind plan, see
-  "Blind plan".)
+- A reviewer whose call was stopped, or whose code review round call failed twice, is not ready for
+  the rest of the ticket, and the rules for a reviewer that is not ready apply. (A blind-plan call
+  that failed twice: see "Blind plan".)
 - A failed call never counts as `approve`.
 
 ### Code review round
@@ -318,9 +318,14 @@ The blind plan and the code review round start Codex and Copilot as background B
 
 - Codex and Copilot with `--scope branch --base origin/main`, as background calls;
 - while they run, `code-review` and the docs check that Step 7 describes, on a range of commits.
-  Find the newest commit on the branch whose subject is `[#<n>] Address review round <k>` or
-  `[#<n>] Merge origin/main`
-  (`git log -1 --format='%H %s' -E --grep='^\[#<n>\] (Address review round|Merge origin/main)' origin/main..HEAD`):
+  Find the newest commit on the branch whose subject (not body) is `[#<n>] Address review round <k>`
+  or `[#<n>] Merge origin/main`:
+
+  ```bash
+  git log --format='%H %s' origin/main..HEAD | grep -m1 -E '^[0-9a-f]+ \[#<n>\] (Address review round|Merge origin/main)'
+  ```
+
+  Then:
   - an `Address review round` commit: review only the commits since the last round, `<sha>^..HEAD`.
     This keeps `code-review` from raising new points on code that did not change, and it works
     after a resume;

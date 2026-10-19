@@ -46,8 +46,7 @@ How work moves from an idea to `main`. The rules behind these steps are in the
 7. Review the branch in rounds. In each round, run three reviews at the same time:
    `/codex:adversarial-review` and `/copilot:adversarial-review`, both with
    `--scope branch --base origin/main`, and a code review of the diff with its check against
-   `CLAUDE.md` and the docs it links to. The code review covers the whole branch in the first round,
-   and only the new commits in later rounds. Fix the confirmed findings, record rejected ones with the
+   `CLAUDE.md` and the docs it links to. Fix the confirmed findings, record rejected ones with the
    reason, test, and commit. Stop when all three approve, or when every finding left was rejected
    in an earlier round. If Codex or Copilot is not set up, run this step and step 9 without it, and
    say so in the PR.
