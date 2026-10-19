@@ -98,11 +98,12 @@ Ask which planning mode to use. Mark the mode that REFERENCE.md "Planning mode" 
 two Spec Kit modes.
 
 Then start the blind plan (REFERENCE.md) with the task description, and plan in the chosen mode
-while it runs. Before you show the plan, write the comparison and merge what you take into the plan
-(Spec Kit files by hand). Show the comparison with the plan for approval.
+while it runs; REFERENCE.md says what you may write in the checkout before it ends. Before you show
+the plan, write the comparison and merge what you take into the plan (Spec Kit files by hand). Show
+the comparison with the plan for approval.
 
-- **Claude plan mode**: start the blind plan, then `EnterPlanMode`, read the code, write the plan,
-  then `ExitPlanMode` for approval.
+- **Claude plan mode**: once the blind plan has started, `EnterPlanMode`, read the code, write the
+  plan, then `ExitPlanMode` for approval.
 - **Spec Kit spec flow**: offer it only when REFERENCE.md "Spec Kit" allows it. Run the skills in
   the main checkout, as REFERENCE.md "Planning mode" says. The spec files stay untracked;
   `workflow-branch` moves them into the worktree.
@@ -140,7 +141,7 @@ Read the root `CLAUDE.md` in the worktree and the docs it links to. Read
 ## Step 4. Implement
 
 - For an existing issue that has not been planned yet, plan it first (see "Input", a ticket id with
-  no branch), and append the comparison to the issue (REFERENCE.md "Blind plan").
+  no branch), and add the comparison to the issue (REFERENCE.md "Blind plan").
 - Before you write code, say in a few lines which files you will change and why.
 - With Spec Kit feature planning, work through `tasks.md` and tick each task when it is done.
 - With bug triage, run `/speckit-bug-fix slug=NNN-<slug>`, then handle its result (REFERENCE.md "Bug
@@ -185,14 +186,14 @@ issue's `Bug notes:` line.
 Run the code review round (REFERENCE.md) with the plan in the focus text. A resume at this step
 starts a new round on the current head.
 
-1. The docs check: check the branch diff against `CLAUDE.md` and the docs it links to. With Spec
+1. The docs check: check the diff against `CLAUDE.md` and the docs it links to. With Spec
    Kit feature planning, also check it against `spec.md` and `plan.md`. With bug triage, check it
    against `assessment.md` and the "Deviations from Assessment" in `fix.md` (only `assessment.md`
    for an `invalid` port).
 2. Report the checks that ran and the findings, with `path:lines` and their source, or "No
    deviations found".
-3. Check the findings of all three together (REFERENCE.md). Fix the confirmed ones and run Step 5
-   again. With bug triage, a round that changed the fix also updates `fix.md` (REFERENCE.md "Bug
+3. Check the findings of all three together (REFERENCE.md). Fix the confirmed ones by the rules of
+   Step 4 (the spec sweep and the docs too), and run Step 5 again. With bug triage, a round that changed the fix also updates `fix.md` (REFERENCE.md "Bug
    triage", Edits). Commit with `workflow-commit`, the description `Address review round <k>` and a
    body that gives the outcome of each finding. Then run the next round, until the loop ends by its
    rules.

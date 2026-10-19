@@ -18,8 +18,8 @@ How work moves from an idea to `main`. The rules behind these steps are in the
    made in Claude plan mode is not saved in the repo. If it is not clear which row fits, ask the
    owner. If a plan-mode ticket grows into plugin files, stop and plan it again with Spec Kit.
 
-   Before your plan is shown, Codex and Copilot each write their own plan from the issue text alone,
-   while you plan. Compare the three plans, take what is better into yours, and keep the comparison
+   Before your plan is shown, Codex and Copilot each write their own plan from the issue text (or
+   the task description) alone, while you plan. Compare the three plans, take what is better into yours, and keep the comparison
    in the issue as `## Plan comparison`. A difference that needs a decision goes to the owner.
 
    The bug triage plan is `assessment.md` plus a Constitution Check that you write in it, because
@@ -47,8 +47,8 @@ How work moves from an idea to `main`. The rules behind these steps are in the
    `/codex:adversarial-review` and `/copilot:adversarial-review`, both with
    `--scope branch --base origin/main`. Fix the confirmed findings, record rejected ones with the
    reason, test, and commit. Stop when all three approve, or when every finding left was rejected
-   in an earlier round. If one reviewer is not set up, run this step and step 9 with the other one,
-   and say so in the PR.
+   in an earlier round. If Codex or Copilot is not set up, run this step and step 9 without it, and
+   say so in the PR.
 8. Open a PR into `main`. The bot reviewers (today Copilot and CodeRabbit) review each push.
 9. Review the PR in rounds. In each round, read every review, including findings that are only in a
    review body or summary comment. Fix the confirmed findings, have Codex and Copilot review the

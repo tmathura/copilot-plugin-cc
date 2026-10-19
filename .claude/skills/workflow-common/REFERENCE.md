@@ -215,10 +215,9 @@ Before Claude's plan is shown, Codex and Copilot each write their own plan from 
 do not see Claude's plan, so they can find a simpler approach or a different root cause. Run it once
 per ticket, in every planning mode.
 
-1. Write `<scratchpad>/blind-plan-<n>.md` (`<slug>` in Step 1, before the issue exists) with the
-   file tool. Put in it this request, then the issue title and body from `gh issue view <n>` (in
-   Step 1: the task description), without a `## Plan comparison` section and without the folder
-   line:
+1. Write `<scratchpad>/blind-plan-<n>.md` (`blind-plan-new.md` in Step 1, before the issue exists)
+   with the file tool. Put in it this request, then the issue title and body from
+   `gh issue view <n>` (in Step 1: the task description), without the folder line:
 
    > Plan the change that the text below asks for, in the repo in the current directory. Read the
    > code and docs you need, but do not change any file. Give a short plan, as a list: the root cause
@@ -229,8 +228,9 @@ per ticket, in every planning mode.
    `## Plan comparison` was planned before: do not run the blind plan again.
 2. Start each ready reviewer with `node "$CODEX" task --prompt-file "<file>"` (`$CODEX` and the
    Copilot script as in "Codex and Copilot review loop"; "Background calls" there), then plan while
-   they run. `task` without `--write` is read-only, and it starts a
-   fresh thread, so it cannot see this session. Until both calls have ended, write nothing in the
+   they run. Pull `main` first when the planning mode pulls it. `task` without `--write` is
+   read-only, and it starts a fresh thread, so it cannot see this session. Until both calls have
+   ended, write nothing in the
    checkout that shows Claude's plan: in the Spec Kit modes, read the code, and start the skill that
    writes the planning folder only after the calls end. A plan-mode plan lives outside the checkout.
    Install and ready checks are as in "Codex and Copilot review loop": plan with the ready ones, or
@@ -239,10 +239,11 @@ per ticket, in every planning mode.
    and what Claude took from them. Claude's plan with those changes (the merged plan) is the plan
    for the review loop. A difference that needs the owner's decision is asked like an unclear
    finding ("Checking review findings").
-4. The comparison goes in the issue body as a `## Plan comparison` section, above the folder line.
-   In Step 1 it is part of the ticket draft. For an issue that exists, append it as the folder line
-   is appended ("Planning mode"). There it survives a resume, and `workflow-pr` copies it into the
-   PR body.
+4. The comparison goes in the issue body as a `## Plan comparison` section. In Step 1 it is part of
+   the ticket draft, and `workflow-ticket` puts the folder line after it. For an issue that exists,
+   edit the body as for the folder line ("Planning mode"), but put the section above the folder
+   line, so the folder line stays last. There it survives a resume, and `workflow-pr` copies it into
+   the PR body.
 
 ## Codex and Copilot review loop
 
@@ -298,11 +299,13 @@ left open: the constitution allows a merge only when each one is fixed or reject
 The blind plan and the code review round start Codex and Copilot as background Bash calls
 (`run_in_background`). Read each call's output when it ends.
 
+- Start a background `sleep 1800` with them, so that you are called again after 30 minutes. Stop it
+  with `TaskStop` when both calls have ended.
 - A call that ended with an error, or with no plan or no verdict, runs once more.
-- A call that runs more than 30 minutes is stopped with `TaskStop` and does not run again, because
-  its reviewer process may still run. Name it in the report as a possible leftover process.
+- A call that still runs when the 30 minutes end is stopped with `TaskStop` and does not run again,
+  because its reviewer process may still run. Name it in the report as a possible leftover process.
 - A reviewer whose call failed twice, or was stopped, is not ready for the rest of the ticket. The
-  rules for a reviewer that is not ready apply.
+  rules for a reviewer that is not ready apply, and the PR body names it as not available.
 - A failed call never counts as `approve`.
 
 ### Code review round
@@ -310,7 +313,10 @@ The blind plan and the code review round start Codex and Copilot as background B
 `workflow-manual` Step 7 reviews the committed branch with three reviews at once in each round:
 
 - Codex and Copilot with `--scope branch --base origin/main`, as background calls;
-- while they run, `code-review` on `origin/main...HEAD`, and the docs check that Step 7 describes.
+- while they run, `code-review` and the docs check that Step 7 describes. In the first round they
+  review `origin/main...HEAD`. In each later round they review only the commits since the last
+  round (`<last round's head>..HEAD`), so that `code-review` does not raise new points on code that
+  did not change.
 
 The round waits for all three. A `code-review` or docs-check finding is checked like any other
 finding. For the end rule above, `code-review` with the docs check counts as one more reviewer. It
