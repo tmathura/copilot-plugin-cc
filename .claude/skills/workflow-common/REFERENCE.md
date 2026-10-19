@@ -328,8 +328,8 @@ The blind plan and the code review round start Codex and Copilot as background B
 
   Then:
   - an `Address review round` commit: review only the commits since the last round, `<sha>^..HEAD`.
-    Each round's fixes go in one such commit, on top of the head that the round reviewed. So its
-    parent is that head. This range keeps `code-review` from raising new points on code that did
+    Each round's fixes go in one such commit, so its parent is the head that the round reviewed.
+    This range keeps `code-review` from raising new points on code that did
     not change. It also works after a resume;
   - a merge commit, or nothing (the first round): review the whole branch, `origin/main...HEAD`.
 
@@ -337,10 +337,9 @@ The round waits for all three. A `code-review` or docs-check finding is checked 
 finding. For the end rule above, `code-review` with the docs check counts as one more reviewer. It
 says `approve` when it ran, reported, and has no finding left that is not rejected. An empty list
 of findings is a report. A `code-review` run that fails, or ends with no report, never counts as
-`approve`. Handle it as a step skill that fails ("Questions to the user"). On **Skip**, the later
-rounds of this ticket run without `code-review`, but the docs check still runs. The PR names
-`code-review` as not available. `code-review` does not replace Codex and Copilot: when neither of
-them is ready, the PR names both as not available.
+`approve`. Handle it as a step skill that fails ("Questions to the user"). When neither Codex nor
+Copilot is ready, only their part of the round is skipped: `code-review` and the docs check still
+run, and the PR names Codex and Copilot as not available.
 
 ## PR review loop
 
