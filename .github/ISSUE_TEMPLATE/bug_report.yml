@@ -19,7 +19,9 @@ body:
     id: copilot-version
     attributes:
       label: Copilot CLI version
-      description: The output of `copilot --version`. Write `none` if the Copilot CLI is not installed or does not start.
+      description: >-
+        The output of `copilot --no-auto-update --version`. Write `none` if the Copilot CLI is not
+        installed. If it does not start, put its error in "Error text".
     validations:
       required: true
   - type: input
