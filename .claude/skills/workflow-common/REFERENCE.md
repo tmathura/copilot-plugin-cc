@@ -317,25 +317,27 @@ The blind plan and the code review round start Codex and Copilot as background B
 
 - Codex and Copilot with `--scope branch --base origin/main`, as background calls;
 - while they run, `code-review` and the docs check that Step 7 describes, on a range of commits.
-  Find the newest commit on the branch whose subject (not body) is `[#<n>] Address review round <k>`
-  or a merge of `origin/main` (`[#<n>] Merge origin/main` from Step 9, or the default subject of
-  the plain `git merge origin/main` in "Resume"). No output means none:
+  Find the newest commit on the branch's first-parent line that is a merge commit (it has two
+  parents) or has the subject `[#<n>] Address review round <k>`. The command prints it as
+  `<sha>|<parents>|<subject>`. If it prints nothing, the branch has no such commit:
 
   ```bash
-  git log --format='%H %s' origin/main..HEAD | grep -m1 -E '^[0-9a-f]+ (\[#<n>\] Address review round|.*Merge.*origin/main)' || true
+  git log --first-parent --format='%H|%p|%s' origin/main..HEAD | grep -m1 -E '^[0-9a-f]+\|([0-9a-f]+ [0-9a-f]+\||[0-9a-f]+\|\[#<n>\] Address review round [0-9])' || true
   ```
 
   Then:
   - an `Address review round` commit: review only the commits since the last round, `<sha>^..HEAD`.
     This keeps `code-review` from raising new points on code that did not change, and it works
     after a resume;
-  - a merge of `origin/main`, or none (the first round): review the whole branch,
-    `origin/main...HEAD`.
+  - a merge commit (any merge of `main` into the branch), or nothing (the first round): review the
+    whole branch, `origin/main...HEAD`.
 
 The round waits for all three. A `code-review` or docs-check finding is checked like any other
 finding. For the end rule above, `code-review` with the docs check counts as one more reviewer. It
-says `approve` when it has no finding left that is not rejected. It does not replace Codex and
-Copilot: when neither of them is ready, the PR names both as not available.
+says `approve` when it ran, reported, and has no finding left that is not rejected. A `code-review`
+run that fails or gives no result is a step skill that fails ("Questions to the user"), and it
+never counts as `approve`. It does not replace Codex and Copilot: when neither of them is ready,
+the PR names both as not available.
 
 ## PR review loop
 
