@@ -89,10 +89,19 @@ WT_ROOT="$MAIN/.claude/worktrees"                                               
 
 | Purpose | Command |
 | --- | --- |
+| Install | `npm ci --include=dev` (the dev dependencies that the build needs; CI runs `npm ci` too) |
 | Build | `npm run build` (the `tsc` type check; CI runs it too) |
 | Format | none configured yet |
 | Test | `npm test` and `npm run check-version` |
 | Validate | `claude plugin validate .` (skip with a note if `claude` is not on the PATH) |
+
+Run them in this order, so the install comes first, each time, when `package-lock.json` exists. It
+runs with no check for an existing `node_modules/`, because such a check can be wrong (a partial
+install, a lockfile that a merge changed), and it takes about a second. This covers a resumed
+worktree, which `workflow-branch` did not install in. If the install fails, run none of the other
+commands, and sort the failure as `workflow-manual` Step 5 says: a `package-lock.json` that does
+not match `package.json` is a code fault (update it with `npm install` and commit it), and a
+network or registry failure is an environment fault.
 
 When the repo gets tooling, add the commands here. Do not guess them in the step skills.
 

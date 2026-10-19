@@ -40,8 +40,9 @@ How work moves from an idea to `main`. The rules behind these steps are in the
 4. Make the change, with its tests and docs. If the work departs from the spec, update the spec in
    the same commit ("Keeping the spec current", below). If the change is a release, raise the
    version and add the `CHANGELOG.md` entry ("Release", below).
-5. Run `npm run build`, `npm test`, `npm run check-version` and `claude plugin validate .`. They
-   must pass. Do this before every commit, also in the review rounds below.
+5. Run `npm ci --include=dev` (it installs the dev dependencies that the build needs), then
+   `npm run build`, `npm test`, `npm run check-version` and `claude plugin validate .`. They must
+   pass. Do this before every commit, also in the review rounds below.
 6. Commit with the subject `[#n] Imperative description`.
 7. Review the branch in rounds. In each round, run three reviews at the same time:
    `/codex:adversarial-review` and `/copilot:adversarial-review`, both with
