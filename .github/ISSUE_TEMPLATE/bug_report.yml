@@ -19,7 +19,9 @@ body:
     id: copilot-version
     attributes:
       label: Copilot CLI version
-      description: The output of `copilot --no-auto-update --version`, or the error that it prints.
+      description: >-
+        The output of `copilot --no-auto-update --version`. If the command fails, write `unknown`
+        here and put the error in "Error text".
     validations:
       required: true
   - type: input
