@@ -235,8 +235,7 @@ per ticket, in every planning mode.
    skill that writes the planning folder only after the calls end. A plan-mode plan lives outside
    the checkout. Install and ready checks are as in "Codex and Copilot review loop": plan with the
    ready ones, or skip this step when none is ready. A blind-plan call that fails twice only leaves
-   out that reviewer's plan. A call that is stopped (it may have left a process) makes that
-   reviewer not ready for the rest of the ticket, as in the code review round. Say in the
+   out that reviewer's plan; a stopped call is handled as "Background calls" says. Say in the
    comparison which plan is missing and why.
 3. When the plans are done, write a short comparison: where they agree, where they differ and why,
    and what Claude took from them. Claude's plan with those changes (the merged plan) is the plan
@@ -319,17 +318,18 @@ The blind plan and the code review round start Codex and Copilot as background B
 - Codex and Copilot with `--scope branch --base origin/main`, as background calls;
 - while they run, `code-review` and the docs check that Step 7 describes, on a range of commits.
   Find the newest commit on the branch whose subject (not body) is `[#<n>] Address review round <k>`
-  or `[#<n>] Merge origin/main`:
+  or a merge of `origin/main` (`[#<n>] Merge origin/main` from Step 9, or the default subject of
+  the plain `git merge origin/main` in "Resume"). No output means none:
 
   ```bash
-  git log --format='%H %s' origin/main..HEAD | grep -m1 -E '^[0-9a-f]+ \[#<n>\] (Address review round|Merge origin/main)'
+  git log --format='%H %s' origin/main..HEAD | grep -m1 -E '^[0-9a-f]+ (\[#<n>\] Address review round|.*Merge.*origin/main)' || true
   ```
 
   Then:
   - an `Address review round` commit: review only the commits since the last round, `<sha>^..HEAD`.
     This keeps `code-review` from raising new points on code that did not change, and it works
     after a resume;
-  - a `Merge origin/main` commit, or none (the first round): review the whole branch,
+  - a merge of `origin/main`, or none (the first round): review the whole branch,
     `origin/main...HEAD`.
 
 The round waits for all three. A `code-review` or docs-check finding is checked like any other
