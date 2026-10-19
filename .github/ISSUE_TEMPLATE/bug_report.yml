@@ -1,0 +1,48 @@
+name: Bug report
+description: Something in the plugin does not work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Do not report a security problem here. See the
+        [security policy](https://github.com/tmathura/copilot-plugin-cc/security/policy).
+        Remove tokens and other secrets from any text you paste.
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: Windows 11, macOS 15, Ubuntu 24.04
+    validations:
+      required: true
+  - type: input
+    id: copilot-version
+    attributes:
+      label: Copilot CLI version
+      description: >-
+        The version number that `copilot --no-auto-update --version` prints, for example `1.0.95`.
+        If it prints no version number, write `unknown` and put what it printed in "Error text".
+    validations:
+      required: true
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      description: The version that `claude plugin list` shows for `copilot@tmathura-copilot`.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps
+      description: The commands you ran, in order, and what you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: Error text
+      description: The full error or output.
+      render: text
+    validations:
+      required: true

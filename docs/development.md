@@ -58,7 +58,9 @@ How work moves from an idea to `main`. The rules behind these steps are in the
    thread is open, or when every finding left was rejected in an earlier round.
 10. Squash-merge when every CI check passes. The ruleset on `main` ("Protect main + Copilot review")
     enforces this: a PR merges only when the jobs `CI (ubuntu-latest)`, `CI (macos-latest)` and
-    `CI (windows-latest)` passed, and its branch has the latest `main`. When `main` has moved on,
+    `CI (windows-latest)` passed, CodeQL found no error alert and no security alert of high or
+    critical level, every review thread is resolved, and its branch has the latest `main`. CodeQL
+    runs through GitHub's default setup, with no workflow file. When `main` has moved on,
     merge `origin/main` into the branch, test, review, push, and wait for the reviews and CI again.
 11. Remove the worktree and the branch, and pull `main`. CI
     (`.github/workflows/pull-request-ci.yml`) also runs on each push to `main`, so the merge commit
