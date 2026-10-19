@@ -192,9 +192,9 @@ starts a new round on the current head.
    for an `invalid` port).
 2. Report the checks that ran and the findings, with `path:lines` and their source, or "No
    deviations found".
-3. Check the findings of all three together (REFERENCE.md). Fix the confirmed ones by the rules of
-   Step 4 (the spec sweep and the docs too), and run Step 5 again. With bug triage, a round that changed the fix also updates `fix.md` (REFERENCE.md "Bug
-   triage", Edits). Commit with `workflow-commit`, the description `Address review round <k>` and a
+3. Check the findings of all three together (REFERENCE.md). Fix the confirmed ones, with the spec
+   sweep and the docs update of Step 4, and run Step 5 again. With bug triage, a round that changed
+   the fix also updates `fix.md` (REFERENCE.md "Bug triage", Edits). Commit with `workflow-commit`, the description `Address review round <k>` and a
    body that gives the outcome of each finding. Then run the next round, until the loop ends by its
    rules.
 

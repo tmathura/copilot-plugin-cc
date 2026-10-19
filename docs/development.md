@@ -19,8 +19,9 @@ How work moves from an idea to `main`. The rules behind these steps are in the
    owner. If a plan-mode ticket grows into plugin files, stop and plan it again with Spec Kit.
 
    Before your plan is shown, Codex and Copilot each write their own plan from the issue text (or
-   the task description) alone, while you plan. Compare the three plans, take what is better into yours, and keep the comparison
-   in the issue as `## Plan comparison`. A difference that needs a decision goes to the owner.
+   the task description) alone, while you plan. Compare the three plans, take what is better into
+   yours, and keep the comparison in the issue as `## Plan comparison`. A difference that needs a
+   decision goes to the owner.
 
    The bug triage plan is `assessment.md` plus a Constitution Check that you write in it, because
    the assessment has none. Run the plan's Constitution Check. Have Codex and Copilot review the
@@ -42,10 +43,11 @@ How work moves from an idea to `main`. The rules behind these steps are in the
 5. Run `npm run build`, `npm test`, `npm run check-version` and `claude plugin validate .`. They
    must pass. Do this before every commit, also in the review rounds below.
 6. Commit with the subject `[#n] Imperative description`.
-7. Review the branch in rounds. In each round, run three reviews of `origin/main...HEAD` at the
-   same time: a code review of the diff with its check against `CLAUDE.md` and the docs it links to,
+7. Review the branch in rounds. In each round, run three reviews at the same time:
    `/codex:adversarial-review` and `/copilot:adversarial-review`, both with
-   `--scope branch --base origin/main`. Fix the confirmed findings, record rejected ones with the
+   `--scope branch --base origin/main`, and a code review of the diff with its check against
+   `CLAUDE.md` and the docs it links to. The code review covers the whole branch in the first round,
+   and only the new commits in later rounds. Fix the confirmed findings, record rejected ones with the
    reason, test, and commit. Stop when all three approve, or when every finding left was rejected
    in an earlier round. If Codex or Copilot is not set up, run this step and step 9 without it, and
    say so in the PR.
