@@ -200,14 +200,26 @@ fix and test only for a ticket that used bug triage.
 
 ## Checking review findings
 
-A finding from Codex, Copilot or a bot reviewer is a claim, not a fact. Check each one against the code. Mark it:
+A finding from Codex, Copilot or a bot reviewer is a claim, not a fact. Check each one against the code.
 
-- **confirmed**: it is true. Apply it without asking.
-- **rejected**: it is not true. Write the reason in one line.
+Also check it against the behaviour before the ticket, that is, what `main` does without this
+branch. Reject a finding that would change that behaviour, unless the issue asks for the change. If
+that behaviour is a real problem, say so in the reason, so that it can get its own ticket. A finding
+on what the issue asks for, or one that says this branch broke that behaviour, is checked as usual.
+
+Mark each finding:
+
+- **confirmed**: it is true, and the rule above does not reject it. Apply it without asking.
+- **rejected**: it is not true, or the rule above rejects it. Write the reason in one line.
 - **unclear**: you cannot tell. Ask: **Apply the confirmed findings, skip the unclear (Recommended)** /
   **Choose which** / **Stop the loop**.
 
-Print the marks as a short list. Do not check a rejected finding again in a later round.
+Print the marks as a short list.
+
+A rejected finding that comes back in a later round with the same point (by its meaning, not its
+words) and the same evidence is rejected again with the earlier reason, with no new check. One with
+new evidence is checked again: the text it points at changed, it names a new case, or the issue now
+asks for the change. If you cannot tell, check it again.
 
 ## Blind plan
 
