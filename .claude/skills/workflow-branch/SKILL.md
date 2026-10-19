@@ -51,9 +51,14 @@ with the `MAIN=` and `WT_ROOT=` lines from REFERENCE.md, and run git as `git -C 
    prints nothing). Create the parent folder
    in the worktree first, and stop if the destination exists. After a move, check that
    `git -C "$MAIN" status --porcelain` is clean.
-8. **Enter the worktree** (see "Worktrees" in REFERENCE.md).
-9. **Report** the branch, the worktree path, the base commit
-   (`git -C "$MAIN" log -1 --oneline origin/main`), and whether `.env` and Spec Kit files were moved.
+8. **Install the dev dependencies** when the worktree has `package-lock.json`: run the Install
+   command from "Commands" in REFERENCE.md with `--prefix "<worktree path>"`, the path that
+   `git -C "$MAIN" worktree list --porcelain` prints for the branch. If it fails, stop and report
+   its error. The worktree stays, and a retry runs this step again.
+9. **Enter the worktree** (see "Worktrees" in REFERENCE.md).
+10. **Report** the branch, the worktree path, the base commit
+    (`git -C "$MAIN" log -1 --oneline origin/main`), whether `.env` and Spec Kit files were moved,
+    and whether the dev dependencies were installed.
 
 Do not push. `workflow-pr` pushes.
 
