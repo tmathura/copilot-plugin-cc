@@ -278,7 +278,8 @@ node "$CODEX" task --prompt-file "<scratchpad>/plan-review.md"                  
 - Each round, run both reviewers at the same time: two foreground Bash calls in one message, each
   with the longest Bash timeout (600000 ms). Give both the same scope and focus text. (The code
   review round runs them in the background, below.)
-- If only one reviewer is ready, run the loop with that one. If neither is, skip the loop.
+- If only one reviewer is ready, run the loop with that one. If neither is, skip the loop. (The
+  code review round still runs `code-review` and the docs check, below.)
 - Branch scope reads commits only. Commit first.
 - A plan-mode plan is outside the repo. Write the plan and the request into the prompt file.
 - The focus text names the agreed plan. It asks the reviewer to check that the work does what the
@@ -328,9 +329,9 @@ The blind plan and the code review round start Codex and Copilot as background B
 
   Then:
   - an `Address review round` commit: review only the commits since the last round, `<sha>^..HEAD`.
-    Each round's fixes go in one such commit, so its parent is the head that the round reviewed.
-    This range keeps `code-review` from raising new points on code that did
-    not change. It also works after a resume;
+    Step 7 makes this commit directly on the head that the round reviewed, so `<sha>^` is that
+    head. This range keeps `code-review` from raising new points on code that did not change. It
+    also works after a resume;
   - a merge commit, or nothing (the first round): review the whole branch, `origin/main...HEAD`.
 
 The round waits for all three. A `code-review` or docs-check finding is checked like any other
@@ -338,8 +339,8 @@ finding. For the end rule above, `code-review` with the docs check counts as one
 says `approve` when it ran, reported, and has no finding left that is not rejected. An empty list
 of findings is a report. A `code-review` run that fails, or ends with no report, never counts as
 `approve`. Handle it as a step skill that fails ("Questions to the user"). When neither Codex nor
-Copilot is ready, only their part of the round is skipped: `code-review` and the docs check still
-run, and the PR names Codex and Copilot as not available.
+Copilot is ready, skip only their part of the round. `code-review` and the docs check still run.
+The PR names Codex and Copilot as not available.
 
 ## PR review loop
 
