@@ -20,8 +20,8 @@ body:
     attributes:
       label: Copilot CLI version
       description: >-
-        The first line that `copilot --no-auto-update --version` prints. If the command fails,
-        write `unknown` here and put the error in "Error text".
+        The version number that `copilot --no-auto-update --version` prints, for example `1.0.95`.
+        If the command fails or hangs, write `unknown` here and put what you see in "Error text".
     validations:
       required: true
   - type: input
