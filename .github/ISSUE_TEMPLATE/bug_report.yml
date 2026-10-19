@@ -19,7 +19,9 @@ body:
     id: copilot-version
     attributes:
       label: Copilot CLI version
-      description: The `copilot:` line that `/copilot:setup` prints.
+      description: >-
+        The version number that `copilot --no-auto-update --version` prints, for example `1.0.95`.
+        If it prints no version number, write `unknown` and put what it printed in "Error text".
     validations:
       required: true
   - type: input
