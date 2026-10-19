@@ -12,8 +12,8 @@ vulnerability**, or go to
 <https://github.com/tmathura/copilot-plugin-cc/security/advisories/new>.
 
 Give the plugin version. `claude plugin list` shows it for `copilot@tmathura-copilot`. Give the
-Copilot CLI version. `copilot --no-auto-update --version` shows it. Say how to see the problem. Do
-not put tokens, passwords or other secrets in the report.
+`copilot:` line that `/copilot:setup` prints. Say how to see the problem. Do not put tokens,
+passwords or other secrets in the report.
 
 A problem in the GitHub Copilot CLI itself, not in this plugin, goes to GitHub, as its
 [security policy](https://github.com/github/.github/blob/main/SECURITY.md) says.
