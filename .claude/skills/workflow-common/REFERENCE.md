@@ -99,10 +99,7 @@ Run them in this order, so the install comes first, each time, when `package-loc
 runs with no check for an existing `node_modules/`, because such a check can be wrong (a partial
 install, a lockfile that a merge changed), and it takes about a second. This also covers a
 worktree that `workflow-manual` Resume enters without `workflow-branch`. If the install fails, run
-none of the other commands. A `package.json` or `package-lock.json` that this branch changed and
-that is not valid, or that no longer match, is a code fault. Any other failure (network, registry,
-an old npm, a locked file, a fault that came from `main`) is an environment fault.
-`workflow-manual` Step 5 says what to do with each kind.
+none of the other commands, and handle it as any failed command (`workflow-manual` Step 5).
 
 When the repo gets tooling, add the commands here. Do not guess them in the step skills.
 
