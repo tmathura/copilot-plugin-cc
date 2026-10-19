@@ -166,7 +166,7 @@ fix and test only for a ticket that used bug triage.
 - **Upstream port:**
   - Input to assess is plain text, no URL: the upstream commit SHA, the pasted upstream diff, and
     the upstream-to-local file map from `UPSTREAM.md`. The proposed fix must be the upstream change.
-  - Verdict `invalid` (the bug does not apply): do not run fix or test. Step 6 reviews
+  - Verdict `invalid` (the bug does not apply): do not run fix or test. Step 7 reviews
     `assessment.md` only. The PR holds `assessment.md` and the `UPSTREAM.md` row set to `skipped`
     with the reason. Not a release.
   - Otherwise the PR sets the row to `ported`. Differences from upstream go, with their reason, in
@@ -209,6 +209,44 @@ A finding from Codex, Copilot or a bot reviewer is a claim, not a fact. Check ea
 
 Print the marks as a short list. Do not check a rejected finding again in a later round.
 
+## Blind plan
+
+Before Claude's plan is shown, Codex and Copilot each write their own plan from the task alone. They
+do not see Claude's plan, so they can find a simpler approach or a different root cause. Run it once
+per ticket, in every planning mode.
+
+1. Write `<scratchpad>/blind-plan-<n>.md` with the file tool. In Step 1, before the issue exists,
+   use a short kebab-case name for the task in place of `<n>`. Put in it this request, then the
+   issue title and body from `gh issue view <n>` (in Step 1: the task description), without the
+   folder line:
+
+   > Plan the change that the text below asks for, in the repo in the current directory. Read the
+   > code and docs you need, but do not change any file. Give a short plan, as a list: the root cause
+   > (only for a bug); the files to change, and what changes in each; the approach, and any simpler
+   > option you see; the tests or checks that prove it.
+
+   Put nothing from Claude's plan or reasoning in it. An issue that already has a
+   `## Plan comparison` was planned before: do not run the blind plan again.
+2. Start each ready reviewer with `node "$CODEX" task --prompt-file "<file>"` (`$CODEX` and the
+   Copilot script as in "Codex and Copilot review loop"; "Background calls" there), then plan while
+   they run. `task` without `--write` is read-only, and it starts a fresh thread, so it cannot see
+   this session. Until both calls have ended, write nothing
+   in the checkout that shows Claude's plan: in the Spec Kit modes, read the code, and start the
+   skill that writes the planning folder only after the calls end. A plan-mode plan lives outside
+   the checkout. Install and ready checks are as in "Codex and Copilot review loop": plan with the
+   ready ones, or skip this step when none is ready. A blind-plan call that fails twice only leaves
+   out that reviewer's plan; a stopped call is handled as "Background calls" says. Say in the
+   comparison which plan is missing and why.
+3. When the plans are done, write a short comparison: where they agree, where they differ and why,
+   and what Claude took from them. Claude's plan with those changes (the merged plan) is the plan
+   for the review loop. A difference that needs the owner's decision is asked like an unclear
+   finding ("Checking review findings").
+4. The comparison goes in the issue body as a `## Plan comparison` section. In Step 1 it is part of
+   the ticket draft, and `workflow-ticket` puts the folder line after it. For an issue that exists,
+   edit the body as for the folder line ("Planning mode"), but put the section above the folder
+   line, so the folder line stays last. There it survives a resume, and `workflow-pr` copies it into
+   the PR body.
+
 ## Codex and Copilot review loop
 
 Two reviewers, Codex and Copilot, take the same commands. Find each reviewer's newest installed
@@ -238,8 +276,10 @@ node "$CODEX" task --prompt-file "<scratchpad>/plan-review.md"                  
 ```
 
 - Each round, run both reviewers at the same time: two foreground Bash calls in one message, each
-  with the longest Bash timeout (600000 ms). Give both the same scope and focus text.
-- If only one reviewer is ready, run the loop with that one. If neither is, skip the loop.
+  with the longest Bash timeout (600000 ms). Give both the same scope and focus text. (The code
+  review round runs them in the background, below.)
+- If only one reviewer is ready, run the loop with that one. If neither is, skip the loop. (The
+  code review round still runs `code-review` and the docs check, below.)
 - Branch scope reads commits only. Commit first.
 - A plan-mode plan is outside the repo. Write the plan and the request into the prompt file.
 - The focus text names the agreed plan. It asks the reviewer to check that the work does what the
@@ -256,6 +296,51 @@ Keep going without asking while every finding is confirmed and fixed. Ask only f
 finding (see "Checking review findings"), or when 10 rounds have run: **One more round
 (Recommended)** / **Reject the open findings, each with its reason** / **Stop**. A finding is never
 left open: the constitution allows a merge only when each one is fixed or rejected with a reason.
+
+### Background calls
+
+The blind plan and the code review round start Codex and Copilot as background Bash calls
+(`run_in_background`). Read each call's output when it ends.
+
+- Start a background `sleep 1800` with each call (a retry too), so that you are called again after
+  30 minutes. Stop the timer with `TaskStop` when its call ends.
+- A call that ended with an error, or with no plan or no verdict, runs once more.
+- A call that still runs when its timer ends is stopped with `TaskStop` and does not run again,
+  because its reviewer process may still run. Name it in the report as a possible leftover process.
+- A reviewer whose call was stopped, or whose code review round call failed twice, is not ready for
+  the rest of the ticket, and the rules for a reviewer that is not ready apply. (A blind-plan call
+  that failed twice: see "Blind plan".)
+- A failed call never counts as `approve`.
+
+### Code review round
+
+`workflow-manual` Step 7 reviews the committed branch with three reviews at once in each round:
+
+- Codex and Copilot with `--scope branch --base origin/main`, as background calls;
+- while they run, `code-review` and the docs check that Step 7 describes, on a range of commits.
+  Look only at the commits made on this branch itself, not the ones that a merge brought in
+  (`--first-parent`). Find the newest one that is a merge commit (it has two or more parents) or
+  has the subject `[#<n>] Address review round <k>`. The command prints it as
+  `<sha>|<parents>|<subject>`. If it prints nothing, the branch has no such commit:
+
+  ```bash
+  git log --first-parent --format='%H|%p|%s' origin/main..HEAD | grep -m1 -E '^[0-9a-f]+\|([0-9a-f]+( [0-9a-f]+)+\||[0-9a-f]+\|\[#<n>\] Address review round [0-9])' || true
+  ```
+
+  Then:
+  - an `Address review round` commit: review only the commits since the last round, `<sha>^..HEAD`.
+    Step 7 makes this commit directly on the head that the round reviewed, so `<sha>^` is that
+    head. This range keeps `code-review` from raising new points on code that did not change. It
+    also works after a resume;
+  - a merge commit, or nothing (the first round): review the whole branch, `origin/main...HEAD`.
+
+The round waits for all three. A `code-review` or docs-check finding is checked like any other
+finding. For the end rule above, `code-review` with the docs check counts as one more reviewer. It
+says `approve` when it ran, reported, and has no finding left that is not rejected. An empty list
+of findings is a report. A `code-review` run that fails, or ends with no report, never counts as
+`approve`. Handle it as a step skill that fails ("Questions to the user"). When neither Codex nor
+Copilot is ready, skip only their part of the round. `code-review` and the docs check still run.
+The PR names Codex and Copilot as not available.
 
 ## PR review loop
 
@@ -310,8 +395,10 @@ Each round:
    (nothing to push), and check the loop's end rule below.
 4. **Run a Codex and Copilot round on the fixes** with `--scope working-tree` and the findings as the focus.
    Check its findings too. If you fix any of them, run the commands from "Commands" again.
-5. **Review the diff** as in Step 6 of `workflow-manual` (`code-review`, then the docs check).
-   Then **commit** with `workflow-commit`. The body lists each finding and what happened to it.
+5. **Review the diff:** `code-review` on the working diff, then the docs check of `workflow-manual`
+   Step 7. Check the findings, fix the confirmed ones, run the commands from "Commands" again, and
+   repeat until no confirmed finding is left. Then **commit** with `workflow-commit`. The body lists
+   each finding and what happened to it.
 6. **Push and rewrite the PR body** with `workflow-pr`.
 7. **Reply to every thread and resolve it.** Say what was done, or why the finding was rejected. Write
    the reply to a file and pass it with `-F body=@<file>`, because backticks in a quoted string run as
@@ -633,13 +720,18 @@ What changed and why. Name any change to a contract, schema, CLI flag or infrast
 ## Testing
 What ran locally (commands and results), and what CI covers. Say so if nothing could run.
 
+## Plan comparison
+The issue's `## Plan comparison` section, copied.
+
 ## Review rounds
-Codex and Copilot: <n> rounds, last result <result per reviewer>. Rejected findings: <reviewer: finding: reason>.
+Review round (`code-review`, Codex, Copilot): <n> rounds, last result <result per reviewer>. Rejected findings: <reviewer: finding: reason>.
 PR review: <n> rounds, <state> (per reviewer).
 
 Closes #<n>
 ```
 
+- Leave out **Plan comparison** when the issue has none (a ticket planned before the blind plan
+  existed).
 - Leave out **Review rounds** until there is something to report.
 - Do not add a "Generated with Claude Code" footer.
 - Each push to an open PR rewrites the body so it describes the branch as it is now. Never add a

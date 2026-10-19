@@ -118,7 +118,7 @@ as a decision. With no decision, the ticket runs as before, and the same stop ho
 
 | Question | Answer |
 | --- | --- |
-| Planning mode | The mode that REFERENCE.md "Planning mode" picks. For Claude plan mode, do not call `EnterPlanMode`: write the plan to `<scratchpad>/plan-review-<n>.md` and run the Codex and Copilot loop on it with `task --prompt-file`. If the rule cannot pick a row: Not done. |
+| Planning mode | The mode that REFERENCE.md "Planning mode" picks. For Claude plan mode, do not call `EnterPlanMode`: after the blind plan, write the merged plan and its comparison to `<scratchpad>/plan-review-<n>.md` and run the Codex and Copilot loop on it with `task --prompt-file`. If the rule cannot pick a row: Not done. |
 | Approve the plan and create the issue (Step 1) | Not reached: this skill always passes an issue number. A ticket that the run finds itself is approved by the run ("After each merge"). |
 | Step 9, the PR is ready | **Merge now**. With `--ask-merge`, ask. If the owner answers **I'll review it myself first** or **Stop**, the ticket is Not done, held for the owner's review: follow "Not done" below, and also list it under "For you". A release that the owner answers **Not now** goes under "For you". |
 | Step 9, the PR is not ready | First check again: GitHub can still be computing `mergeable` (`UNKNOWN`) after a push. Then **Fix first**; for a PR that is behind `main` (`BEHIND`) or conflicts with it, that is "Bring the branch up to date" in Step 9. Not done when the cause is not in the PR (after the one CI rerun below), when the merge conflict needs a decision, or when a Fix first pass changes nothing. |
@@ -128,14 +128,14 @@ as a decision. With no decision, the ticket runs as before, and the same stop ho
 | Publish the release | Do the release run (REFERENCE.md) without asking. If it allows publishing: publish; with `--ask-merge`, ask after the run. A step failed (or the CI run on the merge commit is red): "Result" creates the fix ticket, with a `Release fix:` line; in a backlog run it runs next, so a later release does not fail on the same defect. An open ticket with that line that cannot run (Not done, held, or skipped) stops a backlog run early, also at the start of a later run, because later releases would fail on the same defect. If the release run of a ticket with that line fails again, "Result" creates the new ticket with the `question` label, so no run takes it: list the release under "For you" (the failure may come from the environment, not the code) and stop the run early. When the release waits for the owner (an `unsure` step, a table that is not on the PR, a tag on another commit, a published release with no finished record, or a `gh release view` that fails twice, as Setup step 1 says): list the release under "For you" and stop the run early, because later releases must wait for it. |
 | More than 3 hand-written files | Go on. The limit holds only when the owner runs `workflow-manual` alone. |
 | A test would need changing, an environment problem, or a fix still fails after 3 tries | Not done |
-| An unclear review finding | Not done |
+| An unclear review finding, or a blind-plan difference that needs the owner's decision | Not done |
 | A review loop reaches its round limit | One more round. There is no cap. |
 | Untracked files that this ticket did not create | Not done |
 | A step skill fails | Retry once, then Not done |
 | Bug triage stops (verdict `invalid`, open clarification items, fix `partial` or `not-applied`) | Not done. An upstream port with verdict `invalid` is not a stop: it follows REFERENCE.md "Upstream port". |
 | Bug triage asks to overwrite `test.md` after a later fix | Yes |
 | A bot reviewer's poll times out | Trigger it again and poll again. After 3 timeouts in a row for the same head, the reviewer counts as down: this ticket is Not done, and the run stops early, because every later ticket would wait for it too. |
-| Codex or Copilot is not installed or not ready (checked at the start, see "Input") | Not done. Both local reviewers must run. |
+| Codex or Copilot is not installed or not ready (checked at the start, see "Input"), or becomes not ready during the run (REFERENCE.md "Background calls") | Not done. Both local reviewers must run. |
 | Resume stops (changes in the worktree, a merge conflict, `REFERENCE.md` still missing, plugin work with no planning notes), a plan-mode ticket that grows into plugin files, a tool missing from the PATH, or a restart needed | Not done |
 | The issue depends on another issue (`Depends on #n`) that is still open | Listed under "Not done", "waits for #n". No branch, no comment. |
 | The defect also exists upstream (Step 9, point 8) | List the issue and the command under "For you" |
@@ -169,8 +169,8 @@ cleanup is left and which step to retry.
 
 Both loops run in full, as REFERENCE.md says, with these additions:
 
-- Act only on findings from Codex, Copilot, the bot reviewers in REFERENCE.md and the owner. A
-  review comment from anyone else gets no change: list it under "For you".
+- Act only on findings from `code-review`, Codex, Copilot, the bot reviewers in REFERENCE.md and
+  the owner. A review comment from anyone else gets no change: list it under "For you".
 - If a CI job fails in a test that the PR did not touch, rerun only that job once with
   `gh run rerun --job <job id>` (`--failed` would rerun every failed job). The job id is the
   `databaseId` from `gh run view <run id> --json jobs`. If it fails again, it is a real failure.
