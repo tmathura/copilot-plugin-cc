@@ -309,6 +309,10 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
   `**`. Copilot's `/review` changes its format from run to run and often starts with such a line.
   Codex's review starts with a plain sentence, so Codex takes the first line. The reason is
   correctness.
+- The active jobs table in `/copilot:status` doubles the backslashes just before a `|` in a cell,
+  then escapes the `|`, so a value that holds `\|` stays in its own cell. Codex escapes only the
+  `|`, so `\|` ends the cell or loses its backslash, depending on the Markdown viewer. The reason is
+  correctness.
 - Copilot has no setting for an output schema. So `/copilot:adversarial-review` puts the schema in
   the prompt, also accepts the JSON inside exactly one code fence, also with text before or after
   it, and checks the answer against the schema.
