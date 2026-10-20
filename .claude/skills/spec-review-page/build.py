@@ -1,7 +1,9 @@
 """Assemble a spec review page: template + authored content + the spec's Markdown files.
 
 Usage:
-  python build.py <spec dir> <content.html> --ticket '#<n>' --title "..." --snapshot <hash> --date <yyyy-mm-dd> [--out <file>] [--no-delta]
+  python build.py <spec dir> <content.html> --ticket '#<n>' --title "..." --snapshot <hash> --date <yyyy-mm-dd> [--out <file>]
+
+The nav shows "What moved" when the content has a <section id="delta">.
 
 The page is written to <spec dir>/review.html unless --out is given. An existing file is
 overwritten only when it carries this skill's marker, so a hand-written review.html is never lost.
@@ -19,6 +21,7 @@ import os
 import pathlib
 import re
 import sys
+import tempfile
 from html.parser import HTMLParser
 
 sys.stdout.reconfigure(encoding="utf-8")
@@ -52,18 +55,39 @@ class CiteScan(HTMLParser):
         self.targets.add(href[1:] if href.startswith("#") else "")
 
 
-def strip_details(text: str) -> str:
-    """Remove every <details> element, nested ones included, so only open text remains."""
-    kept = []
-    depth = 0
-    for part in re.split(r"(<details\b[^>]*>|</details\s*>)", text, flags=re.I):
-        if part.lower().startswith("<details"):
-            depth += 1
-        elif part.lower().startswith("</details"):
-            depth = max(depth - 1, 0)
-        elif depth == 0:
-            kept.append(part)
-    return " ".join(kept)
+class ContentScan(HTMLParser):
+    """Read the authored fragment once: is there a delta section, and how many words and mermaid
+    diagrams sit outside <details>. The parser handles case, quoting and comments, as CiteScan does.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.has_delta = False
+        self.words = 0
+        self.diagrams_open = 0
+        self.details = 0
+        self.in_mermaid = False
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        a = dict(attrs)
+        if tag == "section" and a.get("id") == "delta":
+            self.has_delta = True
+        elif tag == "details":
+            self.details += 1
+        elif tag == "pre" and "mermaid" in (a.get("class") or "").split():
+            self.in_mermaid = True
+            if self.details == 0:
+                self.diagrams_open += 1
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "details":
+            self.details = max(self.details - 1, 0)
+        elif tag == "pre":
+            self.in_mermaid = False
+
+    def handle_data(self, data: str) -> None:
+        if self.details == 0 and not self.in_mermaid:
+            self.words += len(re.findall(r"\w+", data))
 
 
 def previous_snapshot(path: pathlib.Path) -> str | None:
@@ -78,9 +102,10 @@ def previous_snapshot(path: pathlib.Path) -> str | None:
 
 
 def read_utf8(path: pathlib.Path) -> str | None:
-    """Return the file's text with LF line ends, or None (after a message) when it is not UTF-8."""
+    """Return the file's text with LF line ends and no BOM, or None (after a message) when it is
+    not UTF-8."""
     try:
-        return path.read_bytes().decode("utf-8").replace("\r\n", "\n")
+        return path.read_bytes().decode("utf-8-sig").replace("\r\n", "\n").replace("\r", "\n")
     except UnicodeDecodeError as e:
         print(f"{path} is not UTF-8 ({e.reason} at byte {e.start}); save it as UTF-8", file=sys.stderr)
         return None
@@ -95,7 +120,6 @@ def main() -> int:
     ap.add_argument("--title", required=True)
     ap.add_argument("--snapshot", required=True)
     ap.add_argument("--date", required=True)
-    ap.add_argument("--no-delta", action="store_true", help="omit the 'what moved' nav entry")
     a = ap.parse_args()
 
     spec = pathlib.Path(a.spec_dir)
@@ -146,15 +170,10 @@ def main() -> int:
     template = read_utf8(HERE / "template.html")
     if content is None or template is None:
         return 1
-    has_delta = re.search(r'<section\b[^>]*\bid="delta"', content, flags=re.I) is not None
-    if has_delta == a.no_delta:
-        print(
-            "the content has a delta section, so do not pass --no-delta"
-            if has_delta
-            else "the content has no delta section, so pass --no-delta",
-            file=sys.stderr,
-        )
-        return 1
+    body = ContentScan()
+    body.feed(content)
+    body.close()
+    has_delta = body.has_delta
     values = {
         "TICKET": html.escape(a.ticket),
         "TITLE": html.escape(a.title),
@@ -203,25 +222,28 @@ def main() -> int:
         text = lines_by_slug[s][int(n) - 1].strip()
         print(f"  {s}:{int(n):>4}  {text}")
 
-    mermaid = r'<pre\b[^>]*\bclass="[^"]*\bmermaid\b[^"]*"[^>]*>'
-    open_only = strip_details(content)
-    open_text = re.sub(mermaid + r".*?</pre\s*>", " ", open_only, flags=re.S | re.I)
-    words = len(re.findall(r"\w+", re.sub(r"<[^>]+>", " ", open_text)))
-    diagrams_open = len(re.findall(mermaid, open_only, flags=re.I))
     print()
-    print(f"open-section words: {words}   (budget about 1800)")
-    print(f"open diagrams: {diagrams_open}   (budget 3)")
+    print(f"open-section words: {body.words}   (budget about 1800)")
+    print(f"open diagrams: {body.diagrams_open}   (budget 3)")
 
     if missing:
         print("\nnot written: fix the missing anchors first", file=sys.stderr)
         return 1
 
-    # Write beside the target and rename, so a failed write never leaves a cut-off page with the
-    # marker; bytes, so Windows does not turn LF into CRLF.
+    # A temp file of its own beside the target, then a rename: a failed write never leaves a
+    # cut-off page with the marker, and two builds never share a temp file. Bytes keep LF on Windows.
     data = page.encode("utf-8")
-    tmp = out.with_name(out.name + ".tmp")
-    tmp.write_bytes(data)
-    os.replace(tmp, out)
+    tmp = None
+    try:
+        fd, tmp = tempfile.mkstemp(prefix=f".{out.name}.", suffix=".tmp", dir=out.parent)
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        os.replace(tmp, out)
+    except OSError as e:
+        if tmp is not None and os.path.exists(tmp):
+            os.remove(tmp)
+        print(f"not written: {out}: {e.strerror or e}", file=sys.stderr)
+        return 1
     print(f"\nwrote {out}  ({len(data):,} bytes)")
     return 0
 

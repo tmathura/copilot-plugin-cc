@@ -24,13 +24,13 @@ function makeSpec(files) {
   return { dir, spec, page: path.join(spec, "review.html") };
 }
 
-function build({ dir, spec }, content, { delta = false, snapshot = "abc1234" } = {}) {
+function build({ dir, spec }, content, { snapshot = "abc1234", title = TITLE, out } = {}) {
   const fragment = path.join(dir, "content.html");
-  fs.writeFileSync(fragment, content, "utf8");
+  fs.writeFileSync(fragment, content);
   return run(PYTHON, [
     BUILD, spec, fragment,
-    "--ticket", "#105", "--title", TITLE, "--snapshot", snapshot, "--date", "2026-10-20",
-    ...(delta ? [] : ["--no-delta"])
+    "--ticket", "#105", "--title", title, "--snapshot", snapshot, "--date", "2026-10-20",
+    ...(out ? ["--out", out] : [])
   ]);
 }
 
@@ -60,8 +60,8 @@ test("the build writes a page with every citation found and the text unchanged",
 test("a refresh reads the previous page's snapshot and adds the What moved entry", { skip }, () => {
   const ctx = makeSpec({ "spec.md": SPEC_MD });
   buildOk(ctx, GOOD);
-  assert.ok(!fs.readFileSync(ctx.page, "utf8").includes('href="#delta"'), "--no-delta drops the entry");
-  assert.match(buildOk(ctx, WITH_DELTA, { delta: true, snapshot: "def5678" }).stdout, /previous page snapshot: abc1234/);
+  assert.ok(!fs.readFileSync(ctx.page, "utf8").includes('href="#delta"'), "no delta section, no entry");
+  assert.match(buildOk(ctx, WITH_DELTA, { snapshot: "def5678" }).stdout, /previous page snapshot: abc1234/);
   const page = fs.readFileSync(ctx.page, "utf8");
   assert.match(page, /<meta name="spec-review-snapshot" content="def5678">/);
   assert.ok(page.includes('href="#delta"'));
@@ -79,21 +79,18 @@ test("a folder without spec.md builds, because the template cites no file", { sk
   buildOk(ctx, '<section id="change"><a class="cite" href="#plan-md-L1">plan.md:1</a></section>');
 });
 
-test("lines are split on LF only, so a form feed does not shift the line numbers", { skip }, () => {
-  const ctx = makeSpec({ "spec.md": "# Spec\r\n\r\nx\fy\r\nz\r\n" });
-  buildOk(ctx, '<section id="change"><a class="cite" href="#spec-md-L4">spec.md:4</a></section>');
-  assert.ok(fs.readFileSync(ctx.page, "utf8").includes('<span id="spec-md-L4">z</span>'));
+test("line ends: a form feed does not split a line, CR and CRLF do, and a BOM is dropped", { skip }, () => {
+  const ctx = makeSpec({ "spec.md": "﻿# Spec\r\n\r\nx\fy\r\nz\rw\n" });
+  buildOk(ctx, '<section id="change"><a class="cite" href="#spec-md-L5">spec.md:5</a></section>');
+  const page = fs.readFileSync(ctx.page, "utf8");
+  assert.ok(page.includes('<span id="spec-md-L1"># Spec</span>'));
+  assert.ok(page.includes('<span id="spec-md-L4">z</span><span id="spec-md-L5">w</span>'));
+  assert.ok(!page.includes("﻿") && !page.includes("\r"));
 });
 
 test("{{...}} text in the content and the title is not filled in again", { skip }, () => {
   const ctx = makeSpec({ "spec.md": SPEC_MD });
-  const fragment = path.join(ctx.dir, "content.html");
-  fs.writeFileSync(fragment, `${GOOD}<p>{{SOURCES}}</p>`, "utf8");
-  const result = run(PYTHON, [
-    BUILD, ctx.spec, fragment, "--ticket", "#105", "--title", "{{CONTENT}}", "--snapshot", "abc1234",
-    "--date", "2026-10-20", "--no-delta"
-  ]);
-  assert.equal(result.status, 0, result.stderr);
+  buildOk(ctx, `${GOOD}<p>{{SOURCES}}</p>`, { title: "{{CONTENT}}" });
   const page = fs.readFileSync(ctx.page, "utf8");
   assert.equal(page.match(/<details id="spec-md">/g).length, 1);
   assert.ok(page.includes("<p>{{SOURCES}}</p>"));
@@ -101,33 +98,45 @@ test("{{...}} text in the content and the title is not filled in again", { skip 
   assert.ok(page.includes(">{{CONTENT}}</h1>"));
 });
 
-test("the diagram count finds a mermaid block with more attributes", { skip }, () => {
+test("open words and diagrams skip details bodies, diagram text and comments, in any case or quoting", { skip }, () => {
   const ctx = makeSpec({ "spec.md": SPEC_MD });
-  const result = buildOk(ctx, `${GOOD}<figure><PRE class="mermaid" aria-label="x">graph LR; a-->b</PRE></figure>`);
+  const content = `<section id='change'><p>one two</p>
+    <figure><PRE class='mermaid' aria-label="x">graph LR
+      a-->b</PRE></figure>
+    <DETAILS><summary>three</summary><pre class="mermaid">graph TD
+      c-->d</pre> four five</DETAILS >
+    <!-- six <section id="delta"> --><p data-id="delta">seven</p></section>`;
+  const result = buildOk(ctx, content);
+  assert.match(result.stdout, /open-section words: 3 /);
   assert.match(result.stdout, /open diagrams: 1 /);
+  assert.ok(!fs.readFileSync(ctx.page, "utf8").includes('href="#delta"'), "a comment or data-id is no delta section");
 });
 
-for (const [name, content, delta, message] of [
-  ["a delta section with --no-delta", WITH_DELTA, false, /so do not pass --no-delta/],
-  ["no delta section without --no-delta", GOOD, true, /so pass --no-delta/]
+test("a single-quoted delta section gets the What moved entry", { skip }, () => {
+  const ctx = makeSpec({ "spec.md": SPEC_MD });
+  buildOk(ctx, `${GOOD}<SECTION id='delta'><p>Moved</p></SECTION>`);
+  assert.ok(fs.readFileSync(ctx.page, "utf8").includes('href="#delta"'));
+});
+
+for (const [name, files, content, message] of [
+  ["a Markdown file", { "spec.md": SPEC_MD, "plan.md": Buffer.from([0x23, 0x20, 0xff, 0x0a]) }, GOOD, /plan\.md is not UTF-8/],
+  ["the content fragment", { "spec.md": SPEC_MD }, Buffer.from([0x3c, 0x70, 0x3e, 0xff]), /content\.html is not UTF-8/]
 ]) {
-  test(`${name} fails and keeps the previous page`, { skip }, () => {
-    const ctx = makeSpec({ "spec.md": SPEC_MD });
-    buildOk(ctx, GOOD);
-    const before = fs.readFileSync(ctx.page, "utf8");
-    const result = build(ctx, content, { delta });
+  test(`${name} that is not UTF-8 fails with its name, not a traceback`, { skip }, () => {
+    const result = build(makeSpec(files), content);
     assert.equal(result.status, 1, result.stderr);
     assert.match(result.stderr, message);
-    assert.equal(fs.readFileSync(ctx.page, "utf8"), before);
+    assert.ok(!result.stderr.includes("Traceback"), result.stderr);
   });
 }
 
-test("a Markdown file that is not UTF-8 fails with its name, not a traceback", { skip }, () => {
-  const ctx = makeSpec({ "spec.md": SPEC_MD, "plan.md": Buffer.from([0x23, 0x20, 0xff, 0x0a]) });
-  const result = build(ctx, GOOD);
+test("a write that fails reports it, with no traceback and no temp file left", { skip }, () => {
+  const ctx = makeSpec({ "spec.md": SPEC_MD });
+  const result = build(ctx, GOOD, { out: path.join(ctx.dir, "missing", "review.html") });
   assert.equal(result.status, 1, result.stderr);
-  assert.match(result.stderr, /plan\.md is not UTF-8/);
+  assert.match(result.stderr, /not written: .*review\.html/);
   assert.ok(!result.stderr.includes("Traceback"), result.stderr);
+  assert.deepEqual(fs.readdirSync(ctx.spec), ["spec.md"]);
 });
 
 for (const [name, target] of [

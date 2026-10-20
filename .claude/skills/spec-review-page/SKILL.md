@@ -52,7 +52,7 @@ Rules that came from reviewer feedback. Do not relax them.
    yet (the command prints nothing), use the repository `HEAD` hash with `-wip` and today's date
    for `--date`. The delta rule is one rule, used in steps 2, 3 and 4: the page gets a delta
    section only when a previous page exists **and** the spec Markdown has at least one commit;
-   otherwise skip the diff, omit the section and pass `--no-delta`.
+   otherwise skip the diff and omit the section.
 3. Previous page: if `<spec dir>/review.html` exists and carries this skill's marker comment in
    its head (the build checks the first 4000 characters; the template puts the marker right after
    the viewport meta), read the snapshot hash from its `spec-review-snapshot` meta tag. That hash is where "what moved
@@ -127,11 +127,11 @@ line, substitutes the header fields, and then:
 
 - fails if any citation points at an anchor that does not exist;
 - prints every cited line, so each can be read against the claim it supports;
-- prints the word count of the fragment with `<details>` bodies removed, so the budget can be checked.
+- prints the word count and the diagram count of the fragment outside `<details>`, so the budget
+  can be checked.
 
-When the delta rule of step 1 does not hold, pass `--no-delta` so the nav drops the entry; the
-fragment then has no `delta` section either. The build fails when the flag and the fragment
-disagree. To write somewhere else, pass `--out <file>`.
+The nav shows the "What moved" entry only when the fragment has a `delta` section. To write
+somewhere else, pass `--out <file>`.
 
 ## Step 5: Hand over
 
