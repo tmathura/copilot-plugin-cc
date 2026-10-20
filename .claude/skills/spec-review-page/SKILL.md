@@ -38,12 +38,12 @@ Rules that came from reviewer feedback. Do not relax them.
 
 ## Step 1: Locate the spec and the previous page
 
-1. Take the ticket number `<n>` from the branch `<type>/<n>-<slug>`
-   (`git rev-parse --abbrev-ref HEAD`); step 4 passes it as `--ticket`. If a spec directory was
-   given, use it. Otherwise pad `<n>` to 3 digits (`printf '%03d' <n>`) and glob `specs/NNN-*/`.
-   If nothing matches, ask for the path.
+1. If a spec directory was given, use it. Otherwise `git rev-parse --abbrev-ref HEAD`, take `<n>`
+   from the branch `<type>/<n>-<slug>`, pad it to 3 digits (`printf '%03d' <n>`) and glob
+   `specs/NNN-*/`. If nothing matches, ask for the path. The ticket number for step 4 is the
+   folder's `NNN` without its leading zeros, because the folder carries the issue number.
 2. Snapshot: `git log -1 --format='%h %ad' --date=short -- <spec dir>`. If the folder has uncommitted
-   changes, use the working tree, pass `--snapshot <hash>-wip` so the page says so, and say it
+   changes other than `review.html`, use the working tree, pass `--snapshot <hash>-wip` so the page says so, and say it
    again in the change section. The next refresh diffs from `<hash>`, so changes already shown
    from a working tree can appear as new once more; that is accepted. If the folder has no commit
    yet (the command prints nothing), use the repository `HEAD` hash with `-wip` and today's date
@@ -83,7 +83,7 @@ Section order and content:
 
 | id | Title | Holds |
 | --- | --- | --- |
-| `change` | The change | Problem in two sentences. Fix in one. What grew since the first draft, if anything. A stat strip: decisions, requirements, tasks, public changes, things that do not change. One short card per settled decision with its id and one citation. |
+| `change` | The change | Problem in two sentences. Fix in one. What grew since the first draft, if anything. A stat strip: decisions, requirements, tasks, public changes, things that do not change. One short card per settled decision, named by its heading in the spec, with one citation. |
 | `delta` | What moved since you last read it | Only when the delta rule of step 1 holds. One table: then, now, citation. One line saying how many of the previous page's checks are resolved and which are still open. Otherwise omit the section and its nav entry. |
 | `how` | How it works | Two or three mermaid diagrams, each with a caption that states the claim. A before-and-after of the defect if there is one. The mechanism that the decisions turn on. Further mechanisms go in `<details>` under this section, closed. |
 | `examples` | Examples | At most five cards. Each names a concrete input, the expected outcome in one line, and why it matters in one or two sentences. Choose cases that changed the design or are easy to get wrong. Say that nothing was run. |
@@ -99,7 +99,7 @@ in `b`, the label and its citation in `span`), `.grid2` with `.card`, `.pill`
 
 ### Citations
 
-Every chip is `<a class="cite" href="#<slug>-L<n>"><label>:<n></a>`. The slug is the file path,
+Every chip is `<a class="cite" href="#<slug>-L<n>"><label></a>`. The slug is the file path,
 lower-cased, every run of characters outside `a-z0-9` replaced by one hyphen, trimmed:
 `spec.md` → `spec-md`, `contracts/companion-cli.md` → `contracts-companion-cli-md`,
 `checklists/requirements.md` → `checklists-requirements-md`. The label is short and names the
