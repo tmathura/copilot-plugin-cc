@@ -10,9 +10,12 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const BUILD = path.join(ROOT, ".claude", "skills", "spec-review-page", "build.py");
 const TITLE = "Revue de la spec — été";
 
-// Not uv: it can download a Python, and tests use no network. The Windows Store python3 stub fails --version.
-const PYTHON = ["python3", "python"].find((name) => run(name, ["--version"]).status === 0);
-const skip = PYTHON ? false : "no python3 or python on the PATH";
+// Not uv: it can download a Python, and tests use no network. The Windows Store python3 stub fails
+// this probe, and so does a Python older than 3.9, which build.py needs.
+const PYTHON = ["python3", "python"].find(
+  (name) => run(name, ["-c", "import sys; sys.exit(sys.version_info < (3, 9))"]).status === 0
+);
+const skip = PYTHON ? false : "no Python 3.9 or later as python3 or python on the PATH";
 
 function makeSpec(files) {
   const dir = makeTempDir("spec-review-page-test-");
@@ -231,14 +234,150 @@ test("a preview with a delta section fails when the spec folder's page cannot be
   assert.ok(!fs.existsSync(preview));
 });
 
-test("a folder named like a Markdown file fails with a message, not a traceback", { skip }, () => {
+// A file symlink on Windows needs developer mode, so such a case skips there; a folder link is made
+// as a junction on Windows, which needs no rights, so those cases run on every system.
+for (const [name, makeLink, message] of [
+  ["a Markdown file link to a file outside the spec folder", (ctx, secret) => {
+    fs.symlinkSync(secret, path.join(ctx.spec, "leak.md"), "file");
+  }, /leak\.md is a link/],
+  ["a folder link (a junction on Windows) to a folder outside", (ctx, secret) => {
+    fs.symlinkSync(path.dirname(secret), path.join(ctx.spec, "linked"), "junction");
+  }, /linked is a link/],
+  ["a folder link inside a subfolder", (ctx, secret) => {
+    fs.mkdirSync(path.join(ctx.spec, "contracts"));
+    fs.symlinkSync(path.dirname(secret), path.join(ctx.spec, "contracts", "linked"), "junction");
+  }, /contracts\/linked is a link/],
+  ["a folder link back into the spec folder (a loop)", (ctx) => {
+    fs.symlinkSync(ctx.spec, path.join(ctx.spec, "loop"), "junction");
+  }, /loop is a link/],
+  ["a review.html that is a link", (ctx, secret) => {
+    fs.symlinkSync(secret, ctx.page, "file");
+  }, /review\.html is a link/]
+]) {
+  test(`${name} is refused`, { skip }, (t) => {
+    const ctx = makeSpec({ "spec.md": SPEC_MD });
+    const outside = path.join(ctx.dir, "outside");
+    fs.mkdirSync(outside);
+    const secret = path.join(outside, "secret.md");
+    fs.writeFileSync(secret, "TOKEN=do-not-embed\n");
+    try {
+      makeLink(ctx, secret);
+    } catch {
+      t.skip("this system cannot make this kind of link");
+      return;
+    }
+    const result = build(ctx, GOOD);
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stderr, message);
+    assert.equal(fs.readFileSync(secret, "utf8"), "TOKEN=do-not-embed\n");
+    const page = fs.lstatSync(ctx.page, { throwIfNoEntry: false });
+    assert.ok(!page || page.isSymbolicLink(), "no page was written");
+  });
+}
+
+test("a spec folder that is itself a link is refused", { skip }, (t) => {
   const ctx = makeSpec({ "spec.md": SPEC_MD });
-  fs.mkdirSync(path.join(ctx.spec, "notes.md"));
-  const result = build(ctx, GOOD);
+  const linked = path.join(ctx.dir, "linked-spec");
+  try {
+    fs.symlinkSync(ctx.spec, linked, "junction");
+  } catch {
+    t.skip("this system cannot make a folder link");
+    return;
+  }
+  const result = build({ dir: ctx.dir, spec: linked }, GOOD);
   assert.equal(result.status, 1, result.stderr);
-  assert.match(result.stderr, /cannot read .*notes\.md/);
-  assert.ok(!result.stderr.includes("Traceback"), result.stderr);
+  assert.match(result.stderr, /linked-spec is a link/);
+  assert.ok(!fs.existsSync(ctx.page));
 });
+
+function buildFrom(cwd, spec, content) {
+  const fragment = path.join(cwd, "content.html");
+  fs.writeFileSync(fragment, content);
+  return run(PYTHON, [BUILD, spec, fragment, "--ticket", "#105", "--title", TITLE, "--snapshot", "abc1234", "--date", "2026-10-20"], { cwd });
+}
+
+test("a relative spec path through a linked parent folder (a committed specs link) is refused", { skip }, (t) => {
+  const repo = makeTempDir("spec-review-page-test-");
+  const outside = makeTempDir("spec-review-page-test-");
+  fs.mkdirSync(path.join(outside, "105-x"));
+  fs.writeFileSync(path.join(outside, "105-x", "spec.md"), "TOKEN=do-not-embed\n");
+  try {
+    fs.symlinkSync(outside, path.join(repo, "specs"), "junction");
+  } catch {
+    t.skip("this system cannot make a folder link");
+    return;
+  }
+  const result = buildFrom(repo, path.join("specs", "105-x"), GOOD);
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /specs is a link/);
+  assert.ok(!fs.existsSync(path.join(outside, "105-x", "review.html")));
+});
+
+test("a relative spec path with '..' and no link builds", { skip }, () => {
+  const ctx = makeSpec({ "spec.md": SPEC_MD });
+  const sub = path.join(ctx.dir, "sub");
+  fs.mkdirSync(sub);
+  const result = buildFrom(sub, path.join("..", "spec"), GOOD);
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(fs.existsSync(ctx.page));
+});
+
+test("a spec path with '..' is refused, because the system resolves '..' through a link", { skip }, () => {
+  const ctx = makeSpec({ "spec.md": SPEC_MD });
+  fs.mkdirSync(path.join(ctx.spec, "sub"));
+  // A plain string: path.join would remove the '..' before the build sees it.
+  const result = build({ dir: ctx.dir, spec: `${ctx.spec}${path.sep}sub${path.sep}..` }, GOOD);
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /pass the spec folder without '\.\.'/);
+});
+
+test("a FIFO named like a Markdown file is not read, so the build does not hang", { skip: posix }, () => {
+  const ctx = makeSpec({ "spec.md": SPEC_MD });
+  assert.equal(run("mkfifo", [path.join(ctx.spec, "pipe.md")]).status, 0);
+  const result = buildOk(ctx, GOOD);
+  assert.match(result.stdout, /files: 1 /);
+});
+
+test("an --out that is a link is refused", { skip }, (t) => {
+  const ctx = makeSpec({ "spec.md": SPEC_MD });
+  const elsewhere = path.join(ctx.dir, "elsewhere.html");
+  fs.writeFileSync(elsewhere, "<!doctype html><p>somewhere else</p>\n");
+  const out = path.join(ctx.dir, "preview.html");
+  try {
+    fs.symlinkSync(elsewhere, out, "file");
+  } catch {
+    t.skip("this system cannot make a symlink (Windows without developer mode)");
+    return;
+  }
+  const result = build(ctx, GOOD, { out });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /refusing to use .*preview\.html: it is a link/);
+  assert.equal(fs.readFileSync(elsewhere, "utf8"), "<!doctype html><p>somewhere else</p>\n");
+});
+
+test("a folder named like a Markdown file is not read as one; an upper-case .MD file is", { skip }, () => {
+  const ctx = makeSpec({ "spec.md": SPEC_MD, "UPPER.MD": "# Upper\n" });
+  fs.mkdirSync(path.join(ctx.spec, "notes.md"));
+  fs.writeFileSync(path.join(ctx.spec, "notes.md", "inner.md"), "# Inner\n");
+  const result = buildOk(ctx, '<section id="change"><a class="cite" href="#notes-md-inner-md-L1">inner:1</a> <a class="cite" href="#upper-md-L1">upper:1</a></section>');
+  assert.match(result.stdout, /files: 3 /);
+});
+
+for (const [name, block, message] of [
+  ["a Markdown file", (ctx) => path.join(ctx.spec, "spec.md"), /cannot read .*spec\.md/],
+  ["a folder", (ctx) => { fs.mkdirSync(path.join(ctx.spec, "contracts")); return path.join(ctx.spec, "contracts"); }, /cannot read .*contracts/]
+]) {
+  test(`${name} that cannot be read fails with a message, not a traceback`, { skip: unreadable }, () => {
+    const ctx = makeSpec({ "spec.md": SPEC_MD });
+    const target = block(ctx);
+    fs.chmodSync(target, 0o000);
+    const result = build(ctx, GOOD);
+    fs.chmodSync(target, 0o755);
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stderr, message);
+    assert.ok(!result.stderr.includes("Traceback"), result.stderr);
+  });
+}
 
 for (const [name, files, content, message] of [
   ["a Markdown file", { "spec.md": SPEC_MD, "plan.md": Buffer.from([0x23, 0x20, 0xff, 0x0a]) }, GOOD, /plan\.md is not UTF-8/],

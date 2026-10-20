@@ -47,7 +47,7 @@ Tools that must be on the PATH:
 | `gh` | 2.48 or later (the review poll uses `gh api --slurp`). `gh auth status` shows a login, and `gh api repos/tmathura/copilot-plugin-cc --jq .permissions.push` prints `true` |
 | `node` | Codex, Copilot and the review poll use it |
 | `specify` | only for Spec Kit |
-| `uv` | Spec Kit setup, and `spec-review-page` (`uv run --no-project python`) |
+| `uv` | Spec Kit setup, and `spec-review-page` (its build command is in the skill's Step 4) |
 
 If `command -v <tool>` prints nothing, stop and tell the user what to install. If a tool was just
 installed and is still not found, ask the user to restart Claude Code. The shell can be older than the

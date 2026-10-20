@@ -3,7 +3,7 @@
 Usage:
   python build.py <spec dir> <content.html> --ticket '#<n>' --title "..." --snapshot <hash> --date <yyyy-mm-dd> [--out <file>]
 
-The nav shows "What moved" when the content has a <section id="delta">. Such a section needs a
+It needs Python 3.9 or later. The nav shows "What moved" when the content has a <section id="delta">. Such a section needs a
 previous generated page in the spec folder (<spec dir>/review.html, also for an --out preview);
 without one the build fails.
 
@@ -24,8 +24,13 @@ import pathlib
 import re
 import secrets
 import shutil
+import stat
 import sys
+import time
 from html.parser import HTMLParser
+
+if sys.version_info < (3, 9):
+    sys.exit("build.py needs Python 3.9 or later")
 
 sys.stdout.reconfigure(encoding="utf-8")
 
@@ -114,6 +119,62 @@ def previous_snapshot(path: pathlib.Path) -> str | None:
     return m.group(1) if m else ""
 
 
+def is_link(path: pathlib.Path) -> bool:
+    """True for a symlink, or a Windows junction (Python before 3.12 does not count one as a link).
+    The reparse tag, not a path comparison, so 8.3 short names and case do not matter, and other
+    reparse points (such as OneDrive placeholders) stay ordinary files. os.path.islink and os.lstat
+    errors never raise here, unlike Path.is_symlink before 3.13."""
+    if os.path.islink(path):
+        return True
+    try:
+        tag = getattr(os.lstat(path), "st_reparse_tag", 0)
+    except OSError:
+        return False
+    return tag == getattr(stat, "IO_REPARSE_TAG_MOUNT_POINT", 0xA0000003)
+
+
+def markdown_files(spec: pathlib.Path) -> tuple[list[pathlib.Path], str | None]:
+    """Return every Markdown file under spec, or an error when the folder or anything in it is a
+    link, or a folder in it cannot be read. The page embeds what it reads and is committed, so the
+    walk stops at the first link before it goes into one: a link can point outside the folder (such
+    as at a .env), loop back into it, or show a folder twice."""
+    # A link on the way to the folder leads elsewhere as much as one inside it, for example a
+    # committed specs/ link. For a relative path (the workflow passes specs/NNN-<name>) every part
+    # is checked, which also covers ".." through a link. An absolute path can pass through system
+    # links (macOS /var), so only the folder itself is checked, and ".." is refused because the
+    # system resolves it through a link.
+    if spec.is_absolute():
+        if ".." in spec.parts:
+            return [], f"refusing to read {spec}: pass the spec folder without '..'"
+        on_the_way = [spec]
+    else:
+        on_the_way = [pathlib.Path(*spec.parts[: i + 1]) for i in range(len(spec.parts))]
+    for part in on_the_way:
+        if is_link(part):
+            return [], f"refusing to read {spec}: {part} is a link"
+    found = []
+    errors: list[OSError] = []
+    for root, dirs, names in os.walk(spec, onerror=errors.append):
+        for name in sorted(dirs + names):
+            entry = pathlib.Path(root, name)
+            if is_link(entry):
+                return [], f"refusing to read {spec}: {entry.relative_to(spec).as_posix()} is a link"
+        for n in names:
+            if not n.lower().endswith(".md"):
+                continue
+            try:
+                mode = os.lstat(os.path.join(root, n)).st_mode
+            except OSError as e:
+                errors.append(e)
+                continue
+            # Regular files only: a FIFO named *.md would block the read forever.
+            if stat.S_ISREG(mode):
+                found.append(pathlib.Path(root, n))
+    if errors:
+        return [], f"cannot read {errors[0].filename}: {errors[0].strerror or errors[0]}"
+    return sorted(found), None
+
+
 def read_utf8(path: pathlib.Path) -> str | None:
     """Return the file's text with CRLF turned into LF and no BOM, or None (after a message) when
     it is not UTF-8. A lone CR stays inside its line, because git and grep count lines by LF."""
@@ -139,7 +200,10 @@ def main() -> int:
     a = ap.parse_args()
 
     spec = pathlib.Path(a.spec_dir)
-    files = sorted(p for p in spec.rglob("*.md"))
+    files, error = markdown_files(spec)
+    if error:
+        print(error, file=sys.stderr)
+        return 1
     if not files:
         print(f"no Markdown files under {spec}", file=sys.stderr)
         return 1
@@ -149,6 +213,12 @@ def main() -> int:
     out = pathlib.Path(a.out) if a.out else page_path
     if out.is_dir():
         print(f"not written: {out} is a folder; pass a file path", file=sys.stderr)
+        return 1
+    # An --out that is a link would make the build read another file's head (and take its snapshot
+    # as the previous page's); the rename would only replace the link itself. The spec folder's own
+    # review.html never gets here as a link: the walk above refuses it.
+    if is_link(out):
+        print(f"refusing to use {out}: it is a link", file=sys.stderr)
         return 1
     try:
         out_prev = previous_snapshot(out)
@@ -285,7 +355,16 @@ def main() -> int:
         # cleanup fail, so modes are copied on POSIX only.
         if out.exists() and os.name != "nt":
             shutil.copymode(out, tmp)
-        os.replace(tmp, out)
+        # Windows refuses to replace a file that another process (a virus scanner, an editor) has
+        # open for a moment; try again for up to 2 seconds, as the plugin's state module does.
+        for attempt in range(20):
+            try:
+                os.replace(tmp, out)
+                break
+            except PermissionError:
+                if os.name != "nt" or attempt == 19:
+                    raise
+                time.sleep(0.1)
     except OSError as e:
         try:
             tmp.unlink(missing_ok=True)

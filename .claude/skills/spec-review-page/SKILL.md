@@ -41,12 +41,19 @@ Rules that came from reviewer feedback. Do not relax them.
 
 1. If a spec directory was given, use it. Otherwise `git rev-parse --abbrev-ref HEAD`, take `<n>`
    from the branch `<type>/<n>-<slug>`, pad it to 3 digits (`printf '%03d' <n>`) and glob
-   `specs/NNN-*/`. If nothing matches, ask for the path. The ticket number `<n>` for step 4 is the
+   `specs/NNN-*` (no trailing `/`). If nothing matches, ask for the path. The ticket number `<n>` for step 4 is the
    folder's `NNN` without its leading zeros, because the folder carries the issue number. A folder
    with no number yet (`specs/<name>/`, before the issue exists) takes `<n>` from the branch; if
-   there is none, ask.
-2. Snapshot: `git log -1 --format='%h %ad' --date=short -- <spec dir>`. If the folder has uncommitted
-   changes other than `review.html`, use the working tree, pass `--snapshot <hash>-wip` so the page says so, and say it
+   there is none, ask. Before you read any file in it, check that no folder on the way to it, nor
+   the folder, nor anything in it is a link. For `specs/NNN-<name>`:
+   `find specs "<spec dir>" -maxdepth 0 -type l` and `find "<spec dir>" -type l` both print
+   nothing; for a folder elsewhere, list every folder on its path in the first command. Write the
+   paths without a trailing `/`, or `find` follows a linked folder and prints nothing. A link can point at a file outside
+   the folder, such as a `.env`, and reading it would put its text in the page. If it prints
+   anything, stop and ask. The build refuses such a folder too.
+2. Snapshot: `git log -1 --format='%h %ad' --date=short -- <spec dir>`. If the folder's Markdown has
+   uncommitted changes (`git status --porcelain -- ':(icase)<spec dir>/*.md'` prints something), use
+   the working tree, pass `--snapshot <hash>-wip` so the page says so, and say it
    again in the change section. The next refresh diffs from `<hash>`, so changes already shown
    from a working tree can appear as new once more; that is accepted. If the folder has no commit
    yet (the command prints nothing), use the repository `HEAD` hash with `-wip` and today's date
@@ -72,9 +79,9 @@ stated as fact.
 
 When the delta rule of step 1 holds (a previous page exists and the Markdown has a commit), run
 `git diff <hash> -- "<spec dir>" ':(exclude)<spec dir>/review.html'` with the `-wip` suffix
-dropped, and read the commit messages since. For a `-wip` build, also list new files with
-`git status --porcelain -- "<spec dir>"`, because `git diff` does not show untracked files. The
-generated page is left out because it is not spec content. That is the raw material for section 2. When the rule does not hold, there is no
+dropped, and read the commit messages since. For a `-wip` build, also list new Markdown files
+with `git status --porcelain -- ':(icase)<spec dir>/*.md'` (any case, as the build reads them), because `git diff` does not show untracked
+files. The generated page is left out of both because it is not spec content. That is the raw material for section 2. When the rule does not hold, there is no
 section 2.
 
 ## Step 3: Write the content fragment
@@ -116,7 +123,7 @@ line so you can check each one landed. Fix any that did not before you hand the 
 ## Step 4: Build and check
 
 ```bash
-uv run --no-project python .claude/skills/spec-review-page/build.py "<spec dir>" "<scratchpad>/content.html" --ticket '#<n>' --title '<spec title>' --snapshot <hash> --date <yyyy-mm-dd>
+uv run --no-project --python '>=3.9' python .claude/skills/spec-review-page/build.py "<spec dir>" "<scratchpad>/content.html" --ticket '#<n>' --title '<spec title>' --snapshot <hash> --date <yyyy-mm-dd>
 ```
 
 Write each `'` in the title as `'\''`. Double quotes would run a backtick or `$(...)` in it.
@@ -126,6 +133,8 @@ a page someone wrote by hand is never lost. It embeds every Markdown file with o
 line, substitutes the header fields, and then:
 
 - fails if any citation points at an anchor that does not exist;
+- refuses a spec folder that is a link or holds one (a symlink or a Windows junction), and an
+  `--out` that is a link;
 - prints every cited line, so each can be read against the claim it supports;
 - prints the word count and the diagram count of the fragment outside `<details>`, so the budget
   can be checked.
