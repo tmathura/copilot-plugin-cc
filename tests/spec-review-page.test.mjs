@@ -27,6 +27,10 @@ function makeSpec(files) {
   return { dir, spec, page: path.join(spec, "review.html") };
 }
 
+// spawnSync blocks the event loop, so a node:test timeout could not stop a build that hangs (on a
+// FIFO, say); the child gets its own limit instead.
+const BUILD_TIMEOUT = 30_000;
+
 function build({ dir, spec }, content, { snapshot = "abc1234", title = TITLE, out } = {}) {
   const fragment = path.join(dir, "content.html");
   fs.writeFileSync(fragment, content);
@@ -34,11 +38,12 @@ function build({ dir, spec }, content, { snapshot = "abc1234", title = TITLE, ou
     BUILD, spec, fragment,
     "--ticket", "#105", "--title", title, "--snapshot", snapshot, "--date", "2026-10-20",
     ...(out ? ["--out", out] : [])
-  ]);
+  ], { timeout: BUILD_TIMEOUT });
 }
 
 function buildOk(ctx, content, options) {
   const result = build(ctx, content, options);
+  assert.equal(result.error?.code, undefined, "the build timed out");
   assert.equal(result.status, 0, result.stderr);
   return result;
 }
@@ -293,7 +298,7 @@ test("a spec folder that is itself a link is refused", { skip }, (t) => {
 function buildFrom(cwd, spec, content) {
   const fragment = path.join(cwd, "content.html");
   fs.writeFileSync(fragment, content);
-  return run(PYTHON, [BUILD, spec, fragment, "--ticket", "#105", "--title", TITLE, "--snapshot", "abc1234", "--date", "2026-10-20"], { cwd });
+  return run(PYTHON, [BUILD, spec, fragment, "--ticket", "#105", "--title", TITLE, "--snapshot", "abc1234", "--date", "2026-10-20"], { cwd, timeout: BUILD_TIMEOUT });
 }
 
 test("a relative spec path through a linked parent folder (a committed specs link) is refused", { skip }, (t) => {
@@ -329,6 +334,72 @@ test("a spec path with '..' is refused, because the system resolves '..' through
   const result = build({ dir: ctx.dir, spec: `${ctx.spec}${path.sep}sub${path.sep}..` }, GOOD);
   assert.equal(result.status, 1, result.stderr);
   assert.match(result.stderr, /pass the spec folder without '\.\.'/);
+});
+
+for (const [name, outOf] of [
+  ["a review.html", () => undefined],
+  ["an --out", (ctx) => path.join(ctx.dir, "preview.html")]
+]) {
+  test(`${name} that is a FIFO fails with a message, without hanging`, { skip: posix }, () => {
+    const ctx = makeSpec({ "spec.md": SPEC_MD });
+    const out = outOf(ctx);
+    assert.equal(run("mkfifo", [out ?? ctx.page]).status, 0);
+    const result = build(ctx, GOOD, { out });
+    assert.equal(result.error?.code, undefined, "the build timed out on the FIFO");
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stderr, /is not a regular file/);
+  });
+}
+
+test("an absolute spec path below the current folder is checked for a linked parent", { skip }, (t) => {
+  const repo = makeTempDir("spec-review-page-test-");
+  const outside = makeTempDir("spec-review-page-test-");
+  fs.mkdirSync(path.join(outside, "105-x"));
+  fs.writeFileSync(path.join(outside, "105-x", "spec.md"), "TOKEN=do-not-embed\n");
+  try {
+    fs.symlinkSync(outside, path.join(repo, "specs"), "junction");
+  } catch {
+    t.skip("this system cannot make a folder link");
+    return;
+  }
+  const result = buildFrom(repo, path.join(repo, "specs", "105-x"), GOOD);
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /specs is a link/);
+});
+
+test("an absolute spec path that is a link to the current folder is refused", { skip }, (t) => {
+  const repo = makeTempDir("spec-review-page-test-");
+  fs.writeFileSync(path.join(repo, "spec.md"), SPEC_MD);
+  const shortcut = `${repo}-shortcut`;
+  try {
+    fs.symlinkSync(repo, shortcut, "junction");
+  } catch {
+    t.skip("this system cannot make a folder link");
+    return;
+  }
+  const result = buildFrom(repo, shortcut, GOOD);
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /shortcut is a link/);
+});
+
+test("an absolute spec path through an alias above the repo (macOS /var) still checks the repo's parts", { skip }, (t) => {
+  const real = makeTempDir("spec-review-page-test-");
+  const repo = path.join(real, "repo");
+  fs.mkdirSync(repo);
+  const outside = makeTempDir("spec-review-page-test-");
+  fs.mkdirSync(path.join(outside, "105-x"));
+  fs.writeFileSync(path.join(outside, "105-x", "spec.md"), "TOKEN=do-not-embed\n");
+  const alias = `${real}-alias`;
+  try {
+    fs.symlinkSync(real, alias, "junction");
+    fs.symlinkSync(outside, path.join(repo, "specs"), "junction");
+  } catch {
+    t.skip("this system cannot make a folder link");
+    return;
+  }
+  const result = buildFrom(repo, path.join(alias, "repo", "specs", "105-x"), GOOD);
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /specs is a link/);
 });
 
 test("a FIFO named like a Markdown file is not read, so the build does not hang", { skip: posix }, () => {

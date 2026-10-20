@@ -111,6 +111,9 @@ def previous_snapshot(path: pathlib.Path) -> str | None:
     """Return the snapshot hash of an existing generated page, or None."""
     if not path.exists():
         return None
+    # Opening a FIFO (or a device) would block the build forever.
+    if not stat.S_ISREG(os.stat(path).st_mode):
+        raise OSError(f"{path} is not a regular file")
     with path.open("rb") as f:
         head = f.read(16000).decode("utf-8", errors="replace")[:4000]
     if MARKER not in head:
@@ -133,20 +136,35 @@ def is_link(path: pathlib.Path) -> bool:
     return tag == getattr(stat, "IO_REPARSE_TAG_MOUNT_POINT", 0xA0000003)
 
 
+def same_file(a: pathlib.Path, b: str) -> bool:
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        return False
+
+
 def markdown_files(spec: pathlib.Path) -> tuple[list[pathlib.Path], str | None]:
     """Return every Markdown file under spec, or an error when the folder or anything in it is a
     link, or a folder in it cannot be read. The page embeds what it reads and is committed, so the
     walk stops at the first link before it goes into one: a link can point outside the folder (such
     as at a .env), loop back into it, or show a folder twice."""
     # A link on the way to the folder leads elsewhere as much as one inside it, for example a
-    # committed specs/ link. For a relative path (the workflow passes specs/NNN-<name>) every part
-    # is checked, which also covers ".." through a link. An absolute path can pass through system
-    # links (macOS /var), so only the folder itself is checked, and ".." is refused because the
-    # system resolves it through a link.
+    # committed specs/ link. Every part below the current folder (the repo root, where the
+    # workflow runs) is checked, which also covers ".." through a link in a relative path. Folders
+    # above it can be system links (macOS /var) and are not the repo's, so they are not checked;
+    # ".." in an absolute path is refused, because the system resolves it through a link.
     if spec.is_absolute():
         if ".." in spec.parts:
             return [], f"refusing to read {spec}: pass the spec folder without '..'"
-        on_the_way = [spec]
+        # Find the current folder among the path's ancestors by file identity, so a system alias
+        # above it (macOS /var for /private/var), another letter case or an 8.3 name still matches;
+        # the parts below it are checked as written. The spec folder itself is always checked.
+        parts = spec.parts
+        start = next((i for i in range(1, len(parts)) if same_file(pathlib.Path(*parts[:i]), ".")), None)
+        if start is None:
+            on_the_way = [spec]
+        else:
+            on_the_way = [pathlib.Path(*parts[:i]) for i in range(start + 1, len(parts) + 1)]
     else:
         on_the_way = [pathlib.Path(*spec.parts[: i + 1]) for i in range(len(spec.parts))]
     for part in on_the_way:

@@ -50,7 +50,8 @@ Rules that came from reviewer feedback. Do not relax them.
    nothing; for a folder elsewhere, list every folder on its path in the first command. Write the
    paths without a trailing `/`, or `find` follows a linked folder and prints nothing. A link can point at a file outside
    the folder, such as a `.env`, and reading it would put its text in the page. If it prints
-   anything, stop and ask. The build refuses such a folder too.
+   anything, stop and ask. The build refuses such a folder too, for every folder from the repo
+   root down; folders above the repo root are not its to check.
 2. Snapshot: `git log -1 --format='%h %ad' --date=short -- <spec dir>`. If the folder's Markdown has
    uncommitted changes (`git status --porcelain -- ':(icase)<spec dir>/*.md'` prints something), use
    the working tree, pass `--snapshot <hash>-wip` so the page says so, and say it
