@@ -332,8 +332,7 @@ nothing else in the call. The parts in `[ ]` are optional:
 ```
 
 The program is a program name or `env`. `VAR=value` may be an argument of `env`, but it is never
-the program. Outside quotes, the `exec` line has no other shell operator: no `|`, `;`, `&`, `&&` or
-`||`. A `$( ... )`, as in the `MAIN=` line, is fine.
+the program. Outside quotes, the call holds only the parts that the template shows.
 
 The reason is that on Windows, `TaskStop` ends the Git Bash shell. A Git Bash tool that the shell
 started, such as `sleep.exe` or `env.exe`, can stay running. Windows can then give that pid to a
