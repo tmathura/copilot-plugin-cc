@@ -681,15 +681,14 @@ export async function runPromptModeReview(cwd, options = {}) {
   return { ...result, reviewText: result.finalMessage };
 }
 
-// Prompt mode has no output schema setting, so the model may wrap its JSON in one code fence, and
-// may write text before or after that fence.
+// Prompt mode has no output schema setting, so the model may wrap its JSON in one code fence.
 function stripCodeFence(text) {
   const match = /^\s*```[\w-]*[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*```\s*$/.exec(text);
   return match ? match[1] : text;
 }
 
-// The content of each fenced block, with fences paired from left to right; null when a fence is
-// left open.
+// The model may also write text before or after its fenced JSON. This gives the content of each
+// fenced block, with fences paired from left to right; null when a fence is left open.
 function fencedBlocks(text) {
   const blocks = [];
   let open = null;

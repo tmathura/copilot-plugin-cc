@@ -58,7 +58,9 @@ if (blocks?.length === 1) {
 
 ## Deviations from Assessment
 
-None.
+- 2026-10-20, review round 1: the comment above `stripCodeFence` is back to what it said before;
+  the note that text may come around the fence is on `fencedBlocks`, which handles it. No code
+  change; `npm test` passes again (290 tests).
 
 ## Follow-ups
 
