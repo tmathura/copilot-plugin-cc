@@ -326,12 +326,13 @@ The blind plan and the code review round start Codex and Copilot as background B
 Write each background Bash call that may be stopped with `TaskStop` in this form, and write
 nothing else in the call. The parts in `[ ]` are optional:
 
-```bash
-[the MAIN= and WT_ROOT= lines from "Shell and paths"]
+```text
+[the MAIN= line, then the WT_ROOT= line, from "Shell and paths"]
 [cd "<dir>" &&] exec <program> <args> [< "<file>"]
 ```
 
-The program is a program name or `env`, never `VAR=value`.
+The program is a program name or `env`, never `VAR=value`. The arguments hold no pipe, `;`, `&&`
+or `&`. A `$( ... )` that ends before the `exec` runs is fine.
 
 The reason is that on Windows, `TaskStop` ends the Git Bash shell. A Git Bash tool that the shell
 started, such as `sleep.exe` or `env.exe`, can stay running. Windows can then give that pid to a
