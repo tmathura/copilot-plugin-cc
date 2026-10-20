@@ -323,14 +323,15 @@ left open: the constitution allows a merge only when each one is fixed or reject
 The blind plan and the code review round start Codex and Copilot as background Bash calls
 (`run_in_background`). Read each call's output when it ends.
 
-Write each background Bash call that may be stopped with `TaskStop` in this form:
+Write each background Bash call that may be stopped with `TaskStop` in this form, and write
+nothing else in the call. The parts in `[ ]` are optional:
 
-- The command is one `exec <program> <args>`. Only an input redirect from a file, `< "<file>"`,
-  may follow it: no pipe, `;` or `&&`.
-- Before it, only the `MAIN=` and `WT_ROOT=` lines may come, in that order, and then a
-  `cd "<dir>" &&`. Do not put the command in a `( ... )` group or in a `bash -c` of your own. A
-  `$( ... )` that ends before the `exec`, as in the `MAIN=` line, is fine.
-- The program is a program name or `env`. It is never `VAR=value`.
+```bash
+[the MAIN= and WT_ROOT= lines from "Shell and paths"]
+[cd "<dir>" &&] exec <program> <args> [< "<file>"]
+```
+
+The program is a program name or `env`, never `VAR=value`.
 
 The reason is that on Windows, `TaskStop` ends the Git Bash shell. A Git Bash tool that the shell
 started, such as `sleep.exe` or `env.exe`, can stay running. Windows can then give that pid to a
