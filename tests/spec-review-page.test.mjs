@@ -80,13 +80,14 @@ test("a folder without spec.md builds, because the template cites no file", { sk
 });
 
 test("line numbers count LF as git and grep do, CRLF counts once, and a BOM is dropped", { skip }, () => {
-  const ctx = makeSpec({ "spec.md": "﻿# Spec\r\n\r\nx\fy\r\nz\rw\nlast\n" });
-  buildOk(ctx, '<section id="change"><a class="cite" href="#spec-md-L5">spec.md:5</a></section>');
+  const ctx = makeSpec({ "spec.md": "﻿# Spec\r\n\r\nx\fy y\r\nz\rw\r\r\nlast\n" });
+  const result = buildOk(ctx, '<section id="change"><a class="cite" href="#spec-md-L4">spec.md:4</a> <a class="cite" href="#spec-md-L5">spec.md:5</a></section>');
   const page = fs.readFileSync(ctx.page, "utf8");
   assert.ok(page.includes('<span id="spec-md-L1"># Spec</span>'));
-  // A lone CR is shown as ␍, so neither the browser nor the terminal breaks the line there.
-  assert.ok(page.includes('<span id="spec-md-L3">x\fy</span><span id="spec-md-L4">z␍w</span><span id="spec-md-L5">last</span>'));
-  assert.ok(!page.includes("﻿") && !page.includes("\r"));
+  // Characters that could break a line on screen are shown as symbols, so line numbers still match.
+  assert.ok(page.includes('<span id="spec-md-L3">x␌y␤y</span><span id="spec-md-L4">z␍w␍</span><span id="spec-md-L5">last</span>'));
+  assert.ok(!page.includes("﻿") && !page.includes("\r") && !page.includes(" "));
+  assert.match(result.stdout, /spec-md:\s+4\s+z␍w␍/);
 });
 
 test("{{...}} text in the content and the title is not filled in again", { skip }, () => {
@@ -128,11 +129,35 @@ test("a delta section with no previous page fails", { skip }, () => {
   assert.ok(!fs.existsSync(ctx.page));
 });
 
-test("a delta section is allowed when the previous page has an empty snapshot, or in an --out preview", { skip }, () => {
+test("a delta section is allowed when the previous page has an empty snapshot", { skip }, () => {
   const ctx = makeSpec({ "spec.md": SPEC_MD });
   buildOk(ctx, GOOD, { snapshot: "" });
   buildOk(ctx, WITH_DELTA);
-  buildOk(ctx, WITH_DELTA, { out: path.join(ctx.dir, "preview.html") });
+  assert.ok(fs.readFileSync(ctx.page, "utf8").includes('href="#delta"'));
+});
+
+test("an --out preview compares with the spec folder's page, not with the preview file", { skip }, () => {
+  const ctx = makeSpec({ "spec.md": SPEC_MD });
+  const preview = path.join(ctx.dir, "preview.html");
+  const none = build(ctx, WITH_DELTA, { out: preview });
+  assert.equal(none.status, 1, none.stderr);
+  assert.match(none.stderr, /no previous page to compare with/);
+  buildOk(ctx, GOOD, { snapshot: "page123" });
+  const result = buildOk(ctx, WITH_DELTA, { out: preview, snapshot: "new456" });
+  assert.match(result.stdout, /previous page snapshot: page123/);
+  assert.ok(fs.readFileSync(preview, "utf8").includes('href="#delta"'));
+});
+
+test("a refresh over a read-only page leaves no temp file", { skip }, () => {
+  const ctx = makeSpec({ "spec.md": SPEC_MD });
+  buildOk(ctx, GOOD);
+  fs.chmodSync(ctx.page, 0o444);
+  const result = build(ctx, GOOD);
+  fs.chmodSync(ctx.page, 0o644);
+  // Windows refuses to replace a read-only file; POSIX replaces it. Either way nothing is left behind.
+  if (result.status !== 0) assert.match(result.stderr, /not written: /);
+  assert.ok(!result.stderr.includes("Traceback"), result.stderr);
+  assert.deepEqual(fs.readdirSync(ctx.spec).sort(), ["review.html", "spec.md"]);
 });
 
 const posix = skip || (process.platform === "win32" && "POSIX file modes");

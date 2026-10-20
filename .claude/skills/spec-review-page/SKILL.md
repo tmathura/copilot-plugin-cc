@@ -132,7 +132,7 @@ line, substitutes the header fields, and then:
 
 The nav shows the "What moved" entry only when the fragment has a `delta` section. A `delta`
 section with no previous page in the spec folder fails the build. To write somewhere else, pass
-`--out <file>`; that preview skips the previous-page check.
+`--out <file>`; the previous page is still the spec folder's `review.html`.
 
 ## Step 5: Hand over
 
