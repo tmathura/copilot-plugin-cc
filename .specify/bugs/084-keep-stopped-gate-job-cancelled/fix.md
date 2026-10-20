@@ -61,6 +61,8 @@ await cancelCompanionJob(options.workspaceRoot, options.runId, reason, { overrid
   that failed while it was being stopped. The `CHANGELOG.md` entry no longer says "always", because
   a job that completed at the limit keeps `completed`. The new gate test waits for the job no longer
   than the run limit, and the gate's header comment is wrapped again.
+- 2026-10-20, review round 2: the gate's header comment and the `docs/operations.md` gate bullet
+  are wrapped at 100 characters (round 1 left one long line in each).
 
 ## Follow-ups
 

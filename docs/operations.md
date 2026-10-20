@@ -27,7 +27,8 @@ stateDiagram-v2
   processes could not be stopped stays, so you can cancel it again.
 - The review gate runs as a task job titled "Copilot Stop Gate Review". If it is still running 14
   minutes after the hook started, or the hook is stopped, the gate stops it and marks it
-  `cancelled`, also when the job failed while the gate was stopping it. `/copilot:rescue --resume` never continues it.
+  `cancelled`, also when the job failed while the gate was stopping it. `/copilot:rescue --resume`
+  never continues it.
 
 ## Logs and state
 

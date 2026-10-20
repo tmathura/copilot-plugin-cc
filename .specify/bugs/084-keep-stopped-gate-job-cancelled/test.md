@@ -10,8 +10,8 @@
 
 The forced form of the race (the job saved `failed` between the companion's stop and the gate's
 cancel) no longer leaves the job `failed`. It ends `cancelled` with the gate's reason, after the
-limit and after a signal. No regressions were found. Run again after review round 1 (docs, the
-changelog wording, the test's wait and a comment); the results below are from that run.
+limit and after a signal. No regressions were found. Run again after review rounds 1 and 2 (docs,
+the changelog wording, the test's wait and comment wrapping); the results below are from that run.
 
 ## Checks Performed
 

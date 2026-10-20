@@ -5,7 +5,8 @@
 // the limit, or when the hook itself is stopped, the hook stops the companion's process tree and
 // cancels its job, which stops the job's Copilot process, also when the companion saved the job as
 // failed while it was being stopped; it also cancels the job of a companion that ended before its job
-// did. The hook uses Claude Code's own CLAUDE_PLUGIN_DATA, not an inherited companion export. A failed run's message gives the reason from the task's JSON payload.
+// did. The hook uses Claude Code's own CLAUDE_PLUGIN_DATA, not an inherited companion export. A failed
+// run's message gives the reason from the task's JSON payload.
 
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
