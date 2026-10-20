@@ -51,16 +51,20 @@ test("the build writes a page with every citation found and the text unchanged",
   assert.ok(page.includes('<span id="spec-md-L3">Café — the first claim.</span>'));
 });
 
-test("a second build reads the previous page's snapshot", { skip }, () => {
+test("a refresh reads the previous page's snapshot and adds the What moved entry", { skip }, () => {
   const ctx = makeSpec({ "spec.md": SPEC_MD });
   assert.equal(build(ctx, GOOD).status, 0);
-  const result = build(ctx, GOOD);
+  assert.ok(!fs.readFileSync(ctx.page, "utf8").includes('href="#delta"'), "--no-delta drops the entry");
+  const result = build(ctx, GOOD, []);
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /previous page snapshot: abc1234/);
+  assert.ok(fs.readFileSync(ctx.page, "utf8").includes('href="#delta"'));
 });
 
 for (const [name, target] of [
   ["a line past the end", "spec-md-L99"],
+  ["line zero", "spec-md-L0"],
+  ["a file that does not exist", "plan-md-L1"],
   ["a malformed target", "spec_md-L3"],
   ["a zero-padded line number", "spec-md-L03"]
 ]) {
@@ -71,17 +75,10 @@ for (const [name, target] of [
     const result = build(ctx, GOOD.replace("#spec-md-L3", `#${target}`));
     assert.equal(result.status, 1);
     assert.ok(result.stdout.includes(`MISSING ${target}`), result.stdout);
+    assert.match(result.stderr, /not written: fix the missing anchors first/);
     assert.equal(fs.readFileSync(ctx.page, "utf8"), before);
   });
 }
-
-test("--no-delta drops the What moved nav entry, and without it the entry is there", { skip }, () => {
-  const ctx = makeSpec({ "spec.md": SPEC_MD });
-  assert.equal(build(ctx, GOOD).status, 0);
-  assert.ok(!fs.readFileSync(ctx.page, "utf8").includes('href="#delta"'));
-  assert.equal(build(ctx, GOOD, []).status, 0);
-  assert.ok(fs.readFileSync(ctx.page, "utf8").includes('href="#delta"'));
-});
 
 function generatedPage() {
   const ctx = makeSpec({ "spec.md": SPEC_MD });
