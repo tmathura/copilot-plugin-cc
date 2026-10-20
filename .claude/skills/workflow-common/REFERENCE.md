@@ -27,9 +27,9 @@ The skills must work the same on macOS, Linux and Windows.
 
 - Run every command with the Bash tool. That is bash on macOS and Linux, and Git Bash on Windows.
 - Do not use PowerShell, `cmd`, `.exe` paths, drive letters or fixed home folders.
-- Use only `git`, `gh`, `node`, `npm`, `claude`, `uv`, `specify`, POSIX `sh` builtins, and the
-  standard POSIX tools that the steps use, such as `mkdir`, `mv`, `ls`, `sort`, `tail`, `grep`,
-  `awk` and `sed`.
+- Use only `git`, `gh`, `node`, `npm`, `claude`, `uv`, `specify`, POSIX `sh` builtins (such as
+  `cd` and `exec`), and the standard POSIX tools that the steps use, such as `mkdir`, `mv`, `ls`,
+  `sort`, `tail`, `grep`, `awk`, `sed` and `sleep`.
 - Do not pass `-R` with a different repo to `gh`.
 - Run commands from the root of the current checkout (main checkout or worktree,
   `git rev-parse --show-toplevel`). Paths such as `.claude/skills/...` are relative to it.
@@ -248,7 +248,7 @@ per ticket, in every planning mode.
 
    Put nothing from Claude's plan or reasoning in it. An issue that already has a
    `## Plan comparison` was planned before: do not run the blind plan again.
-2. Start each ready reviewer with `node "$CODEX" task --prompt-file "<file>"` (`$CODEX` and the
+2. Start each ready reviewer with `exec node "$CODEX" task --prompt-file "<file>"` (`$CODEX` and the
    Copilot script as in "Codex and Copilot review loop"; "Background calls" there), then plan while
    they run. `task` without `--write` is read-only, and it starts a fresh thread, so it cannot see
    this session. Until both calls have ended, write nothing
@@ -323,8 +323,17 @@ left open: the constitution allows a merge only when each one is fixed or reject
 The blind plan and the code review round start Codex and Copilot as background Bash calls
 (`run_in_background`). Read each call's output when it ends.
 
-- Start a background `sleep 1800` with each call (a retry too), so that you are called again after
-  30 minutes. Stop the timer with `TaskStop` when its call ends.
+A background Bash call that may be stopped with `TaskStop` ends with one `exec <program> <args>`,
+with at most a `< <file>` redirect, and nothing after it: no subshell, pipe, `;` or `&&`. Before it
+may come only the `MAIN=` and `WT_ROOT=` lines and a `cd "<dir>" &&`. The program is a program name
+or `env`, never `VAR=value`. On Windows, `TaskStop` ends the Git Bash shell but can leave a Git Bash
+tool that the shell started, such as `sleep.exe` or `env.exe`, running; Windows can then give its
+pid to a process that a release run records. With `exec`, the shell becomes the program, so
+`TaskStop` ends it. It does not end the processes that the program started (a reviewer's Copilot or
+Codex, or the children of `claude -p`): the rules for a possible leftover process still apply.
+
+- Start a background `exec sleep 1800` with each call (a retry too), so that you are called again
+  after 30 minutes. Stop the timer with `TaskStop` when its call ends.
 - A call that ended with an error, or with no plan or no verdict, runs once more.
 - A call that still runs when its timer ends is stopped with `TaskStop` and does not run again,
   because its reviewer process may still run. Name it in the report as a possible leftover process.
@@ -337,7 +346,8 @@ The blind plan and the code review round start Codex and Copilot as background B
 
 `workflow-manual` Step 7 reviews the committed branch with three reviews at once in each round:
 
-- Codex and Copilot with `--scope branch --base origin/main`, as background calls;
+- Codex and Copilot with `--scope branch --base origin/main`, as background calls
+  (`exec node "$CODEX" adversarial-review ...`, as "Background calls" says);
 - while they run, `code-review` and the docs check that Step 7 describes, on a range of commits.
   Look only at the commits made on this branch itself, not the ones that a merge brought in
   (`--first-parent`). Find the newest one that is a merge commit (it has two or more parents) or
@@ -580,8 +590,8 @@ Before a run, read every record:
    the first commit's SHA to the record. Make the data folder with `mkdir`.
 
 **Commands.** Run every command in the throwaway repo, with `env -u COPILOT_COMPANION_PLUGIN_DATA`,
-so nothing touches the installed plugin's jobs or gate. Use a subshell, `(cd "<repo>" && <command>)`,
-so the shell does not stay in the throwaway repo: from there the `MAIN=` line would find the wrong
+so nothing touches the installed plugin's jobs or gate. In a foreground call, use a subshell,
+`(cd "<repo>" && <command>)`, so the shell does not stay in the throwaway repo: from there the `MAIN=` line would find the wrong
 repo, and Windows cannot delete a folder that a shell is in.
 
 - Slash commands: `env -u COPILOT_COMPANION_PLUGIN_DATA -u CLAUDE_PLUGIN_DATA claude -p --settings '{"enabledPlugins":{"copilot@tmathura-copilot":false}}' --plugin-dir "$WT_ROOT/release-X.Y.Z/plugins/copilot" '/copilot:<command> <args>'`.
@@ -592,8 +602,10 @@ repo, and Windows cannot delete a folder that a shell is in.
   `env -u COPILOT_COMPANION_PLUGIN_DATA CLAUDE_PLUGIN_DATA="<data folder>" COPILOT_COMPANION_SESSION_ID=<id> node "$WT_ROOT/release-X.Y.Z/plugins/copilot/scripts/copilot-companion.mjs" <command> <args>`.
   The Stop hook is `scripts/stop-review-gate-hook.mjs`, run the same way.
 - Run the Stop hook and the `claude -p` reviews as background Bash calls (`run_in_background`). They
-  can take longer than the 600 s limit of a foreground call. A call that runs more than 30 minutes
-  is stopped (`TaskStop`), and its step is `unsure`.
+  can take longer than the 600 s limit of a foreground call. Write them as `cd "<repo>" && exec
+  <command>`, not in a subshell ("Background calls"); the shell of a background call ends with its
+  command. Start a timer with each, as "Background calls" says. A call that still runs when its
+  timer ends is stopped (`TaskStop`), and its step is `unsure`.
 - Write a path that a program reads from a file (the hook input) in the form that
   `git rev-parse --show-toplevel` prints (`C:/...` on Windows), not as `/c/...`.
 
@@ -609,7 +621,7 @@ repo, and Windows cannot delete a folder that a shell is in.
 | 6 Reset the throwaway repo to its first commit (`git reset --hard <first commit>`, `git clean -fd`), so the gate sees only the planted bug. `setup --enable-review-gate`, make a change with an obvious bug, write `{"session_id": "<id>", "cwd": "<repo>", "last_assistant_message": "<what changed>"}` to a file in the scratchpad (not in the repo) with the file tool, and run the Stop hook with `< <file>` | The hook prints `"decision":"block"` with a reason that names the planted bug. A block for another reason is `unsure` |
 | 7 Fix the bug, write a new hook input whose `last_assistant_message` describes the fix, and run the Stop hook again | The hook ran a review (a new job in `status --json`) and does not block. A block is `unsure`, because the review is the model's opinion |
 | 8 `setup --disable-review-gate` | `setup --json` shows the gate off |
-| 9 The CI run on the merge commit ("CI" in "Repo"). Run its commands from the main checkout, because the throwaway repo has no `origin` | Find the push run: `gh run list --workflow pull-request-ci.yml --branch main --event push --commit <merge commit> --json databaseId,status,conclusion,url` (the full 40-character SHA). If none is listed yet, wait with a background `sleep 30` (`run_in_background`) and look again, up to 20 times. Wait for the run with a background `gh run watch <run id> --exit-status`, stopped (`TaskStop`) after 30 minutes. Then read `gh run view <run id> --json status,conclusion`, because the exit code does not say why the watch ended. `success`: pass. Any other conclusion: note the `attempt` from `gh run view <run id> --json attempt`, rerun it once with `gh run rerun <run id> --failed`, wait until `attempt` is higher (as for a missing run), then watch and read it again. After the rerun, `success` is pass and `failure` is `fail` (a red CI run). Anything else (no run, a run that did not finish, another conclusion, a `gh` error) is `unsure`. The note gives the run link |
+| 9 The CI run on the merge commit ("CI" in "Repo"). Run its commands from the main checkout, because the throwaway repo has no `origin` | Find the push run: `gh run list --workflow pull-request-ci.yml --branch main --event push --commit <merge commit> --json databaseId,status,conclusion,url` (the full 40-character SHA). If none is listed yet, wait with a background `exec sleep 30` (`run_in_background`) and look again, up to 20 times. Wait for the run with a background `exec gh run watch <run id> --exit-status`, with a timer as in "Background calls", stopped (`TaskStop`) when its timer ends. Then read `gh run view <run id> --json status,conclusion`, because the exit code does not say why the watch ended. `success`: pass. Any other conclusion: note the `attempt` from `gh run view <run id> --json attempt`, rerun it once with `gh run rerun <run id> --failed`, wait until `attempt` is higher (as for a missing run), then watch and read it again. After the rerun, `success` is pass and `failure` is `fail` (a red CI run). Anything else (no run, a run that did not finish, another conclusion, a `gh` error) is `unsure`. The note gives the run link |
 
 Judge each step by facts where they exist (the exit code, `git status`, the pids, the hook's
 decision), not only by the model's words. Run a step that fails on timing once more before it
