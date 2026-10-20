@@ -55,10 +55,13 @@ test("a refresh reads the previous page's snapshot and adds the What moved entry
   const ctx = makeSpec({ "spec.md": SPEC_MD });
   assert.equal(build(ctx, GOOD).status, 0);
   assert.ok(!fs.readFileSync(ctx.page, "utf8").includes('href="#delta"'), "--no-delta drops the entry");
-  const result = build(ctx, GOOD, []);
+  // argparse keeps the last --snapshot, so this build's snapshot differs from the previous page's.
+  const result = build(ctx, GOOD, ["--snapshot", "def5678"]);
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /previous page snapshot: abc1234/);
-  assert.ok(fs.readFileSync(ctx.page, "utf8").includes('href="#delta"'));
+  const page = fs.readFileSync(ctx.page, "utf8");
+  assert.match(page, /<meta name="spec-review-snapshot" content="def5678">/);
+  assert.ok(page.includes('href="#delta"'));
 });
 
 for (const [name, target] of [
