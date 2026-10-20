@@ -80,14 +80,25 @@ test("a folder without spec.md builds, because the template cites no file", { sk
 });
 
 test("line numbers count LF as git and grep do, CRLF counts once, and a BOM is dropped", { skip }, () => {
-  const ctx = makeSpec({ "spec.md": "﻿# Spec\r\n\r\nx\fy y\r\nz\rw\r\r\nlast\n" });
+  const ctx = makeSpec({ "spec.md": "\ufeff# Spec\r\n\r\nx\fy\u2028y\r\nz\rw\r\r\nlast\n" });
   const result = buildOk(ctx, '<section id="change"><a class="cite" href="#spec-md-L4">spec.md:4</a> <a class="cite" href="#spec-md-L5">spec.md:5</a></section>');
   const page = fs.readFileSync(ctx.page, "utf8");
   assert.ok(page.includes('<span id="spec-md-L1"># Spec</span>'));
   // Characters that could break a line on screen are shown as symbols, so line numbers still match.
   assert.ok(page.includes('<span id="spec-md-L3">x␌y␤y</span><span id="spec-md-L4">z␍w␍</span><span id="spec-md-L5">last</span>'));
-  assert.ok(!page.includes("﻿") && !page.includes("\r") && !page.includes(" "));
+  assert.ok(!page.includes("\ufeff") && !page.includes("\r") && !page.includes("\u2028"));
   assert.match(result.stdout, /spec-md:\s+4\s+z␍w␍/);
+});
+
+test("every control and separator character in a line is shown as a symbol", { skip }, () => {
+  const ch = (...codes) => String.fromCharCode(...codes);
+  // ESC, backspace, VT, FS, DEL, NEL, a C1 control, LS, PS; a tab stays.
+  const raw = `a${ch(0x1b, 0x08, 0x0b, 0x1c, 0x7f, 0x85, 0x90, 0x2028, 0x2029)}\tb`;
+  const shown = `a${ch(0x241b, 0x2408, 0x240b, 0x241c, 0x2421, 0x2424, 0x2426, 0x2424, 0x2424)}\tb`;
+  const ctx = makeSpec({ "spec.md": `# Spec\n${raw}\n` });
+  const result = buildOk(ctx, '<section id="change"><a class="cite" href="#spec-md-L2">spec.md:2</a></section>');
+  assert.ok(fs.readFileSync(ctx.page, "utf8").includes(`<span id="spec-md-L2">${shown}</span>`));
+  assert.ok(result.stdout.includes(`spec-md:   2  ${shown}`), result.stdout);
 });
 
 test("{{...}} text in the content and the title is not filled in again", { skip }, () => {
@@ -142,10 +153,13 @@ test("an --out preview compares with the spec folder's page, not with the previe
   const none = build(ctx, WITH_DELTA, { out: preview });
   assert.equal(none.status, 1, none.stderr);
   assert.match(none.stderr, /no previous page to compare with/);
+  assert.ok(!fs.existsSync(preview));
   buildOk(ctx, GOOD, { snapshot: "page123" });
+  const page = fs.readFileSync(ctx.page, "utf8");
   const result = buildOk(ctx, WITH_DELTA, { out: preview, snapshot: "new456" });
   assert.match(result.stdout, /previous page snapshot: page123/);
   assert.ok(fs.readFileSync(preview, "utf8").includes('href="#delta"'));
+  assert.equal(fs.readFileSync(ctx.page, "utf8"), page, "a preview leaves the spec folder's page alone");
 });
 
 test("a refresh over a read-only page leaves no temp file", { skip }, () => {
@@ -155,7 +169,11 @@ test("a refresh over a read-only page leaves no temp file", { skip }, () => {
   const result = build(ctx, GOOD);
   fs.chmodSync(ctx.page, 0o644);
   // Windows refuses to replace a read-only file; POSIX replaces it. Either way nothing is left behind.
-  if (result.status !== 0) assert.match(result.stderr, /not written: /);
+  if (process.platform === "win32") {
+    if (result.status !== 0) assert.match(result.stderr, /not written: /);
+  } else {
+    assert.equal(result.status, 0, result.stderr);
+  }
   assert.ok(!result.stderr.includes("Traceback"), result.stderr);
   assert.deepEqual(fs.readdirSync(ctx.spec).sort(), ["review.html", "spec.md"]);
 });
@@ -182,6 +200,15 @@ test("a previous page that cannot be read fails with a message", { skip: posix |
   assert.equal(result.status, 1, result.stderr);
   assert.match(result.stderr, /cannot read the previous page/);
   assert.ok(!result.stderr.includes("Traceback"), result.stderr);
+});
+
+test("a preview with no delta section builds even when the spec folder's page cannot be read", { skip: posix || (process.getuid?.() === 0 && "root reads any file") }, () => {
+  const ctx = makeSpec({ "spec.md": SPEC_MD });
+  buildOk(ctx, GOOD);
+  fs.chmodSync(ctx.page, 0o000);
+  const result = build(ctx, GOOD, { out: path.join(ctx.dir, "preview.html") });
+  fs.chmodSync(ctx.page, 0o644);
+  assert.equal(result.status, 0, result.stderr);
 });
 
 for (const [name, files, content, message] of [
