@@ -1,6 +1,6 @@
 ---
 name: spec-review-page
-description: Build a one-page reading companion for a speckit spec folder so a reviewer can judge the spec without reading every Markdown file. Writes review.html into the spec folder with the change in one screen, what moved since the last read, two or three mechanism diagrams, a few worked examples, what breaks for consumers, a short list of things to check, and the source files embedded with line-cited claims. Use when asked to make a spec easier to review, to build or refresh the review page, or after a spec has been updated and needs re-reviewing. Invoke with an optional spec directory, for example "/spec-review-page specs/005-copilot-plugin-port".
+description: Build a one-page reading companion for a speckit spec folder so a reviewer can judge the spec without reading every Markdown file. Writes review.html into the spec folder with the change in one screen, what moved since the last read, two or three mechanism diagrams, a few worked examples, what breaks for consumers, a short list of things to check, and the source files embedded with line-cited claims. Use when asked to make a spec easier to review, to build or refresh the review page, or after a spec has been updated and needs re-reviewing. Invoke with an optional spec directory, for example "/spec-review-page specs/NNN-<name>".
 allowed-tools: Read, Glob, Grep, Bash, Write
 ---
 
@@ -10,9 +10,9 @@ One HTML page that lets a reviewer decide on a spec in about ten minutes. It con
 duplicate. Nothing on the page asks the reviewer for input.
 
 The page is a plain file, `review.html`, written into the spec folder next to the Markdown it
-condenses. It opens from disk in any browser. The diagrams need network access once, for the mermaid
-script. The template pins its version and carries its hash, so the browser refuses a changed file.
-Without network the diagrams show as text.
+condenses. It opens from disk in any browser. It needs network access once, for the mermaid script
+and the Google fonts. The template pins the mermaid version and carries its hash, so the browser
+refuses a changed file. Without network the diagrams show as text, and the page uses system fonts.
 
 ## What the page must be
 
@@ -101,8 +101,8 @@ in `b`, the label and its citation in `span`), `.grid2` with `.card`, `.pill`
 Every chip is `<a class="cite" href="#<slug>-L<n>"><label>:<n></a>`. The slug is the file path,
 lower-cased, every run of characters outside `a-z0-9` replaced by one hyphen, trimmed:
 `spec.md` → `spec-md`, `contracts/companion-cli.md` → `contracts-companion-cli-md`,
-`checklists/requirements.md` → `checklists-requirements-md`. The label is short: `spec.md:142`,
-`contract:131`, `checklist:81`, `T027a` for a task line.
+`checklists/requirements.md` → `checklists-requirements-md`. The label is short and names the
+file: `spec.md:142`, `companion-cli:9`, `checklist:11`, `T053b` for a task line.
 
 Cite the line where the claim starts, not the heading above it. The build step prints every cited
 line so you can check each one landed. Fix any that did not before you hand the page over.
