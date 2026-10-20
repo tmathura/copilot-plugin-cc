@@ -24,12 +24,12 @@ function makeSpec(files) {
   return { dir, spec, page: path.join(spec, "review.html") };
 }
 
-function build({ dir, spec }, content, extra = ["--no-delta"]) {
+function build({ dir, spec }, content, extra = ["--no-delta"], snapshot = "abc1234") {
   const fragment = path.join(dir, "content.html");
   fs.writeFileSync(fragment, content, "utf8");
   return run(PYTHON, [
     BUILD, spec, fragment,
-    "--ticket", "#105", "--title", TITLE, "--snapshot", "abc1234", "--date", "2026-10-20", ...extra
+    "--ticket", "#105", "--title", TITLE, "--snapshot", snapshot, "--date", "2026-10-20", ...extra
   ]);
 }
 
@@ -53,10 +53,10 @@ test("the build writes a page with every citation found and the text unchanged",
 
 test("a refresh reads the previous page's snapshot and adds the What moved entry", { skip }, () => {
   const ctx = makeSpec({ "spec.md": SPEC_MD });
-  assert.equal(build(ctx, GOOD).status, 0);
+  const first = build(ctx, GOOD);
+  assert.equal(first.status, 0, first.stderr);
   assert.ok(!fs.readFileSync(ctx.page, "utf8").includes('href="#delta"'), "--no-delta drops the entry");
-  // argparse keeps the last --snapshot, so this build's snapshot differs from the previous page's.
-  const result = build(ctx, GOOD, ["--snapshot", "def5678"]);
+  const result = build(ctx, GOOD, [], "def5678");
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /previous page snapshot: abc1234/);
   const page = fs.readFileSync(ctx.page, "utf8");
