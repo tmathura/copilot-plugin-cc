@@ -5,8 +5,8 @@
 ### 1.0.17
 
 - The active jobs table in `/copilot:status` keeps a value that holds `\|`, such as a job summary,
-  in its own cell, as written. Before, depending on the Markdown viewer, the `|` ended the cell or
-  the backslash was lost.
+  in its own cell. Before, depending on the Markdown viewer, the `|` ended the cell or the backslash
+  was lost.
 
 ### 1.0.16
 

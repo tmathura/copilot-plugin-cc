@@ -96,11 +96,10 @@ function formatJobLine(job) {
   return parts.join(" | ");
 }
 
-// Only the backslashes just before a pipe are doubled, so other backslashes, such as in a path in a
-// code span, still show as written.
+// A code span reads no escapes, so doubling every backslash would show a path there with two.
 function escapeMarkdownCell(value) {
   return String(value ?? "")
-    .replace(/(\\*)\|/g, (_match, backslashes) => `${backslashes}${backslashes}\\|`)
+    .replace(/(\\*)\|/g, "$1$1\\|")
     .replace(/\r?\n/g, " ")
     .trim();
 }

@@ -10,7 +10,7 @@
 
 The reproduction from the assessment now gives 8 cells, the same as the header, and the summary cell
 is `a\\\|b`. The new test fails on the old code and on the first fix (every backslash doubled), and
-passes with the fix; the full suite passes. Run again after review round 1.
+passes with the fix; the full suite passes. Run again after review rounds 1 and 2.
 
 ## Checks Performed
 
@@ -32,7 +32,8 @@ cells 8 (header has 8)
 
 - How a viewer splits the row depends on its Markdown renderer; the test follows CommonMark
   backslash escapes, and the fixed text is also correct for GitHub's table parser.
-- A `\|` inside a code span in a cell shows one extra backslash, because a code span reads no escapes.
+- On GitHub, a `\|` inside a code span in a cell shows one extra backslash, because a code span
+  reads no escapes. The test pins this text.
 - CodeQL alert #1 closes only after CodeQL scans `main` with the fix.
 
 ## Recommendation

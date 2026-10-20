@@ -26,7 +26,7 @@ stay as written. A status-table test pins the cell text and count.
 ```js
 function escapeMarkdownCell(value) {
   return String(value ?? "")
-    .replace(/(\\*)\|/g, (_match, backslashes) => `${backslashes}${backslashes}\\|`)
+    .replace(/(\\*)\|/g, "$1$1\\|")
     .replace(/\r?\n/g, " ")
     .trim();
 }
@@ -36,7 +36,8 @@ function escapeMarkdownCell(value) {
 
 - `tests/render.test.mjs` "renderStatusReport keeps each value with a backslash or a pipe in its
   own status table cell": one running job with a summary `a\|b` (cell `a\\\|b`), a backslash in a
-  code span (`` `C:\a` `` stays as written), a trailing backslash (`x\` stays), two backslashes
+  code span (`` `C:\a` `` stays as written), a `\|` in a code span (`` `x\|y` `` gives
+  `` `x\\\|y` ``, the same as outside one), a trailing backslash (`x\` stays), two backslashes
   before a pipe (`c\\|d` gives `c\\\\\|d`), and a CRLF line break with outer spaces
   (` rescue\r\nrun ` gives `rescue run`). The row and the header each have 8 cells when split as
   CommonMark reads them.
@@ -58,6 +59,12 @@ function escapeMarkdownCell(value) {
   backslash that must stay as written. The README and CHANGELOG say that, with the old code, `\|`
   ends the cell or loses its backslash, depending on the viewer (GitHub keeps the cell). `npm test`
   passes again (291 tests).
+- 2026-10-20, review round 2: the replace uses the string `"$1$1\\|"`, not a callback; same result.
+  The comment gives only the reason. The test adds a `\|` in a code span: it gets the same escape as
+  outside one, so on GitHub, which removes one backslash before each pipe, the code span shows one
+  extra backslash. No text keeps that cell right in both GitHub and a viewer that counts
+  backslashes; the issue sets `\\\|` for `\|`. README and CHANGELOG no longer say "as written".
+  `npm test` passes again (291 tests).
 
 ## Follow-ups
 
