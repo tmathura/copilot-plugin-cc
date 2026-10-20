@@ -332,8 +332,9 @@ nothing else in the call. The parts in `[ ]` are optional:
 ```
 
 The program is a program name or `env`. `VAR=value` may be an argument of `env`, but it is never
-the program. `<args>` are plain words or quoted text, with no `$( ... )` in them. The call holds
-only the parts that the template shows.
+the program. `<args>` are words, quoted text (also with the `'\''` of "Shell and paths") and
+`$VAR` values such as `"$WT_ROOT/..."`. Outside single quotes, they start no other command: no
+`$( ... )`, backticks or `<( ... )`.
 
 The reason is that on Windows, `TaskStop` ends the Git Bash shell. A Git Bash tool that the shell
 started, such as `sleep.exe` or `env.exe`, can stay running. Windows can then give that pid to a
