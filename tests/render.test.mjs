@@ -3,7 +3,27 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { renderCancelReport, renderJobStatusReport, renderReviewResult, renderStoredJobResult } from "../plugins/copilot/scripts/lib/render.mjs";
+import { renderCancelReport, renderJobStatusReport, renderReviewResult, renderStatusReport, renderStoredJobResult } from "../plugins/copilot/scripts/lib/render.mjs";
+
+// Splits a Markdown table row as CommonMark reads it: a backslash escapes the next character, so only
+// a pipe that is not escaped ends a cell.
+function tableCells(row) {
+  const cells = [];
+  let cell = "";
+  for (let index = 0; index < row.length; index += 1) {
+    if (row[index] === "\\") {
+      cell += row.slice(index, index + 2);
+      index += 1;
+    } else if (row[index] === "|") {
+      cells.push(cell.trim());
+      cell = "";
+    } else {
+      cell += row[index];
+    }
+  }
+  cells.push(cell.trim());
+  return cells.slice(1, -1);
+}
 
 test("renderReviewResult degrades gracefully when JSON is missing required review fields", () => {
   const output = renderReviewResult(
@@ -78,6 +98,42 @@ test("renderStoredJobResult reads the native review text from the copilot payloa
   );
 
   assert.equal(output, "No issues found.\n");
+});
+
+test("renderStatusReport keeps each value with a backslash or a pipe in its own status table cell", () => {
+  const output = renderStatusReport({
+    sessionRuntime: { label: "direct" },
+    config: { stopReviewGate: false },
+    running: [
+      {
+        id: "task-1",
+        kindLabel: " rescue\r\nrun ",
+        status: "running",
+        phase: "x\\",
+        elapsed: "a\\b",
+        threadId: "c\\\\|d",
+        summary: "a\\|b"
+      }
+    ],
+    latestFinished: null,
+    recent: [],
+    needsReview: false
+  });
+  const lines = output.split("\n");
+  const header = lines.find((line) => line.startsWith("| Job |"));
+  const row = lines.find((line) => line.startsWith("| task-1 |"));
+
+  assert.equal(tableCells(header).length, 8);
+  assert.deepEqual(tableCells(row).slice(0, 7), [
+    "task-1",
+    "rescue run",
+    "running",
+    "x\\\\",
+    "a\\\\b",
+    "c\\\\\\\\\\|d",
+    "a\\\\\\|b"
+  ]);
+  assert.equal(tableCells(row).length, 8);
 });
 
 test("renderCancelReport says when a failed job keeps its outcome", () => {
