@@ -13,6 +13,11 @@ First read the repo's `.claude/skills/workflow-common/REFERENCE.md`. Follow its 
 `$ARGUMENTS`: an optional one-line description. It can be followed by `--` and a commit body. A review
 round, for example, passes its findings and their outcomes as the body.
 
+`--allow-empty` as the first word, before the description, marks a review round commit with no
+change (REFERENCE.md "Code review round"). Then `git status --porcelain` must print nothing: if
+any file is staged, changed or new, stop and report it. Skip step 3, and commit with
+`--allow-empty` in step 6.
+
 ## Steps
 
 1. **Check the branch.** If `git branch --show-current` is `main` or empty, stop. Take `<n>` from the
@@ -44,7 +49,8 @@ round, for example, passes its findings and their outcomes as the body.
    <trailer from "Naming" in REFERENCE.md, if there is one>
    ```
 
-   Then run `git commit -F "<scratchpad>/commit-msg.txt"`.
+   Then run `git commit -F "<scratchpad>/commit-msg.txt"`, or with `--allow-empty`, run
+   `git commit --allow-empty -F "<scratchpad>/commit-msg.txt"`.
 
 7. **Check** with `git status` and `git log -1 --oneline`. Report the hash and the subject.
 

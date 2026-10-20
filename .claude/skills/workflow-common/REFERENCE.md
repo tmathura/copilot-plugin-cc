@@ -219,7 +219,8 @@ on what the issue asks for, or one that says this branch broke that behaviour, i
 Mark each finding:
 
 - **confirmed**: it is true, and the rule above does not reject it. Apply it without asking.
-- **rejected**: it is not true, or the rule above rejects it. Write the reason in one line.
+- **rejected**: it is not true, or the rule above rejects it, or "Code review round" rejects it as
+  wording only. Write the reason in one line.
 - **unclear**: you cannot tell. Ask: **Apply the confirmed findings, skip the unclear (Recommended)** /
   **Choose which** / **Stop the loop**.
 
@@ -371,8 +372,8 @@ them.
   Then:
   - an `Address review round` commit: review only the commits since the last round, `<sha>^..HEAD`.
     Step 7 makes this commit directly on the head that the round reviewed, so `<sha>^` is that
-    head. This range keeps `code-review` from raising new points on code that did not change. It
-    also works after a resume;
+    head. This range shows `code-review` only the commits made since the last round. It also
+    works after a resume;
   - a merge commit, or nothing (the first round): review the whole branch, `origin/main...HEAD`.
 
 The round waits for all three. A `code-review` or docs-check finding is checked like any other
@@ -382,6 +383,45 @@ of findings is a report. A `code-review` run that fails, or ends with no report,
 `approve`. Handle it as a step skill that fails ("Questions to the user"). When neither Codex nor
 Copilot is ready, skip only their part of the round. `code-review` and the docs check still run.
 The PR names Codex and Copilot as not available.
+
+`code-review` keeps no record between rounds, and each fix gives it new text to find small points
+in. So the round keeps its own record:
+
+- **The record.** The `[#<n>] Address review round <k>` commit body gives each rejected finding
+  as an entry, `rejected: <reviewer>: <finding>: <reason>`, with a blank line after it. A repeat
+  that is rejected again for the same reason gets no new entry. A round that fixes nothing but has
+  a new entry still commits: pass `--allow-empty` to `workflow-commit`. A round that fixes nothing
+  and has no new entry makes no commit.
+- **The round number** is the number of round commits on the branch plus one. A merge of
+  `origin/main` does not reset it, and PR review loop commits have another subject:
+
+  ```bash
+  git rev-list --count --first-parent --grep='^\[#<n>\] Address review round [0-9]' origin/main..HEAD
+  ```
+
+- **Rejected findings reach `code-review` (from round 2 on).** At the start of each round, collect
+  the `rejected:` entries from the round commits only:
+
+  ```bash
+  git log --first-parent --grep='^\[#<n>\] Address review round [0-9]' --format='%b' origin/main..HEAD | awk '/^rejected:/{p=1} p; /^$/{p=0}'
+  ```
+
+  Give `code-review` the range, then this text and the whole list:
+  `Earlier review rounds rejected these findings, with these reasons. Do not raise them again in
+  other words; raise one only with new evidence:`. The docs check and the `code-review` run in the
+  PR review loop step 5 use the same list. When PR review loop step 5 repeats within one PR
+  review loop round, the list also holds the findings that it rejected earlier in that round.
+  Every finding that is still reported is checked as above. In a Step 7 round, when
+  `git diff --quiet <range>` succeeds, the range holds no change: skip `code-review` and the docs
+  check in that round. As an exception to the rule above, they then count as `approve`.
+- **Later rounds take substance only (from round 3 on).** A `code-review` or docs-check finding
+  that is wording only is rejected with the reason `wording only, from round 3 on`, and a few
+  words on why. Wording only means that its fix would change no fact, rule or step that a reader
+  follows: points on style, plain language, length or saying a thing once, also when they cite
+  `docs/conventions.md`. A finding that shows a wrong fact, text that contradicts itself or
+  another rule, a step that would fail, or a breach of the constitution is never wording only. If
+  you cannot tell, check it as usual. Codex and Copilot findings are not limited. Rounds 1 and 2
+  take wording findings, so that the text that a fix adds is reviewed once.
 
 ## PR review loop
 
@@ -436,8 +476,8 @@ Each round:
    (nothing to push), and check the loop's end rule below.
 4. **Run a Codex and Copilot round on the fixes** with `--scope working-tree` and the findings as the focus.
    Check its findings too. If you fix any of them, run the commands from "Commands" again.
-5. **Review the diff:** `code-review` on the working diff, then the docs check of `workflow-manual`
-   Step 7. Check the findings, fix the confirmed ones, run the commands from "Commands" again, and
+5. **Review the diff:** `code-review` on the working diff, with the list of rejected findings
+   ("Code review round"), then the docs check of `workflow-manual` Step 7. Check the findings, fix the confirmed ones, run the commands from "Commands" again, and
    repeat until no confirmed finding is left. Then **commit** with `workflow-commit`. The body lists
    each finding and what happened to it.
 6. **Push and rewrite the PR body** with `workflow-pr`.

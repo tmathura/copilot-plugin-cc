@@ -196,8 +196,10 @@ starts a new round on the current head.
 3. Check the findings of all three together (REFERENCE.md). Fix the confirmed ones by the rules of
    Step 4, and run Step 5 again. With bug triage, a round that changed the fix also updates
    `fix.md` (REFERENCE.md "Bug triage", Edits). Commit with `workflow-commit`, the description
-   `Address review round <k>` and a body that gives the outcome of each finding. Then run the next
-   round, until the loop ends by its rules.
+   `Address review round <k>` and a body that gives the outcome of each finding, with the record
+   that REFERENCE.md "Code review round" describes. A round that fixes nothing commits as that
+   section says. Then run the next round, until the loop ends by its
+   rules.
 
 ## Step 8. Push and PR
 
