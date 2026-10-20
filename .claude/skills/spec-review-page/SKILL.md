@@ -32,7 +32,7 @@ Rules that came from reviewer feedback. Do not relax them.
 - **Every claim carries a citation** to a source line, as a chip that jumps to the embedded file.
 - **Diagrams show a mechanism**, not a list of boxes. What flows where, which edge is added or
   removed, what a request passes through. Prefer a before-and-after. Use mermaid in
-  `<pre class="mermaid">`; the artifact host renders it.
+  `<pre class="mermaid">`; the template's mermaid script renders it.
 - **Plain writing.** Simplified Technical English. Short sentences, one thought each, everyday words.
   Keep exact identifiers, metric names and codes as written.
 
@@ -100,12 +100,12 @@ in `b`, the label and its citation in `span`), `.grid2` with `.card`, `.pill`
 
 Every chip is `<a class="cite" href="#<slug>-L<n>"><label>:<n></a>`. The slug is the file path,
 lower-cased, every run of characters outside `a-z0-9` replaced by one hyphen, trimmed:
-`spec.md` → `spec-md`, `contracts/telemetry-catalogue.md` → `contracts-telemetry-catalogue-md`,
+`spec.md` → `spec-md`, `contracts/companion-cli.md` → `contracts-companion-cli-md`,
 `checklists/requirements.md` → `checklists-requirements-md`. The label is short: `spec.md:142`,
 `contract:131`, `checklist:81`, `T027a` for a task line.
 
 Cite the line where the claim starts, not the heading above it. The build step prints every cited
-line so you can check each one landed. Fix any that did not before publishing.
+line so you can check each one landed. Fix any that did not before you hand the page over.
 
 ## Step 4: Build and check
 
