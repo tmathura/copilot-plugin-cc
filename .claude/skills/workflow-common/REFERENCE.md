@@ -409,8 +409,8 @@ in. So the round keeps its own record:
   Give `code-review` the range, then this text and the whole list:
   `Earlier review rounds rejected these findings, with these reasons. Do not raise them again in
   other words; raise one only with new evidence:`. The docs check and the `code-review` run in the
-  PR review loop (step 5) use the same list, and a repeated step 5 pass adds the findings that
-  this step rejected so far. Every finding that is still reported is checked as above. When
+  PR review loop (step 5) use the same list. When the PR review loop repeats its step 5, the list
+  also holds the findings that its step 5 rejected so far. Every finding that is still reported is checked as above. When
   `git diff --quiet <range>` succeeds, the range holds no change: skip `code-review` and the docs
   check in that round. As an exception to the rule above, they then count as `approve`.
 - **Later rounds take substance only (from round 3 on).** A `code-review` or docs-check finding

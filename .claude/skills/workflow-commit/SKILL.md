@@ -13,8 +13,9 @@ First read the repo's `.claude/skills/workflow-common/REFERENCE.md`. Follow its 
 `$ARGUMENTS`: an optional one-line description. It can be followed by `--` and a commit body. A review
 round, for example, passes its findings and their outcomes as the body.
 
-`--allow-empty` before the description marks a review round commit with no change
-(REFERENCE.md "Code review round"). Then skip step 3 and commit with `--allow-empty` in step 6.
+`--allow-empty` as the first word, before the description, marks a review round commit with no
+change (REFERENCE.md "Code review round"). Then `git diff --staged --quiet` must succeed: if
+anything is staged, stop and report it. Skip step 3, and commit with `--allow-empty` in step 6.
 
 ## Steps
 
