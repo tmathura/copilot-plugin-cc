@@ -387,17 +387,22 @@ The PR names Codex and Copilot as not available.
 `code-review` keeps no record between rounds, and each fix gives it new text to find small points
 in. So the round keeps its own record:
 
-- **The record.** The `[#<n>] Address review round <k>` commit body gives each rejected finding as
-  an entry that starts with `rejected: <reviewer>: <finding>: <reason>`. When the body is wrapped
-  at 72 characters, the next lines of an entry are indented. A round that rejects findings but
-  fixes nothing still commits: Step 7 writes the message in the `workflow-commit` format to a
-  scratchpad file and runs `git commit --allow-empty -F <file>`, as Step 9 does for its merge
-  commit. A round with no finding, or whose rejections all repeat entries already on the branch,
+- **The record.** The `[#<n>] Address review round <k>` commit body gives each new rejected
+  finding as an entry: `rejected: <reviewer>: <finding>: <reason>`. An entry runs until the next
+  entry or a blank line, so wrapping it does not matter. A repeat of an entry already on the branch
+  gets no new entry. A round that fixes nothing but rejects new findings still commits. Then Step
+  7 does not use `workflow-commit`: it writes the message in its format to a scratchpad file and
+  runs `git commit --allow-empty -F <file>`. A round that fixes nothing and has no new rejection
   makes no commit. By the end rule, such a round ends the loop.
-- **The round number** is the number of `Address review round` commits on the branch plus one. A
-  merge of `origin/main` does not reset it, and PR review loop commits have another subject.
+- **The round number** is the number of round commits on the branch plus one. A merge of
+  `origin/main` does not reset it, and PR review loop commits have another subject:
+
+  ```bash
+  git rev-list --count --first-parent --grep='^\[#<n>\] Address review round' origin/main..HEAD
+  ```
+
 - **Rejected findings reach `code-review` (from round 2 on).** At the start of each round, collect
-  the `rejected:` entries, each with its indented lines, from the round commits only:
+  the `rejected:` entries from the round commits only:
 
   ```bash
   git log --first-parent --grep='^\[#<n>\] Address review round' --format='%b' origin/main..HEAD

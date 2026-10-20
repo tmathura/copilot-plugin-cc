@@ -185,9 +185,7 @@ issue's `Bug notes:` line.
 ## Step 7. Review round
 
 Run the code review round (REFERENCE.md) with the plan in the focus text. A resume at this step
-starts a new round on the current head. From round 2 on, give `code-review` and the docs check the
-list of earlier rejected findings, and from round 3 on, reject wording-only findings, as
-REFERENCE.md "Code review round" says.
+starts a new round on the current head.
 
 1. The docs check: check the diff against `CLAUDE.md` and the docs it links to. With Spec
    Kit feature planning, also check it against `spec.md` and `plan.md`. With bug triage, check it
@@ -198,10 +196,10 @@ REFERENCE.md "Code review round" says.
 3. Check the findings of all three together (REFERENCE.md). Fix the confirmed ones by the rules of
    Step 4, and run Step 5 again. With bug triage, a round that changed the fix also updates
    `fix.md` (REFERENCE.md "Bug triage", Edits). Commit with `workflow-commit`, the description
-   `Address review round <k>` and a body that gives the outcome of each finding, with a
-   `rejected:` entry for each rejected one. A round that only rejects makes an empty commit
-   (REFERENCE.md "Code review round"). Then run the next round, until the loop ends by its rules.
-   The PR's **Review rounds** names each wording-only rejection.
+   `Address review round <k>` and a body that gives the outcome of each finding, with the record
+   that REFERENCE.md "Code review round" describes. A round that fixes nothing commits as that
+   section says, without `workflow-commit`. Then run the next round, until the loop ends by its
+   rules.
 
 ## Step 8. Push and PR
 
