@@ -84,8 +84,9 @@ test("line numbers count LF as git and grep do, CRLF counts once, and a BOM is d
   buildOk(ctx, '<section id="change"><a class="cite" href="#spec-md-L5">spec.md:5</a></section>');
   const page = fs.readFileSync(ctx.page, "utf8");
   assert.ok(page.includes('<span id="spec-md-L1"># Spec</span>'));
-  assert.ok(page.includes('<span id="spec-md-L3">x\fy</span><span id="spec-md-L4">z\rw</span><span id="spec-md-L5">last</span>'));
-  assert.ok(!page.includes("﻿"));
+  // A lone CR is shown as ␍, so neither the browser nor the terminal breaks the line there.
+  assert.ok(page.includes('<span id="spec-md-L3">x\fy</span><span id="spec-md-L4">z␍w</span><span id="spec-md-L5">last</span>'));
+  assert.ok(!page.includes("﻿") && !page.includes("\r"));
 });
 
 test("{{...}} text in the content and the title is not filled in again", { skip }, () => {
@@ -127,12 +128,35 @@ test("a delta section with no previous page fails", { skip }, () => {
   assert.ok(!fs.existsSync(ctx.page));
 });
 
-test("the page gets the mode a plain write gives, not mkstemp's owner-only mode", { skip: skip || (process.platform === "win32" && "POSIX file modes") }, () => {
+test("a delta section is allowed when the previous page has an empty snapshot, or in an --out preview", { skip }, () => {
+  const ctx = makeSpec({ "spec.md": SPEC_MD });
+  buildOk(ctx, GOOD, { snapshot: "" });
+  buildOk(ctx, WITH_DELTA);
+  buildOk(ctx, WITH_DELTA, { out: path.join(ctx.dir, "preview.html") });
+});
+
+const posix = skip || (process.platform === "win32" && "POSIX file modes");
+
+test("a new page gets the mode a plain write gives, and a refresh keeps the old page's mode", { skip: posix }, () => {
   const ctx = makeSpec({ "spec.md": SPEC_MD });
   buildOk(ctx, GOOD);
   const plain = path.join(ctx.dir, "plain.txt");
   fs.writeFileSync(plain, "x");
   assert.equal(fs.statSync(ctx.page).mode & 0o777, fs.statSync(plain).mode & 0o777);
+  fs.chmodSync(ctx.page, 0o640);
+  buildOk(ctx, GOOD);
+  assert.equal(fs.statSync(ctx.page).mode & 0o777, 0o640);
+});
+
+test("a previous page that cannot be read fails with a message", { skip: posix || (process.getuid?.() === 0 && "root reads any file") }, () => {
+  const ctx = makeSpec({ "spec.md": SPEC_MD });
+  buildOk(ctx, GOOD);
+  fs.chmodSync(ctx.page, 0o000);
+  const result = build(ctx, GOOD);
+  fs.chmodSync(ctx.page, 0o644);
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /cannot read the previous page/);
+  assert.ok(!result.stderr.includes("Traceback"), result.stderr);
 });
 
 for (const [name, files, content, message] of [

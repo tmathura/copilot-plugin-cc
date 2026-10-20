@@ -130,8 +130,9 @@ line, substitutes the header fields, and then:
 - prints the word count and the diagram count of the fragment outside `<details>`, so the budget
   can be checked.
 
-The nav shows the "What moved" entry only when the fragment has a `delta` section. To write
-somewhere else, pass `--out <file>`.
+The nav shows the "What moved" entry only when the fragment has a `delta` section. A `delta`
+section with no previous page in the spec folder fails the build. To write somewhere else, pass
+`--out <file>`; that preview skips the previous-page check.
 
 ## Step 5: Hand over
 
