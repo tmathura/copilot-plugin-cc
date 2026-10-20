@@ -182,6 +182,11 @@ Invoke `workflow-commit` with a one-line description of the diff and the list of
 ticket changed. With bug triage, the list includes `.specify/bugs/NNN-<slug>/`, the path in the
 issue's `Bug notes:` line.
 
+With the spec flow, after the commit: if the spec folder has no `review.html`, run
+`spec-review-page` on it to build the first page, and commit the page as steps 2 and 3 of "Spec
+review page" in REFERENCE.md ("Checking review findings") say. Otherwise refresh the page where
+that rule applies.
+
 ## Step 7. Review round
 
 Run the code review round (REFERENCE.md) with the plan in the focus text. A resume at this step
@@ -198,7 +203,8 @@ starts a new round on the current head.
    `fix.md` (REFERENCE.md "Bug triage", Edits). Commit with `workflow-commit`, the description
    `Address review round <k>` and a body that gives the outcome of each finding, with the record
    that REFERENCE.md "Code review round" describes. A round that fixes nothing commits as that
-   section says. Then run the next round, until the loop ends by its
+   section says. After the round commit, refresh the spec review page where it applies
+   (REFERENCE.md "Checking review findings"). Then run the next round, until the loop ends by its
    rules.
 
 ## Step 8. Push and PR

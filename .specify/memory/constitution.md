@@ -26,14 +26,16 @@ Why: the owner follows upstream releases. An upstream change must land in the sa
 
 ### II. Only reviewed code
 
-- Code MUST come from one of three sources: code written in this repo, code ported from upstream
-  codex-plugin-cc, or the Spec Kit files already in the repo.
+- Code MUST come from one of four sources: code written in this repo, code ported from upstream
+  codex-plugin-cc, the Spec Kit files already in the repo, or repo tooling outside the plugin that
+  the owner wrote in another of the owner's own repos.
 - Code from other Copilot ports MUST NOT be copied. Those repos are read for ideas only.
 - Other Copilot plugins for Claude Code MUST NOT be installed. Review tools that the owner chooses,
   such as the Codex plugin used in the workflow, are allowed.
 - The plugin MUST NOT have runtime npm dependencies. It uses Node built-ins only.
 - A devDependency is allowed only for build or test. Its PR MUST give the reason.
-- A PR that brings in upstream code MUST list the files and the upstream commit. It MUST say that
+- A PR that brings in upstream code MUST list the files and the upstream commit. A PR that brings in
+  the owner's tooling from another repo MUST list the files and name that repo. Both MUST say that
   someone read them line by line.
 
 ### III. Copilot CLI through documented interfaces only
@@ -164,4 +166,4 @@ Why: the owner follows upstream releases. An upstream change must land in the sa
 Why: the agent trusts the spec folder at the start of each session. A decision changed in one file
 only leaves stale copies in the others, and reviews then find them one at a time.
 
-**Version**: 3.0.0 | **Ratified**: 2026-10-08 | **Last Amended**: 2026-10-14
+**Version**: 3.1.0 | **Ratified**: 2026-10-08 | **Last Amended**: 2026-10-20

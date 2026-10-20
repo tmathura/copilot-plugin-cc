@@ -232,9 +232,11 @@ one sweep before you push:
    `spec.md`; `plan.md` (summary, Technical Context, Constitution Check, project structure and
    phases); `data-model.md`; `contracts/`; the `tasks.md` task that did the work (add a suffixed
    task, such as `T053b`, if work was added); `checklists/`; and any file the feature added.
-3. Rebuild any page that is built from the spec folder.
-4. Run `/speckit-analyze` and fix what it finds.
-5. Commit the spec changes with the code, in the same commit.
+3. Run `/speckit-analyze` and fix what it finds.
+4. Commit the spec changes with the code, in the same commit.
+5. If the folder has a `review.html`, refresh it after that commit with `spec-review-page`, and
+   commit it on its own, in the same PR. The skill reads the committed folder, so the page's
+   snapshot is that commit.
 
 A change written only in a PR body or a commit message does not count.
 

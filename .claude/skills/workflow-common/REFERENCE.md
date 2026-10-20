@@ -47,6 +47,7 @@ Tools that must be on the PATH:
 | `gh` | 2.48 or later (the review poll uses `gh api --slurp`). `gh auth status` shows a login, and `gh api repos/tmathura/copilot-plugin-cc --jq .permissions.push` prints `true` |
 | `node` | Codex, Copilot and the review poll use it |
 | `specify` | only for Spec Kit |
+| `uv` | Spec Kit setup, and `spec-review-page` (`uv run --no-project python`) |
 
 If `command -v <tool>` prints nothing, stop and tell the user what to install. If a tool was just
 installed and is still not found, ask the user to restart Claude Code. The shell can be older than the
@@ -230,6 +231,26 @@ A rejected finding that comes back in a later round with the same point (by its 
 words) and the same evidence is rejected again with the earlier reason, with no new check. One with
 new evidence is checked again: the text it points at changed, it names a new case, or the issue now
 asks for the change. If you cannot tell, check it again.
+
+**Spec review page.** It applies when a spec folder (`specs/NNN-<name>/`) holds a `review.html` that
+`spec-review-page` built (it has the skill's marker, as the skill's Step 1 says), and a commit
+changed a Markdown file in that folder: the last commit of a review round, or the commit of
+`workflow-manual` Step 6. Then, once, before the push:
+
+1. Wait for the last commit. A Codex and Copilot round inside a PR review loop round (step 4 there)
+   is part of that round and does not refresh the page itself. The refresh counts the Markdown that
+   any commit of the round changed. Every change in the folder must be in a commit, so the folder is
+   clean and the page's snapshot is that commit, not `-wip`.
+2. Run `spec-review-page` on the folder (pass it). The build must print `missing anchors: 0`. A
+   build that fails is a step skill that fails ("Questions to the user"), but ask only **Retry
+   (Recommended)** / **Abort**: a skipped refresh would push a stale page, and the constitution
+   asks for the page to be rebuilt in the same change.
+3. Commit the page on its own: `workflow-commit` with the description `Refresh the spec review page`
+   and the file list `specs/NNN-<name>/review.html`. This rule is the request to commit that
+   `spec-review-page` Step 5 waits for.
+
+A round that changed no Markdown in the folder leaves the page alone, so its "What moved" section
+is not reset to nothing. A `review.html` without the marker was written by hand: leave it alone.
 
 ## Blind plan
 
@@ -480,7 +501,8 @@ Each round:
    ("Code review round"), then the docs check of `workflow-manual` Step 7. Check the findings, fix the confirmed ones, run the commands from "Commands" again, and
    repeat until no confirmed finding is left. Then **commit** with `workflow-commit`. The body lists
    each finding and what happened to it.
-6. **Push and rewrite the PR body** with `workflow-pr`.
+6. **Push and rewrite the PR body** with `workflow-pr`. Before the push, refresh the spec review
+   page, where it applies ("Checking review findings").
 7. **Reply to every thread and resolve it.** Say what was done, or why the finding was rejected. Write
    the reply to a file and pass it with `-F body=@<file>`, because backticks in a quoted string run as
    commands:
