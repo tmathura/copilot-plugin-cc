@@ -359,3 +359,32 @@ test("a cancel that picked a queued job still stops the Copilot that its worker 
     }
   });
 });
+
+test("overrideFailed cancels a failed job and stops the Copilot it kept; a finished job is refused without it, and a completed one always", async () => {
+  const tasks = setUpTasks();
+  await withCompanionEnv(tasks.env, async ({ cancelJob }) => {
+    const { updateState } = await import("../plugins/copilot/scripts/lib/state.mjs");
+    const stopped = [];
+    const terminateImpl = async (pid) => {
+      if (pid) {
+        stopped.push(pid);
+      }
+      return { attempted: false, delivered: false, method: null };
+    };
+    updateState(tasks.cwd, (state) => {
+      state.jobs.unshift(
+        { id: "task-failed-kept", status: "failed", jobClass: "task", write: false, pid: null, copilotPid: 333333, errorMessage: "Copilot exited." },
+        { id: "task-failed-done", status: "failed", jobClass: "task", write: false, pid: null, copilotPid: null, errorMessage: "Copilot exited." },
+        { id: "task-completed", status: "completed", jobClass: "task", write: false, pid: null, copilotPid: null }
+      );
+    });
+
+    await assert.rejects(cancelJob(tasks.cwd, "task-failed-done", { terminateImpl }), /Job task-failed-done is already failed, so there is nothing to cancel\./);
+    await assert.rejects(cancelJob(tasks.cwd, "task-completed", { terminateImpl, overrideFailed: true }), /Job task-completed is already completed/);
+    await cancelJob(tasks.cwd, "task-failed-kept", { terminateImpl, reason: "The stop-time review timed out.", overrideFailed: true });
+
+    const job = findJob(tasks.dataDir, "task-failed-kept");
+    assert.deepEqual([job.status, job.errorMessage, job.copilotPid], ["cancelled", "The stop-time review timed out.", null]);
+    assert.deepEqual(stopped, [333333]);
+  });
+});

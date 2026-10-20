@@ -284,6 +284,8 @@ test("above the inline limit, the gate passes the patch folder to Copilot and re
     assert.ok(copilotRun.prompt.includes(`## Patch Files\n\n- ${path.join(patchDir, "staged.patch")}\n`));
     assert.match(copilotRun.prompt, /Read the patch files listed below with the view tool/);
     assert.deepEqual(findPatchDirs(dataDir), [], behavior);
+    // A run that ended by itself keeps its outcome; only the gate's own stop turns a failure into a cancel.
+    assert.equal(readJobs(dataDir).find((job) => job.title === GATE_TITLE).status, blocked ? "failed" : "completed", behavior);
   }
 });
 

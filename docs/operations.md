@@ -17,6 +17,7 @@ stateDiagram-v2
   queued --> failed: the worker cannot start
   queued --> cancelled: /copilot:cancel or the Claude session ends
   running --> cancelled: /copilot:cancel, the Claude session ends, or the review gate's time limit
+  failed --> cancelled: the review gate's stop, when the job failed while the gate stopped it
 ```
 
 - A background task is written as `queued` before its worker starts. The worker then marks it
@@ -26,7 +27,8 @@ stateDiagram-v2
   processes could not be stopped stays, so you can cancel it again.
 - The review gate runs as a task job titled "Copilot Stop Gate Review". If it is still running 14
   minutes after the hook started, or the hook is stopped, the gate stops it and marks it
-  `cancelled`. `/copilot:rescue --resume` never continues it.
+  `cancelled`, also when the job failed while the gate was stopping it. `/copilot:rescue --resume`
+  never continues it.
 
 ## Logs and state
 

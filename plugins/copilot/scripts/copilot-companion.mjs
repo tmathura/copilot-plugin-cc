@@ -1156,13 +1156,16 @@ function updateJobRecord(workspaceRoot, jobId, change) {
 // Copilot start use the same lock: a job either started before this step, and its pids are stopped, or
 // finds itself cancelled and never starts. The signals come only after the lock is released. The pids
 // stay in the record until every signal is sent, so a cancel that fails or is stopped can run again.
+// `overrideFailed` is for the Stop gate only: a job whose companion the gate stopped can save itself as
+// failed first, and the gate's stop is still what ended it.
 export async function cancelJob(workspaceRoot, jobId, options = {}) {
   const terminate = options.terminateImpl ?? terminateProcessTree;
   const reason = options.reason ?? "Cancelled by user.";
   const completedAt = nowIso();
+  const cancels = (status) => isActiveJobStatus(status) || (options.overrideFailed && status === "failed");
   let cancelled = null;
   updateJobRecord(workspaceRoot, jobId, (current) => {
-    if (!current || !(isActiveJobStatus(current.status) || hasPendingStop(current))) {
+    if (!current || !(cancels(current.status) || hasPendingStop(current))) {
       throw new Error(
         current
           ? `Job ${jobId} is already ${current.status}, so there is nothing to cancel.`
@@ -1170,7 +1173,7 @@ export async function cancelJob(workspaceRoot, jobId, options = {}) {
       );
     }
     // A finished job whose stop did not finish keeps its outcome; only its processes are stopped.
-    cancelled = isActiveJobStatus(current.status)
+    cancelled = cancels(current.status)
       ? {
           ...current,
           status: "cancelled",

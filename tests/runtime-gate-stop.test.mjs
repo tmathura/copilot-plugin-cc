@@ -127,6 +127,47 @@ test("a gate run past its limit still cancels its job and stops Copilot when the
   });
 });
 
+test("a gate run that it stops cancels its job even when the companion saved the job as failed while it was being stopped", async () => {
+  for (const [stopBy, timeoutMs, reason] of [
+    ["limit", 8000, "The stop-time review timed out."],
+    ["signal", 60000, "The stop-time review was stopped."]
+  ]) {
+    const tasks = setUpTasks("hang", { cwd: makeRepo() });
+    await withCompanionEnv(tasks.env, async () => {
+      const { runStopReview } = await import(pathToFileURL(GATE_HOOK).href);
+      const { updateState } = await import("../plugins/copilot/scripts/lib/state.mjs");
+      const { terminateProcessTree } = await import("../plugins/copilot/scripts/lib/process.mjs");
+      // Stands in for taskkill stopping Copilot before the companion: the companion's runner fails and
+      // saves the job as failed before the gate's cancel reads it.
+      const terminateImpl = async (pid) => {
+        await terminateProcessTree(pid);
+        updateState(tasks.cwd, (state) => {
+          const job = state.jobs.find((entry) => entry.title === GATE_TITLE);
+          Object.assign(job, { status: "failed", phase: "failed", pid: null, copilotPid: null, errorMessage: "Copilot exited." });
+        });
+      };
+
+      const pending = runStopReview(tasks.cwd, { last_assistant_message: "Edited." }, { timeoutMs, terminateImpl });
+      let job = null;
+      await waitFor(() => {
+        job = findJobByTitle(tasks.dataDir, GATE_TITLE);
+        return job?.copilotPid && readFakeChildPids(tasks.binDir).length > 0;
+      }, Math.min(timeoutMs, 30000));
+      const [[copilotPid, childPid]] = readFakeChildPids(tasks.binDir);
+      if (stopBy === "signal") {
+        process.emit("SIGTERM", "SIGTERM");
+      }
+      const review = await pending;
+
+      assert.equal(review.ok, false, stopBy);
+      await waitFor(() => [job.pid, copilotPid, childPid].every((pid) => !isAlive(pid)), 10000);
+      const stopped = findJob(tasks.dataDir, job.id);
+      assert.deepEqual([stopped.status, stopped.errorMessage, stopped.pid, stopped.copilotPid], ["cancelled", reason, null, null], stopBy);
+      assert.deepEqual(findPatchDirs(tasks.dataDir), [], stopBy);
+    });
+  }
+});
+
 test("a gate whose companion is killed outright cancels its job, stops Copilot and its child, and blocks", async () => {
   const repo = makeLargeRepo();
   const tasks = setUpTasks("hang", { cwd: repo });
