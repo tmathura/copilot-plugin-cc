@@ -390,8 +390,8 @@ in. So the round keeps its own record:
 - **The record.** The `[#<n>] Address review round <k>` commit body gives each rejected finding
   as an entry, `rejected: <reviewer>: <finding>: <reason>`, with a blank line after it. A repeat
   that is rejected again for the same reason gets no new entry. A round that fixes nothing but has
-  a new entry still commits, with `workflow-commit` in its empty-commit mode. A round that fixes
-  nothing and has no new entry makes no commit.
+  a new entry still commits: pass `--allow-empty` to `workflow-commit`. A round that fixes nothing
+  and has no new entry makes no commit.
 - **The round number** is the number of round commits on the branch plus one. A merge of
   `origin/main` does not reset it, and PR review loop commits have another subject:
 
@@ -409,9 +409,10 @@ in. So the round keeps its own record:
   Give `code-review` the range, then this text and the whole list:
   `Earlier review rounds rejected these findings, with these reasons. Do not raise them again in
   other words; raise one only with new evidence:`. The docs check and the `code-review` run in the
-  PR review loop (step 5) use the same list. Every finding that is still reported is checked as
-  above. When the newest round commit is empty and is the head, the range holds no change: skip
-  `code-review` and the docs check in that round. They count as `approve`.
+  PR review loop (step 5) use the same list, and a repeated step 5 pass adds the findings that
+  this step rejected so far. Every finding that is still reported is checked as above. When
+  `git diff --quiet <range>` succeeds, the range holds no change: skip `code-review` and the docs
+  check in that round. As an exception to the rule above, they then count as `approve`.
 - **Later rounds take substance only (from round 3 on).** A `code-review` or docs-check finding
   that is wording only is rejected with the reason `wording only, from round 3 on`, and a few
   words on why. Wording only means that its fix would change no fact, rule or step that a reader
