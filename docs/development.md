@@ -234,9 +234,8 @@ one sweep before you push:
    task, such as `T053b`, if work was added); `checklists/`; and any file the feature added.
 3. Run `/speckit-analyze` and fix what it finds.
 4. Commit the spec changes with the code, in the same commit.
-5. If the folder has a `review.html`, refresh it after that commit with `spec-review-page`, and
-   commit it on its own, in the same PR. The skill reads the committed folder, so the page's
-   snapshot is that commit.
+5. Then refresh the spec review page where it applies ("Spec review page" under "Checking review
+   findings" in `.claude/skills/workflow-common/REFERENCE.md`).
 
 A change written only in a PR body or a commit message does not count.
 
