@@ -327,17 +327,13 @@ In each background Bash call that may be stopped with `TaskStop`, the last comma
 `exec <command>`, and nothing else in the call starts a process. Only these may come with it: the
 `MAIN=` and `WT_ROOT=` lines before it, a `cd "<dir>" &&` in front of the `exec`, and an input
 redirect from a file, `< "<file>"`, at its end. The command starts with a program name or with
-`env`. For example:
+`env`, never with `VAR=value`. For example:
 
 ```bash
 exec sleep 1800
 exec node "<printed folder>scripts/copilot-companion.mjs" task --prompt-file "<file>"
 cd "<repo>" && exec env -u COPILOT_COMPANION_PLUGIN_DATA CLAUDE_PLUGIN_DATA="<data folder>" node "<script>" < "<file>"
 ```
-
-So the call has no pipe, `&`, `;` after the `exec`, `||`, `( ... )` group or `bash -c`, and no
-`$( ... )`, backticks or `<( ... )` outside single quotes, except the `$( ... )` in the `MAIN=`
-line.
 
 The reason is that on Windows, `TaskStop` ends the Git Bash shell. A Git Bash tool that the shell
 started, such as `sleep.exe` or `env.exe`, can stay running. Windows can then give that pid to a
