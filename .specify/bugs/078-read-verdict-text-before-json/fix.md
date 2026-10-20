@@ -15,7 +15,7 @@ answer keeps the first error and its raw output.
 
 | File | Change | Notes |
 |------|--------|-------|
-| `plugins/copilot/scripts/lib/copilot.mjs` | modified | new `fencedBlocks` (line by line, fences paired from left to right, null when one is left open); the fallback in `parseStructuredOutput`; the comment above `stripCodeFence` |
+| `plugins/copilot/scripts/lib/copilot.mjs` | modified | new `fencedBlocks` (line by line, fences paired from left to right, null when one is left open) with a comment on why; the fallback in `parseStructuredOutput` |
 | `tests/runtime-review.test.mjs` | added tests | text around one fence (before, after, both sides, CRLF); ten failure cases; a wrong-shape fenced verdict |
 | `README.md` | modified | the "Differences from the Codex plugin" bullet: exactly one code fence, also with text around it |
 | `docs/architecture.md` | modified | the `adversarial-review` line says the same |
@@ -59,8 +59,10 @@ if (blocks?.length === 1) {
 ## Deviations from Assessment
 
 - 2026-10-20, review round 1: the comment above `stripCodeFence` is back to what it said before;
-  the note that text may come around the fence is on `fencedBlocks`, which handles it. No code
+  the note that text may come around the fence is on `fencedBlocks`, which handles it. No behaviour
   change; `npm test` passes again (290 tests).
+- 2026-10-20, review round 2: the comment on `fencedBlocks` keeps only its reason. No behaviour
+  change; `npm test` passes again.
 
 ## Follow-ups
 

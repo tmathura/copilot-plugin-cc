@@ -687,8 +687,7 @@ function stripCodeFence(text) {
   return match ? match[1] : text;
 }
 
-// The model may also write text before or after its fenced JSON. This gives the content of each
-// fenced block, with fences paired from left to right; null when a fence is left open.
+// The model may also write text before or after its fenced JSON, so the blocks are found line by line.
 function fencedBlocks(text) {
   const blocks = [];
   let open = null;

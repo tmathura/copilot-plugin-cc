@@ -10,8 +10,9 @@
 
 The reported answer (a line of text, a blank line, then one fenced JSON verdict) now gives the
 verdict through the fake Copilot CLI. Answers with no closed block, two blocks or an invalid block
-still fail with the first parse error and the raw output. No regressions were found. Run again after
-review round 1 (a comment moved; no code change); the results below are from that run.
+still fail with the first parse error and the raw output. No regressions were found. The test runs were
+repeated after review rounds 1 and 2 (comments only, no behaviour change); the "Reproduction
+(pre-fix)" row is from the first run, before those rounds.
 
 ## Checks Performed
 
