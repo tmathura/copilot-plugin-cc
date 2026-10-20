@@ -1,7 +1,7 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): renamed for the copilot plugin; only write tasks
 // show a resume command, as copilot --resume=<id>; a cancel of a failed job reports that it stays
 // failed; a failed job's result is its rendered text, which says why it failed; a status table cell
-// escapes `\` as well as `|`.
+// also doubles the backslashes before a `|`.
 function severityRank(severity) {
   switch (severity) {
     case "critical":
@@ -96,10 +96,11 @@ function formatJobLine(job) {
   return parts.join(" | ");
 }
 
+// Only the backslashes just before a pipe are doubled, so other backslashes, such as in a path in a
+// code span, still show as written.
 function escapeMarkdownCell(value) {
   return String(value ?? "")
-    .replace(/\\/g, "\\\\")
-    .replace(/\|/g, "\\|")
+    .replace(/(\\*)\|/g, (_match, backslashes) => `${backslashes}${backslashes}\\|`)
     .replace(/\r?\n/g, " ")
     .trim();
 }

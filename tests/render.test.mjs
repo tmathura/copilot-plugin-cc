@@ -110,7 +110,7 @@ test("renderStatusReport keeps each value with a backslash or a pipe in its own 
         kindLabel: " rescue\r\nrun ",
         status: "running",
         phase: "x\\",
-        elapsed: "a\\b",
+        elapsed: "`C:\\a`",
         threadId: "c\\\\|d",
         summary: "a\\|b"
       }
@@ -128,8 +128,8 @@ test("renderStatusReport keeps each value with a backslash or a pipe in its own 
     "task-1",
     "rescue run",
     "running",
-    "x\\\\",
-    "a\\\\b",
+    "x\\",
+    "`C:\\a`",
     "c\\\\\\\\\\|d",
     "a\\\\\\|b"
   ]);
