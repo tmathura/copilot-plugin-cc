@@ -331,8 +331,8 @@ nothing else in the call. The parts in `[ ]` are optional:
 [cd "<dir>" &&] exec <program> <args> [< "<file>"]
 ```
 
-The program is a program name or `env`, never `VAR=value`. The arguments hold no pipe, `;`, `&&`
-or `&`. A `$( ... )` that ends before the `exec` runs is fine.
+The program is a program name or `env`. `VAR=value` may be an argument of `env`, but it is never
+the program.
 
 The reason is that on Windows, `TaskStop` ends the Git Bash shell. A Git Bash tool that the shell
 started, such as `sleep.exe` or `env.exe`, can stay running. Windows can then give that pid to a
