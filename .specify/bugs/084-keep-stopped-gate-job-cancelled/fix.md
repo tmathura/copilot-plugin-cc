@@ -22,6 +22,7 @@ uses it. So a job that the companion saved as `failed` while the gate was stoppi
 | `tests/runtime-hooks.test.mjs` | added check | a run whose companion ended by itself keeps `failed` (or `completed`) |
 | `package.json`, `package-lock.json`, `plugins/copilot/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` | modified | version 1.0.15 |
 | `plugins/copilot/CHANGELOG.md` | modified | the 1.0.15 entry |
+| `docs/operations.md` | modified | the job state diagram gets `failed --> cancelled`; the gate bullet says the gate also cancels a job that failed while it was being stopped |
 
 ## Diff Highlights (optional)
 
@@ -66,4 +67,7 @@ await cancelCompanionJob(options.workspaceRoot, options.runId, reason, { overrid
 
 ## Follow-ups
 
-- None.
+- Own ticket, after this merge: when the companion ends by itself, the gate looks only for a
+  `running` job, so a `failed` job that kept its `copilotPid` (Copilot could not be stopped) is
+  skipped and that Copilot is not stopped. This branch is unchanged from `main` (found by
+  code-review in round 1).
