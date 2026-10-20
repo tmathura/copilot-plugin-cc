@@ -235,7 +235,8 @@ asks for the change. If you cannot tell, check it again.
 **Spec review page.** It applies when a spec folder (`specs/NNN-<name>/`) holds a `review.html` that
 `spec-review-page` built (it has the skill's marker, as the skill's Step 1 says), and a commit
 changed a Markdown file in that folder: the last commit of a review round, or the commit of
-`workflow-manual` Step 6. Then, once, before the push:
+`workflow-manual` Step 6. Then refresh it once for each such round or commit, before the next round
+or the push, so that its "What moved" section shows what that round changed:
 
 1. Wait for the last commit. A Codex and Copilot round inside a PR review loop round (step 4 there)
    is part of that round and does not refresh the page itself. The refresh counts the Markdown that
@@ -542,7 +543,7 @@ Decide in Step 4, from the files the ticket changes:
 | The PR changes | Release? |
 | --- | --- |
 | Anything under `plugins/copilot/`, or `.claude-plugin/marketplace.json` | Yes. Claude Code updates an installed plugin by its version, so a shipped change with no new version can stay unseen by users. |
-| Only files outside those: `docs/`, `specs/`, `tests/`, `.github/`, `.specify/`, `.claude/`, `scripts/`, `package.json`, `package-lock.json`, `tsconfig.*.json`, `README.md`, `CLAUDE.md`, `UPSTREAM.md`, `NOTICE`, `.gitignore` | No. These are not part of the installed plugin. |
+| Only files outside those: `docs/`, `specs/`, `tests/`, `.github/`, `.specify/`, `.claude/`, `scripts/`, `package.json`, `package-lock.json`, `tsconfig.*.json`, `README.md`, `CLAUDE.md`, `UPSTREAM.md`, `NOTICE`, `.gitignore`, `.gitattributes` | No. These are not part of the installed plugin. |
 
 For a release, pick the level by what users see (SemVer, as the constitution says):
 

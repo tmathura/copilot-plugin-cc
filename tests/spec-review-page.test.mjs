@@ -24,12 +24,12 @@ function makeSpec(files) {
   return { dir, spec, page: path.join(spec, "review.html") };
 }
 
-function build({ dir, spec }, content) {
+function build({ dir, spec }, content, extra = ["--no-delta"]) {
   const fragment = path.join(dir, "content.html");
   fs.writeFileSync(fragment, content, "utf8");
   return run(PYTHON, [
     BUILD, spec, fragment,
-    "--ticket", "#105", "--title", TITLE, "--snapshot", "abc1234", "--date", "2026-10-20", "--no-delta"
+    "--ticket", "#105", "--title", TITLE, "--snapshot", "abc1234", "--date", "2026-10-20", ...extra
   ]);
 }
 
@@ -59,14 +59,28 @@ test("a second build reads the previous page's snapshot", { skip }, () => {
   assert.match(result.stdout, /previous page snapshot: abc1234/);
 });
 
-test("a citation with no anchor fails and keeps the previous page", { skip }, () => {
+for (const [name, target] of [
+  ["a line past the end", "spec-md-L99"],
+  ["a malformed target", "spec_md-L3"],
+  ["a zero-padded line number", "spec-md-L03"]
+]) {
+  test(`a citation to ${name} fails and keeps the previous page`, { skip }, () => {
+    const ctx = makeSpec({ "spec.md": SPEC_MD });
+    assert.equal(build(ctx, GOOD).status, 0);
+    const before = fs.readFileSync(ctx.page, "utf8");
+    const result = build(ctx, GOOD.replace("#spec-md-L3", `#${target}`));
+    assert.equal(result.status, 1);
+    assert.ok(result.stdout.includes(`MISSING ${target}`), result.stdout);
+    assert.equal(fs.readFileSync(ctx.page, "utf8"), before);
+  });
+}
+
+test("--no-delta drops the What moved nav entry, and without it the entry is there", { skip }, () => {
   const ctx = makeSpec({ "spec.md": SPEC_MD });
   assert.equal(build(ctx, GOOD).status, 0);
-  const before = fs.readFileSync(ctx.page, "utf8");
-  const result = build(ctx, GOOD.replace("#spec-md-L3", "#spec-md-L99"));
-  assert.equal(result.status, 1);
-  assert.match(result.stdout, /MISSING spec-md-L99/);
-  assert.equal(fs.readFileSync(ctx.page, "utf8"), before);
+  assert.ok(!fs.readFileSync(ctx.page, "utf8").includes('href="#delta"'));
+  assert.equal(build(ctx, GOOD, []).status, 0);
+  assert.ok(fs.readFileSync(ctx.page, "utf8").includes('href="#delta"'));
 });
 
 function generatedPage() {
