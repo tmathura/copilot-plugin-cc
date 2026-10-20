@@ -325,14 +325,14 @@ The blind plan and the code review round start Codex and Copilot as background B
 
 Write each background Bash call that may be stopped with `TaskStop` in this form:
 
-- It ends with one `exec <program> <args>`. A `< <file>` redirect is allowed. Nothing comes after
-  it: no pipe, `;` or `&&`.
+- It ends with one `exec <program> <args>`. An input redirect from a file, `< "<file>"`, is allowed.
+  Nothing comes after it: no pipe, `;` or `&&`.
 - Before it, only the `MAIN=` and `WT_ROOT=` lines may come, in that order, and then a
-  `cd "<dir>" &&`. There is no subshell.
+  `cd "<dir>" &&`. No `( ... )` group is around the command.
 - The program is a program name or `env`. It is never `VAR=value`.
 
-The reason is that on Windows, `TaskStop` ends the Git Bash shell. It can leave a Git Bash tool that
-the shell started running, such as `sleep.exe` or `env.exe`. Windows can then give that pid to a
+The reason is that on Windows, `TaskStop` ends the Git Bash shell. A Git Bash tool that the shell
+started, such as `sleep.exe` or `env.exe`, can stay running. Windows can then give that pid to a
 process that a release run records. With `exec`, the shell becomes the program, so `TaskStop` ends
 it. `exec` does not end the processes that the program started, such as a reviewer's Copilot or
 Codex, or the children of `claude -p`. The rules for a possible leftover process still apply to
@@ -609,7 +609,8 @@ repo, and Windows cannot delete a folder that a shell is in.
   The Stop hook is `scripts/stop-review-gate-hook.mjs`, run the same way.
 - Run the Stop hook and the `claude -p` reviews as background Bash calls (`run_in_background`). They
   can take longer than the 600 s limit of a foreground call. Write them in the form that
-  "Background calls" gives, with `cd "<repo>" && exec <command>`. Start a background
+  "Background calls" gives, with `cd "<repo>" && exec <command>`. A background call's shell ends
+  with its command, so it does not stay in the throwaway repo. Start a background
   `exec sleep 1800` timer with each, and stop it when its call ends. A call that still runs when its
   timer ends is stopped (`TaskStop`), and its step is `unsure`.
 - Write a path that a program reads from a file (the hook input) in the form that
