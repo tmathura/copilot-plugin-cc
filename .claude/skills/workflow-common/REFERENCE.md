@@ -387,31 +387,31 @@ The PR names Codex and Copilot as not available.
 `code-review` keeps no record between rounds, and each fix gives it new text to find small points
 in. So the round keeps its own record:
 
-- **The record.** The `[#<n>] Address review round <k>` commit body gives each new rejected
-  finding as an entry: `rejected: <reviewer>: <finding>: <reason>`. An entry runs until the next
-  entry or a blank line, so wrapping it does not matter. A repeat of an entry already on the branch
-  gets no new entry. A round that fixes nothing but rejects new findings still commits. Then Step
-  7 does not use `workflow-commit`: it writes the message in its format to a scratchpad file and
-  runs `git commit --allow-empty -F <file>`. A round that fixes nothing and has no new rejection
-  makes no commit. By the end rule, such a round ends the loop.
+- **The record.** The `[#<n>] Address review round <k>` commit body gives each rejected finding
+  as an entry, `rejected: <reviewer>: <finding>: <reason>`, with a blank line after it. A repeat
+  that is rejected again for the same reason gets no new entry. A round that fixes nothing but has
+  a new entry still commits, with `workflow-commit` in its empty-commit mode. A round that fixes
+  nothing and has no new entry makes no commit.
 - **The round number** is the number of round commits on the branch plus one. A merge of
   `origin/main` does not reset it, and PR review loop commits have another subject:
 
   ```bash
-  git rev-list --count --first-parent --grep='^\[#<n>\] Address review round' origin/main..HEAD
+  git rev-list --count --first-parent --grep='^\[#<n>\] Address review round [0-9]' origin/main..HEAD
   ```
 
 - **Rejected findings reach `code-review` (from round 2 on).** At the start of each round, collect
   the `rejected:` entries from the round commits only:
 
   ```bash
-  git log --first-parent --grep='^\[#<n>\] Address review round' --format='%b' origin/main..HEAD
+  git log --first-parent --grep='^\[#<n>\] Address review round [0-9]' --format='%b' origin/main..HEAD
   ```
 
   Give `code-review` the range, then this text and the whole list:
   `Earlier review rounds rejected these findings, with these reasons. Do not raise them again in
-  other words; raise one only with new evidence:`. The docs check uses the same list. Every
-  finding that is still reported is checked as above.
+  other words; raise one only with new evidence:`. The docs check and the `code-review` run in the
+  PR review loop (step 5) use the same list. Every finding that is still reported is checked as
+  above. When the newest round commit is empty and is the head, the range holds no change: skip
+  `code-review` and the docs check in that round. They count as `approve`.
 - **Later rounds take substance only (from round 3 on).** A `code-review` or docs-check finding
   that is wording only is rejected with the reason `wording only, from round 3 on`, and a few
   words on why. Wording only means that its fix would change no fact, rule or step that a reader
@@ -474,8 +474,8 @@ Each round:
    (nothing to push), and check the loop's end rule below.
 4. **Run a Codex and Copilot round on the fixes** with `--scope working-tree` and the findings as the focus.
    Check its findings too. If you fix any of them, run the commands from "Commands" again.
-5. **Review the diff:** `code-review` on the working diff, then the docs check of `workflow-manual`
-   Step 7. Check the findings, fix the confirmed ones, run the commands from "Commands" again, and
+5. **Review the diff:** `code-review` on the working diff, with the list of rejected findings
+   ("Code review round"), then the docs check of `workflow-manual` Step 7. Check the findings, fix the confirmed ones, run the commands from "Commands" again, and
    repeat until no confirmed finding is left. Then **commit** with `workflow-commit`. The body lists
    each finding and what happened to it.
 6. **Push and rewrite the PR body** with `workflow-pr`.

@@ -198,7 +198,7 @@ starts a new round on the current head.
    `fix.md` (REFERENCE.md "Bug triage", Edits). Commit with `workflow-commit`, the description
    `Address review round <k>` and a body that gives the outcome of each finding, with the record
    that REFERENCE.md "Code review round" describes. A round that fixes nothing commits as that
-   section says, without `workflow-commit`. Then run the next round, until the loop ends by its
+   section says. Then run the next round, until the loop ends by its
    rules.
 
 ## Step 8. Push and PR
