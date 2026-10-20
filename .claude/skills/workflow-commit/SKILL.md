@@ -49,7 +49,8 @@ any file is staged, changed or new, stop and report it. Skip step 3, and commit 
    <trailer from "Naming" in REFERENCE.md, if there is one>
    ```
 
-   Then run `git commit -F "<scratchpad>/commit-msg.txt"`.
+   Then run `git commit -F "<scratchpad>/commit-msg.txt"`, or with `--allow-empty`, run
+   `git commit --allow-empty -F "<scratchpad>/commit-msg.txt"`.
 
 7. **Check** with `git status` and `git log -1 --oneline`. Report the hash and the subject.
 

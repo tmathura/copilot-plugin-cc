@@ -403,7 +403,7 @@ in. So the round keeps its own record:
   the `rejected:` entries from the round commits only:
 
   ```bash
-  git log --first-parent --grep='^\[#<n>\] Address review round [0-9]' --format='%b' origin/main..HEAD
+  git log --first-parent --grep='^\[#<n>\] Address review round [0-9]' --format='%b' origin/main..HEAD | awk '/^rejected:/{p=1} p; /^$/{p=0}'
   ```
 
   Give `code-review` the range, then this text and the whole list:
