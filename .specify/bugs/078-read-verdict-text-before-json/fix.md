@@ -63,6 +63,8 @@ if (blocks?.length === 1) {
   change; `npm test` passes again (290 tests).
 - 2026-10-20, review round 2: the comment on `fencedBlocks` keeps only its reason. No behaviour
   change; `npm test` passes again.
+- 2026-10-20, review round 3: the comment on `fencedBlocks` says why an open fence gives null (the
+  caller reads only one block). No behaviour change; `npm test` passes again (290 tests).
 
 ## Follow-ups
 
