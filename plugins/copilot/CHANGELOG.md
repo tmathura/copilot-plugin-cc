@@ -2,6 +2,12 @@
 
 ## Copilot plugin
 
+### 1.0.16
+
+- `/copilot:adversarial-review` now reads Copilot's verdict when Copilot writes a line of text
+  before or after its one fenced JSON block. Before, the review failed with "Copilot did not return
+  valid structured JSON". An answer with two fenced blocks still fails.
+
 ### 1.0.15
 
 - When the review gate stops a review that ran past its limit, or that was stopped, its job now

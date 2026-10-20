@@ -687,6 +687,26 @@ function stripCodeFence(text) {
   return match ? match[1] : text;
 }
 
+// The caller reads an answer only when this finds exactly one block, so a fence left open gives null,
+// not the blocks before it.
+function fencedBlocks(text) {
+  const blocks = [];
+  let open = null;
+  for (const line of text.split(/\r?\n/)) {
+    if (open === null) {
+      if (/^[ \t]*```[\w-]*[ \t]*$/.test(line)) {
+        open = [];
+      }
+    } else if (/^[ \t]*```[ \t]*$/.test(line)) {
+      blocks.push(open.join("\n"));
+      open = null;
+    } else {
+      open.push(line);
+    }
+  }
+  return open === null ? blocks : null;
+}
+
 export function parseStructuredOutput(rawOutput, fallback = {}) {
   if (!rawOutput) {
     return {
@@ -705,6 +725,15 @@ export function parseStructuredOutput(rawOutput, fallback = {}) {
       ...fallback
     };
   } catch (error) {
+    // Only an answer with exactly one fenced block is read; any other answer keeps the first error.
+    const blocks = fencedBlocks(rawOutput);
+    if (blocks?.length === 1) {
+      try {
+        return { parsed: JSON.parse(blocks[0]), parseError: null, rawOutput, ...fallback };
+      } catch {
+        // The block is not JSON either; the first error stays.
+      }
+    }
     return {
       parsed: null,
       parseError: error.message,

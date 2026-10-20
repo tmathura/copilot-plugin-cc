@@ -151,6 +151,83 @@ test("adversarial review accepts JSON inside one code fence", () => {
   assert.match(result.stdout, /Missing empty-state guard/);
 });
 
+test("adversarial review reads the verdict from one code fence with text around it", () => {
+  const fence = `\`\`\`json\n${REVIEW_JSON}\n\`\`\``;
+  for (const answer of [
+    `Fine; EPERM treated as alive (conservative).\n\n${fence}`,
+    `${fence}\n\nThat is the verdict.`,
+    `Here it is:\n${fence}\nDone.`,
+    `Here it is:\r\n\r\n${fence.replace(/\n/g, "\r\n")}\r\n`
+  ]) {
+    const { result } = runReview("adversarial-review", makeRepo(), { env: { FAKE_COPILOT_ANSWER: answer } });
+
+    assert.equal(result.status, 0, `${JSON.stringify(answer)}\n${result.stderr}`);
+    assert.match(result.stdout, /Missing empty-state guard/, JSON.stringify(answer));
+  }
+});
+
+// The error that the first parse gives: the whole answer, or the content of a fence that is the
+// whole answer.
+function firstParseError(answer) {
+  const fenced = /^\s*```[\w-]*[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*```\s*$/.exec(answer);
+  try {
+    JSON.parse(fenced ? fenced[1] : answer);
+  } catch (error) {
+    return error.message;
+  }
+  throw new Error(`The answer parses: ${answer}`);
+}
+
+test("an answer without exactly one closed JSON fence fails the job with the first parse error", () => {
+  const fence = (body) => `\`\`\`json\n${body}\n\`\`\``;
+  const verdict = fence(REVIEW_JSON);
+  const notJson = "```js\nconst x = 1;\n```";
+  const empty = "```\n```";
+  for (const answer of [
+    `${verdict}\n${verdict}`,
+    `Two verdicts:\n${verdict}\nand\n${verdict}`,
+    `${verdict}\n${notJson}`,
+    `${notJson}\n${verdict}`,
+    `${verdict}\n${empty}`,
+    `${empty}\n${verdict}`,
+    fence("{not json"),
+    `Here it is:\n${fence("{not json")}\nDone.`,
+    `Here it is:\n\`\`\`json\n${REVIEW_JSON}`,
+    `${verdict}\nAnd one more:\n\`\`\`json\n${REVIEW_JSON}`
+  ]) {
+    const { result, dataDir } = runReview("adversarial-review", makeRepo(), {
+      args: ["--json"],
+      env: { FAKE_COPILOT_ANSWER: answer }
+    });
+    const payload = JSON.parse(result.stdout);
+
+    assert.equal(result.status, 1, answer);
+    assert.equal(payload.parseError, firstParseError(answer), answer);
+    assert.equal(payload.result, null, answer);
+    assert.equal(payload.rawOutput, answer, answer);
+    assert.equal(readJobs(dataDir)[0].status, "failed", answer);
+  }
+
+  const twoVerdicts = `${verdict}\n${verdict}`;
+  const { result } = runReview("adversarial-review", makeRepo(), { env: { FAKE_COPILOT_ANSWER: twoVerdicts } });
+  assert.equal(result.status, 1);
+  assert.ok(result.stdout.includes(`Parse error: ${firstParseError(twoVerdicts)}`), result.stdout);
+  assert.ok(result.stdout.includes(twoVerdicts), result.stdout);
+});
+
+test("a fenced verdict with text around it that has the wrong shape gets the schema error", () => {
+  const answer = `Here it is:\n\`\`\`json\n${JSON.stringify({ ...JSON.parse(REVIEW_JSON), verdict: "maybe" })}\n\`\`\`\nDone.`;
+  const { result } = runReview("adversarial-review", makeRepo(), {
+    args: ["--json"],
+    env: { FAKE_COPILOT_ANSWER: answer }
+  });
+  const payload = JSON.parse(result.stdout);
+
+  assert.equal(result.status, 1);
+  assert.equal(payload.parseError, "The JSON does not match the review schema: `verdict` must be one of: approve, needs-attention.");
+  assert.equal(payload.rawOutput, answer);
+});
+
 test("broken review JSON fails the job and keeps the raw output", () => {
   const answer = "The change looks fine to me.";
   const { result, dataDir } = runReview("adversarial-review", makeRepo(), {
