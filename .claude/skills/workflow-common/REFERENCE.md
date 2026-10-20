@@ -323,14 +323,20 @@ left open: the constitution allows a merge only when each one is fixed or reject
 The blind plan and the code review round start Codex and Copilot as background Bash calls
 (`run_in_background`). Read each call's output when it ends.
 
-A background Bash call that may be stopped with `TaskStop` ends with one `exec <program> <args>`,
-with at most a `< <file>` redirect, and nothing after it: no subshell, pipe, `;` or `&&`. Before it
-may come only the `MAIN=` and `WT_ROOT=` lines and a `cd "<dir>" &&`. The program is a program name
-or `env`, never `VAR=value`. On Windows, `TaskStop` ends the Git Bash shell but can leave a Git Bash
-tool that the shell started, such as `sleep.exe` or `env.exe`, running; Windows can then give its
-pid to a process that a release run records. With `exec`, the shell becomes the program, so
-`TaskStop` ends it. It does not end the processes that the program started (a reviewer's Copilot or
-Codex, or the children of `claude -p`): the rules for a possible leftover process still apply.
+Write each background Bash call that may be stopped with `TaskStop` in this form:
+
+- It ends with one `exec <program> <args>`. A `< <file>` redirect is allowed. Nothing comes after
+  it: no pipe, `;` or `&&`.
+- Before it, only the `MAIN=` and `WT_ROOT=` lines may come, in that order, and then a
+  `cd "<dir>" &&`. There is no subshell.
+- The program is a program name or `env`. It is never `VAR=value`.
+
+The reason is that on Windows, `TaskStop` ends the Git Bash shell. It can leave a Git Bash tool that
+the shell started running, such as `sleep.exe` or `env.exe`. Windows can then give that pid to a
+process that a release run records. With `exec`, the shell becomes the program, so `TaskStop` ends
+it. `exec` does not end the processes that the program started, such as a reviewer's Copilot or
+Codex, or the children of `claude -p`. The rules for a possible leftover process still apply to
+them.
 
 - Start a background `exec sleep 1800` with each call (a retry too), so that you are called again
   after 30 minutes. Stop the timer with `TaskStop` when its call ends.
@@ -602,9 +608,9 @@ repo, and Windows cannot delete a folder that a shell is in.
   `env -u COPILOT_COMPANION_PLUGIN_DATA CLAUDE_PLUGIN_DATA="<data folder>" COPILOT_COMPANION_SESSION_ID=<id> node "$WT_ROOT/release-X.Y.Z/plugins/copilot/scripts/copilot-companion.mjs" <command> <args>`.
   The Stop hook is `scripts/stop-review-gate-hook.mjs`, run the same way.
 - Run the Stop hook and the `claude -p` reviews as background Bash calls (`run_in_background`). They
-  can take longer than the 600 s limit of a foreground call. Write them as `cd "<repo>" && exec
-  <command>`, not in a subshell ("Background calls"); the shell of a background call ends with its
-  command. Start a timer with each, as "Background calls" says. A call that still runs when its
+  can take longer than the 600 s limit of a foreground call. Write them in the form that
+  "Background calls" gives, with `cd "<repo>" && exec <command>`. Start a background
+  `exec sleep 1800` timer with each, and stop it when its call ends. A call that still runs when its
   timer ends is stopped (`TaskStop`), and its step is `unsure`.
 - Write a path that a program reads from a file (the hook input) in the form that
   `git rev-parse --show-toplevel` prints (`C:/...` on Windows), not as `/c/...`.
@@ -621,7 +627,7 @@ repo, and Windows cannot delete a folder that a shell is in.
 | 6 Reset the throwaway repo to its first commit (`git reset --hard <first commit>`, `git clean -fd`), so the gate sees only the planted bug. `setup --enable-review-gate`, make a change with an obvious bug, write `{"session_id": "<id>", "cwd": "<repo>", "last_assistant_message": "<what changed>"}` to a file in the scratchpad (not in the repo) with the file tool, and run the Stop hook with `< <file>` | The hook prints `"decision":"block"` with a reason that names the planted bug. A block for another reason is `unsure` |
 | 7 Fix the bug, write a new hook input whose `last_assistant_message` describes the fix, and run the Stop hook again | The hook ran a review (a new job in `status --json`) and does not block. A block is `unsure`, because the review is the model's opinion |
 | 8 `setup --disable-review-gate` | `setup --json` shows the gate off |
-| 9 The CI run on the merge commit ("CI" in "Repo"). Run its commands from the main checkout, because the throwaway repo has no `origin` | Find the push run: `gh run list --workflow pull-request-ci.yml --branch main --event push --commit <merge commit> --json databaseId,status,conclusion,url` (the full 40-character SHA). If none is listed yet, wait with a background `exec sleep 30` (`run_in_background`) and look again, up to 20 times. Wait for the run with a background `exec gh run watch <run id> --exit-status`, with a timer as in "Background calls", stopped (`TaskStop`) when its timer ends. Then read `gh run view <run id> --json status,conclusion`, because the exit code does not say why the watch ended. `success`: pass. Any other conclusion: note the `attempt` from `gh run view <run id> --json attempt`, rerun it once with `gh run rerun <run id> --failed`, wait until `attempt` is higher (as for a missing run), then watch and read it again. After the rerun, `success` is pass and `failure` is `fail` (a red CI run). Anything else (no run, a run that did not finish, another conclusion, a `gh` error) is `unsure`. The note gives the run link |
+| 9 The CI run on the merge commit ("CI" in "Repo"). Run its commands from the main checkout, because the throwaway repo has no `origin` | Find the push run: `gh run list --workflow pull-request-ci.yml --branch main --event push --commit <merge commit> --json databaseId,status,conclusion,url` (the full 40-character SHA). If none is listed yet, wait with a background `exec sleep 30` (`run_in_background`) and look again, up to 20 times. Wait for the run with a background `exec gh run watch <run id> --exit-status`, with a background `exec sleep 1800` timer that is stopped when the watch ends. A watch that still runs when its timer ends is stopped (`TaskStop`). Then read `gh run view <run id> --json status,conclusion`, because the exit code does not say why the watch ended. `success`: pass. Any other conclusion: note the `attempt` from `gh run view <run id> --json attempt`, rerun it once with `gh run rerun <run id> --failed`, wait until `attempt` is higher (as for a missing run), then watch and read it again. After the rerun, `success` is pass and `failure` is `fail` (a red CI run). Anything else (no run, a run that did not finish, another conclusion, a `gh` error) is `unsure`. The note gives the run link |
 
 Judge each step by facts where they exist (the exit code, `git status`, the pids, the hook's
 decision), not only by the model's words. Run a step that fails on timing once more before it
