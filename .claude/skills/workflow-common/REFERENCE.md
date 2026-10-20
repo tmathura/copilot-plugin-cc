@@ -323,22 +323,21 @@ left open: the constitution allows a merge only when each one is fixed or reject
 The blind plan and the code review round start Codex and Copilot as background Bash calls
 (`run_in_background`). Read each call's output when it ends.
 
-Write each background Bash call that may be stopped with `TaskStop` in this form, and write
-nothing else in the call. The parts in `[ ]` are optional:
+In each background Bash call that may be stopped with `TaskStop`, the last command is
+`exec <command>`, and nothing else in the call starts a process. Only these may come with it: the
+`MAIN=` and `WT_ROOT=` lines before it, a `cd "<dir>" &&` in front of the `exec`, and an input
+redirect from a file, `< "<file>"`, at its end. The command starts with a program name or with
+`env`. For example:
 
-```text
-[the MAIN= line, then the WT_ROOT= line, from "Shell and paths"]
-[cd "<dir>" &&] exec <program> <args> [< "<file>"]
+```bash
+exec sleep 1800
+exec node "<printed folder>scripts/copilot-companion.mjs" task --prompt-file "<file>"
+cd "<repo>" && exec env -u COPILOT_COMPANION_PLUGIN_DATA CLAUDE_PLUGIN_DATA="<data folder>" node "<script>" < "<file>"
 ```
 
-The program is a program name or `env`. `VAR=value` may be an argument of `env`, but it is never
-the program. Each argument is one of these:
-
-- a plain word, such as `--wait` or `CLAUDE_PLUGIN_DATA=`;
-- a single-quoted string, with `'\''` for a `'` in it;
-- a double-quoted path that starts with `"$MAIN` or `"$WT_ROOT`, alone or after a `VAR=`.
-
-`$CODEX` in the commands here stands for the literal path that was printed, so it is a plain word.
+So the call has no pipe, `&`, `;` after the `exec`, `||`, `( ... )` group or `bash -c`, and no
+`$( ... )`, backticks or `<( ... )` outside single quotes, except the `$( ... )` in the `MAIN=`
+line.
 
 The reason is that on Windows, `TaskStop` ends the Git Bash shell. A Git Bash tool that the shell
 started, such as `sleep.exe` or `env.exe`, can stay running. Windows can then give that pid to a
