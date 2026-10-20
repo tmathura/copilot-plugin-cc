@@ -92,9 +92,9 @@ test("line numbers count LF as git and grep do, CRLF counts once, and a BOM is d
 
 test("every control and separator character in a line is shown as a symbol", { skip }, () => {
   const ch = (...codes) => String.fromCharCode(...codes);
-  // ESC, backspace, VT, FS, DEL, NEL, a C1 control, LS, PS; a tab stays.
-  const raw = `a${ch(0x1b, 0x08, 0x0b, 0x1c, 0x7f, 0x85, 0x90, 0x2028, 0x2029)}\tb`;
-  const shown = `a${ch(0x241b, 0x2408, 0x240b, 0x241c, 0x2421, 0x2424, 0x2426, 0x2424, 0x2424)}\tb`;
+  // NUL, ESC, backspace, VT, FS, US, DEL, C1 edges and middle, NEL, LS, PS, an RLO; a tab stays.
+  const raw = `a${ch(0x00, 0x1b, 0x08, 0x0b, 0x1c, 0x1f, 0x7f, 0x80, 0x90, 0x9f, 0x85, 0x2028, 0x2029, 0x202e)}\tb`;
+  const shown = `a${ch(0x2400, 0x241b, 0x2408, 0x240b, 0x241c, 0x241f, 0x2421, 0x2426, 0x2426, 0x2426, 0x2424, 0x2424, 0x2424, 0xfffd)}\tb`;
   const ctx = makeSpec({ "spec.md": `# Spec\n${raw}\n` });
   const result = buildOk(ctx, '<section id="change"><a class="cite" href="#spec-md-L2">spec.md:2</a></section>');
   assert.ok(fs.readFileSync(ctx.page, "utf8").includes(`<span id="spec-md-L2">${shown}</span>`));
@@ -170,7 +170,8 @@ test("a refresh over a read-only page leaves no temp file", { skip }, () => {
   fs.chmodSync(ctx.page, 0o644);
   // Windows refuses to replace a read-only file; POSIX replaces it. Either way nothing is left behind.
   if (process.platform === "win32") {
-    if (result.status !== 0) assert.match(result.stderr, /not written: /);
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stderr, /not written: /);
   } else {
     assert.equal(result.status, 0, result.stderr);
   }
@@ -202,13 +203,41 @@ test("a previous page that cannot be read fails with a message", { skip: posix |
   assert.ok(!result.stderr.includes("Traceback"), result.stderr);
 });
 
-test("a preview with no delta section builds even when the spec folder's page cannot be read", { skip: posix || (process.getuid?.() === 0 && "root reads any file") }, () => {
+const unreadable = posix || (process.getuid?.() === 0 && "root reads any file");
+
+test("a preview with no delta section builds, with a note, when the spec folder's page cannot be read", { skip: unreadable }, () => {
   const ctx = makeSpec({ "spec.md": SPEC_MD });
   buildOk(ctx, GOOD);
+  const page = fs.readFileSync(ctx.page, "utf8");
+  const preview = path.join(ctx.dir, "preview.html");
   fs.chmodSync(ctx.page, 0o000);
-  const result = build(ctx, GOOD, { out: path.join(ctx.dir, "preview.html") });
+  const result = build(ctx, GOOD, { out: preview });
   fs.chmodSync(ctx.page, 0o644);
   assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr, /note: cannot read the previous page/);
+  assert.ok(fs.existsSync(preview));
+  assert.equal(fs.readFileSync(ctx.page, "utf8"), page);
+});
+
+test("a preview with a delta section fails when the spec folder's page cannot be read", { skip: unreadable }, () => {
+  const ctx = makeSpec({ "spec.md": SPEC_MD });
+  buildOk(ctx, GOOD);
+  const preview = path.join(ctx.dir, "preview.html");
+  fs.chmodSync(ctx.page, 0o000);
+  const result = build(ctx, WITH_DELTA, { out: preview });
+  fs.chmodSync(ctx.page, 0o644);
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /no previous page to compare with \(it cannot be read: /);
+  assert.ok(!fs.existsSync(preview));
+});
+
+test("a folder named like a Markdown file fails with a message, not a traceback", { skip }, () => {
+  const ctx = makeSpec({ "spec.md": SPEC_MD });
+  fs.mkdirSync(path.join(ctx.spec, "notes.md"));
+  const result = build(ctx, GOOD);
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /cannot read .*notes\.md/);
+  assert.ok(!result.stderr.includes("Traceback"), result.stderr);
 });
 
 for (const [name, files, content, message] of [
