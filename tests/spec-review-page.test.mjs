@@ -79,13 +79,13 @@ test("a folder without spec.md builds, because the template cites no file", { sk
   buildOk(ctx, '<section id="change"><a class="cite" href="#plan-md-L1">plan.md:1</a></section>');
 });
 
-test("line ends: a form feed does not split a line, CR and CRLF do, and a BOM is dropped", { skip }, () => {
-  const ctx = makeSpec({ "spec.md": "﻿# Spec\r\n\r\nx\fy\r\nz\rw\n" });
+test("line numbers count LF as git and grep do, CRLF counts once, and a BOM is dropped", { skip }, () => {
+  const ctx = makeSpec({ "spec.md": "﻿# Spec\r\n\r\nx\fy\r\nz\rw\nlast\n" });
   buildOk(ctx, '<section id="change"><a class="cite" href="#spec-md-L5">spec.md:5</a></section>');
   const page = fs.readFileSync(ctx.page, "utf8");
   assert.ok(page.includes('<span id="spec-md-L1"># Spec</span>'));
-  assert.ok(page.includes('<span id="spec-md-L4">z</span><span id="spec-md-L5">w</span>'));
-  assert.ok(!page.includes("﻿") && !page.includes("\r"));
+  assert.ok(page.includes('<span id="spec-md-L3">x\fy</span><span id="spec-md-L4">z\rw</span><span id="spec-md-L5">last</span>'));
+  assert.ok(!page.includes("﻿"));
 });
 
 test("{{...}} text in the content and the title is not filled in again", { skip }, () => {
@@ -114,8 +114,25 @@ test("open words and diagrams skip details bodies, diagram text and comments, in
 
 test("a single-quoted delta section gets the What moved entry", { skip }, () => {
   const ctx = makeSpec({ "spec.md": SPEC_MD });
+  buildOk(ctx, GOOD);
   buildOk(ctx, `${GOOD}<SECTION id='delta'><p>Moved</p></SECTION>`);
   assert.ok(fs.readFileSync(ctx.page, "utf8").includes('href="#delta"'));
+});
+
+test("a delta section with no previous page fails", { skip }, () => {
+  const ctx = makeSpec({ "spec.md": SPEC_MD });
+  const result = build(ctx, WITH_DELTA);
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /no previous page to compare with/);
+  assert.ok(!fs.existsSync(ctx.page));
+});
+
+test("the page gets the mode a plain write gives, not mkstemp's owner-only mode", { skip: skip || (process.platform === "win32" && "POSIX file modes") }, () => {
+  const ctx = makeSpec({ "spec.md": SPEC_MD });
+  buildOk(ctx, GOOD);
+  const plain = path.join(ctx.dir, "plain.txt");
+  fs.writeFileSync(plain, "x");
+  assert.equal(fs.statSync(ctx.page).mode & 0o777, fs.statSync(plain).mode & 0o777);
 });
 
 for (const [name, files, content, message] of [
@@ -130,14 +147,19 @@ for (const [name, files, content, message] of [
   });
 }
 
-test("a write that fails reports it, with no traceback and no temp file left", { skip }, () => {
-  const ctx = makeSpec({ "spec.md": SPEC_MD });
-  const result = build(ctx, GOOD, { out: path.join(ctx.dir, "missing", "review.html") });
-  assert.equal(result.status, 1, result.stderr);
-  assert.match(result.stderr, /not written: .*review\.html/);
-  assert.ok(!result.stderr.includes("Traceback"), result.stderr);
-  assert.deepEqual(fs.readdirSync(ctx.spec), ["spec.md"]);
-});
+for (const [name, out, message] of [
+  ["an --out folder that does not exist", (ctx) => path.join(ctx.dir, "missing", "review.html"), /not written: .*review\.html/],
+  ["an --out that is a folder", (ctx) => ctx.dir, /is a folder; pass a file path/]
+]) {
+  test(`${name} fails with a message, not a traceback`, { skip }, () => {
+    const ctx = makeSpec({ "spec.md": SPEC_MD });
+    const result = build(ctx, GOOD, { out: out(ctx) });
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stderr, message);
+    assert.ok(!result.stderr.includes("Traceback"), result.stderr);
+    assert.deepEqual(fs.readdirSync(ctx.spec), ["spec.md"]);
+  });
+}
 
 for (const [name, target] of [
   ["a line past the end", "spec-md-L99"],
