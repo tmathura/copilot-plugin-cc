@@ -32,7 +32,8 @@ Rules that came from reviewer feedback. Do not relax them.
 - **Every claim carries a citation** to a source line, as a chip that jumps to the embedded file.
 - **Diagrams show a mechanism**, not a list of boxes. What flows where, which edge is added or
   removed, what a request passes through. Prefer a before-and-after. Use mermaid in
-  `<pre class="mermaid">`; the template's mermaid script renders it.
+  `<pre class="mermaid">`; the template's mermaid script renders it. Do not put `;` in diagram
+  text: mermaid reads it as the end of a statement, and the diagram shows a syntax error.
 - **Plain writing.** Simplified Technical English. Short sentences, one thought each, everyday words.
   Keep exact identifiers, metric names and codes as written.
 
@@ -40,8 +41,10 @@ Rules that came from reviewer feedback. Do not relax them.
 
 1. If a spec directory was given, use it. Otherwise `git rev-parse --abbrev-ref HEAD`, take `<n>`
    from the branch `<type>/<n>-<slug>`, pad it to 3 digits (`printf '%03d' <n>`) and glob
-   `specs/NNN-*/`. If nothing matches, ask for the path. The ticket number for step 4 is the
-   folder's `NNN` without its leading zeros, because the folder carries the issue number.
+   `specs/NNN-*/`. If nothing matches, ask for the path. The ticket number `<n>` for step 4 is the
+   folder's `NNN` without its leading zeros, because the folder carries the issue number. A folder
+   with no number yet (`specs/<name>/`, before the issue exists) takes `<n>` from the branch; if
+   there is none, ask.
 2. Snapshot: `git log -1 --format='%h %ad' --date=short -- <spec dir>`. If the folder has uncommitted
    changes other than `review.html`, use the working tree, pass `--snapshot <hash>-wip` so the page says so, and say it
    again in the change section. The next refresh diffs from `<hash>`, so changes already shown
@@ -69,8 +72,9 @@ stated as fact.
 
 When the delta rule of step 1 holds (a previous page exists and the Markdown has a commit), run
 `git diff <hash> -- "<spec dir>" ':(exclude)<spec dir>/review.html'` with the `-wip` suffix
-dropped, and read the commit messages since. The generated page is left out because it is not
-spec content. That is the raw material for section 2. When the rule does not hold, there is no
+dropped, and read the commit messages since. For a `-wip` build, also list new files with
+`git status --porcelain -- "<spec dir>"`, because `git diff` does not show untracked files. The
+generated page is left out because it is not spec content. That is the raw material for section 2. When the rule does not hold, there is no
 section 2.
 
 ## Step 3: Write the content fragment
@@ -83,7 +87,7 @@ Section order and content:
 
 | id | Title | Holds |
 | --- | --- | --- |
-| `change` | The change | Problem in two sentences. Fix in one. What grew since the first draft, if anything. A stat strip: decisions, requirements, tasks, public changes, things that do not change. One short card per settled decision, named by its heading in the spec, with one citation. |
+| `change` | The change | Problem in two sentences. Fix in one. What grew since the first draft, if anything. A stat strip: decisions, requirements, tasks, public changes, things that do not change. One short card per settled decision, named by its label in the spec (a heading, or a bold label such as `**Decision (read-only runs)**`), with one citation. |
 | `delta` | What moved since you last read it | Only when the delta rule of step 1 holds. One table: then, now, citation. One line saying how many of the previous page's checks are resolved and which are still open. Otherwise omit the section and its nav entry. |
 | `how` | How it works | Two or three mermaid diagrams, each with a caption that states the claim. A before-and-after of the defect if there is one. The mechanism that the decisions turn on. Further mechanisms go in `<details>` under this section, closed. |
 | `examples` | Examples | At most five cards. Each names a concrete input, the expected outcome in one line, and why it matters in one or two sentences. Choose cases that changed the design or are easy to get wrong. Say that nothing was run. |
@@ -102,8 +106,9 @@ in `b`, the label and its citation in `span`), `.grid2` with `.card`, `.pill`
 Every chip is `<a class="cite" href="#<slug>-L<n>"><label></a>`. The slug is the file path,
 lower-cased, every run of characters outside `a-z0-9` replaced by one hyphen, trimmed:
 `spec.md` → `spec-md`, `contracts/companion-cli.md` → `contracts-companion-cli-md`,
-`checklists/requirements.md` → `checklists-requirements-md`. The label is short and names the
-file, or the task id for a task line: `spec.md:142`, `companion-cli:9`, `checklist:11`, `T053b`.
+`checklists/requirements.md` → `checklists-requirements-md`. The label is short and reads
+`<file>:<line>`, as the template's legend says: `spec.md:142`, `companion-cli:9`, `checklist:11`,
+`tasks:282`.
 
 Cite the line where the claim starts, not the heading above it. The build step prints every cited
 line so you can check each one landed. Fix any that did not before you hand the page over.
@@ -111,7 +116,7 @@ line so you can check each one landed. Fix any that did not before you hand the 
 ## Step 4: Build and check
 
 ```bash
-uv run --no-project python .claude/skills/spec-review-page/build.py <spec dir> <scratchpad>/content.html --ticket '#<n>' --title '<spec title>' --snapshot <hash> --date <yyyy-mm-dd>
+uv run --no-project python .claude/skills/spec-review-page/build.py "<spec dir>" "<scratchpad>/content.html" --ticket '#<n>' --title '<spec title>' --snapshot <hash> --date <yyyy-mm-dd>
 ```
 
 Write each `'` in the title as `'\''`. Double quotes would run a backtick or `$(...)` in it.
@@ -125,7 +130,8 @@ line, substitutes the header fields, and then:
 - prints the word count of the fragment with `<details>` bodies removed, so the budget can be checked.
 
 When the delta rule of step 1 does not hold, pass `--no-delta` so the nav drops the entry; the
-fragment then has no `delta` section either. To write somewhere else, pass `--out <file>`.
+fragment then has no `delta` section either. The build fails when the flag and the fragment
+disagree. To write somewhere else, pass `--out <file>`.
 
 ## Step 5: Hand over
 
