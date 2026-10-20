@@ -310,7 +310,8 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
   Codex's review starts with a plain sentence, so Codex takes the first line. The reason is
   correctness.
 - Copilot has no setting for an output schema. So `/copilot:adversarial-review` puts the schema in
-  the prompt, also accepts the JSON inside one code fence, and checks the answer against the schema.
+  the prompt, also accepts the JSON inside exactly one code fence, also with text before or after
+  it, and checks the answer against the schema.
   An answer that does not match fails the job and keeps Copilot's text. Codex makes its answer match
   the schema itself. The prompt asks for the JSON as plain text in the final message, and says not
   to call a tool for it, because Copilot sometimes called a tool named `json` and the read-only run
