@@ -152,7 +152,7 @@ test("a gate run that it stops cancels its job even when the companion saved the
       await waitFor(() => {
         job = findJobByTitle(tasks.dataDir, GATE_TITLE);
         return job?.copilotPid && readFakeChildPids(tasks.binDir).length > 0;
-      }, 30000);
+      }, Math.min(timeoutMs, 30000));
       const [[copilotPid, childPid]] = readFakeChildPids(tasks.binDir);
       if (stopBy === "signal") {
         process.emit("SIGTERM", "SIGTERM");

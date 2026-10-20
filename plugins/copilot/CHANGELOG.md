@@ -5,8 +5,9 @@
 ### 1.0.15
 
 - When the review gate stops a review that ran past its limit, or that was stopped, its job now
-  always shows as `cancelled` with the gate's reason in `/copilot:status`. Before, on Windows, the
-  job could show as `failed` with the companion's own error.
+  shows as `cancelled` with the gate's reason in `/copilot:status`, also when the review failed
+  while the gate was stopping it. Before, on Windows, such a job could show as `failed` with the
+  companion's own error.
 
 ### 1.0.14
 

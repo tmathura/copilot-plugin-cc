@@ -56,7 +56,11 @@ await cancelCompanionJob(options.workspaceRoot, options.runId, reason, { overrid
 
 ## Deviations from Assessment
 
-None.
+- 2026-10-20, review round 1: `docs/operations.md` also changed. Its job state diagram gets
+  `failed --> cancelled` for the gate's stop, and its gate bullet says the gate also cancels a job
+  that failed while it was being stopped. The `CHANGELOG.md` entry no longer says "always", because
+  a job that completed at the limit keeps `completed`. The new gate test waits for the job no longer
+  than the run limit, and the gate's header comment is wrapped again.
 
 ## Follow-ups
 
