@@ -14,9 +14,8 @@ const TITLE = "Revue de la spec — été";
 const PYTHON = ["python3", "python"].find((name) => run(name, ["--version"]).status === 0);
 const skip = PYTHON ? false : "no python3 or python on the PATH";
 
-function makeSpec(t, files) {
+function makeSpec(files) {
   const dir = makeTempDir("spec-review-page-test-");
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const spec = path.join(dir, "spec");
   fs.mkdirSync(spec);
   for (const [name, text] of Object.entries(files)) {
@@ -48,8 +47,8 @@ test("a Python is on the PATH in CI", { skip: !process.env.CI }, () => {
   assert.ok(PYTHON, "CI must run the spec-review-page build tests");
 });
 
-test("the build writes a page with every citation found and the text unchanged", { skip }, (t) => {
-  const ctx = makeSpec(t, { "spec.md": SPEC_MD });
+test("the build writes a page with every citation found and the text unchanged", { skip }, () => {
+  const ctx = makeSpec({ "spec.md": SPEC_MD });
   assert.match(buildOk(ctx, GOOD).stdout, /missing anchors: 0/);
   const page = fs.readFileSync(ctx.page, "utf8");
   assert.match(page, /<meta name="spec-review-snapshot" content="abc1234">/);
@@ -57,8 +56,8 @@ test("the build writes a page with every citation found and the text unchanged",
   assert.ok(page.includes('<span id="spec-md-L3">Café — the first claim.</span>'));
 });
 
-test("a refresh reads the previous page's snapshot and adds the What moved entry", { skip }, (t) => {
-  const ctx = makeSpec(t, { "spec.md": SPEC_MD });
+test("a refresh reads the previous page's snapshot and adds the What moved entry", { skip }, () => {
+  const ctx = makeSpec({ "spec.md": SPEC_MD });
   buildOk(ctx, GOOD);
   assert.ok(!fs.readFileSync(ctx.page, "utf8").includes('href="#delta"'), "--no-delta drops the entry");
   assert.match(buildOk(ctx, GOOD, { delta: true, snapshot: "def5678" }).stdout, /previous page snapshot: abc1234/);
@@ -74,8 +73,8 @@ for (const [name, target] of [
   ["a malformed target", "spec_md-L3"],
   ["a zero-padded line number", "spec-md-L03"]
 ]) {
-  test(`a citation to ${name} fails and keeps the previous page`, { skip }, (t) => {
-    const ctx = makeSpec(t, { "spec.md": SPEC_MD });
+  test(`a citation to ${name} fails and keeps the previous page`, { skip }, () => {
+    const ctx = makeSpec({ "spec.md": SPEC_MD });
     buildOk(ctx, GOOD);
     const before = fs.readFileSync(ctx.page, "utf8");
     const result = build(ctx, GOOD.replace("#spec-md-L3", `#${target}`));
@@ -86,10 +85,14 @@ for (const [name, target] of [
   });
 }
 
-function generatedPage(t) {
-  const ctx = makeSpec(t, { "spec.md": SPEC_MD });
-  buildOk(ctx, GOOD);
-  return fs.readFileSync(ctx.page, "utf8");
+let cachedPage;
+function generatedPage() {
+  if (cachedPage === undefined) {
+    const ctx = makeSpec({ "spec.md": SPEC_MD });
+    buildOk(ctx, GOOD);
+    cachedPage = fs.readFileSync(ctx.page, "utf8");
+  }
+  return cachedPage;
 }
 
 const HAND_WRITTEN = "<!doctype html><p>Written by hand.</p>\n";
@@ -99,9 +102,9 @@ for (const [name, files, existing, message] of [
   ["a folder with no Markdown", {}, generatedPage, /no Markdown files/],
   ["two files with the same anchor name", { "a-b.md": "one\n", "a_b.md": "two\n" }, generatedPage, /slug collision/]
 ]) {
-  test(`${name} fails and leaves review.html unchanged`, { skip }, (t) => {
-    const ctx = makeSpec(t, files);
-    const before = existing(t);
+  test(`${name} fails and leaves review.html unchanged`, { skip }, () => {
+    const ctx = makeSpec(files);
+    const before = existing();
     fs.writeFileSync(ctx.page, before, "utf8");
     const result = build(ctx, GOOD);
     assert.equal(result.status, 1, result.stderr);
