@@ -14,8 +14,8 @@ First read the repo's `.claude/skills/workflow-common/REFERENCE.md`. Follow its 
 round, for example, passes its findings and their outcomes as the body.
 
 `--allow-empty` as the first word, before the description, marks a review round commit with no
-change (REFERENCE.md "Code review round"). Then `git diff HEAD --quiet` must succeed: if a
-tracked file is changed, staged or not, stop and report it. Skip step 3, and commit with
+change (REFERENCE.md "Code review round"). Then `git status --porcelain` must print nothing: if
+any file is staged, changed or new, stop and report it. Skip step 3, and commit with
 `--allow-empty` in step 6.
 
 ## Steps
