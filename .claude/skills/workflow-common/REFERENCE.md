@@ -325,11 +325,11 @@ The blind plan and the code review round start Codex and Copilot as background B
 
 Write each background Bash call that may be stopped with `TaskStop` in this form:
 
-- It ends with one `exec <program> <args>`. After the arguments, only an input redirect from a
-  file, `< "<file>"`, may come: no pipe, `;` or `&&`.
+- The command is one `exec <program> <args>`. Only an input redirect from a file, `< "<file>"`,
+  may follow it: no pipe, `;` or `&&`.
 - Before it, only the `MAIN=` and `WT_ROOT=` lines may come, in that order, and then a
-  `cd "<dir>" &&`. The command is not inside a subshell, a `( ... )` group or a `bash -c`. (The
-  `$( ... )` inside the `MAIN=` line is fine: it ends before the `exec`.)
+  `cd "<dir>" &&`. Do not put the command in a `( ... )` group or in a `bash -c` of your own. A
+  `$( ... )` that ends before the `exec`, as in the `MAIN=` line, is fine.
 - The program is a program name or `env`. It is never `VAR=value`.
 
 The reason is that on Windows, `TaskStop` ends the Git Bash shell. A Git Bash tool that the shell
@@ -598,8 +598,8 @@ Before a run, read every record:
 
 **Commands.** Run every command in the throwaway repo, with `env -u COPILOT_COMPANION_PLUGIN_DATA`,
 so nothing touches the installed plugin's jobs or gate. In a foreground call, use a subshell,
-`(cd "<repo>" && <command>)`, so the shell does not stay in the throwaway repo: from there the `MAIN=` line would find the wrong
-repo, and Windows cannot delete a folder that a shell is in.
+`(cd "<repo>" && <command>)`, so the shell does not stay in the throwaway repo: from there the
+`MAIN=` line would find the wrong repo, and Windows cannot delete a folder that a shell is in.
 
 - Slash commands: `env -u COPILOT_COMPANION_PLUGIN_DATA -u CLAUDE_PLUGIN_DATA claude -p --settings '{"enabledPlugins":{"copilot@tmathura-copilot":false}}' --plugin-dir "$WT_ROOT/release-X.Y.Z/plugins/copilot" '/copilot:<command> <args>'`.
   `--settings` turns off the installed plugin of the same name for this run, so the commands come
