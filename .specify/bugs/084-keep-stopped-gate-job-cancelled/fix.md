@@ -69,5 +69,5 @@ await cancelCompanionJob(options.workspaceRoot, options.runId, reason, { overrid
 
 - Own ticket, after this merge: when the companion ends by itself, the gate looks only for a
   `running` job, so a `failed` job that kept its `copilotPid` (Copilot could not be stopped) is
-  skipped and that Copilot is not stopped. This branch is unchanged from `main` (found by
-  code-review in round 1).
+  skipped and that Copilot is not stopped. The code for a companion that ended by itself is the
+  same as on `main` (found by code-review in round 1).
