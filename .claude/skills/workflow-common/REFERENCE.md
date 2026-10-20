@@ -234,8 +234,8 @@ asks for the change. If you cannot tell, check it again.
 
 **Spec review page.** It applies when a spec folder (`specs/NNN-<name>/`) holds a `review.html` that
 `spec-review-page` built (it has the skill's marker, as the skill's Step 1 says), and a commit
-changed a Markdown file in that folder: in a review round, the round's last commit; otherwise the
-commit itself, such as the commit of `workflow-manual` Step 6 or of a spec sweep made outside a
+changed a Markdown file in that folder: in a review round, any commit of the round (the refresh
+waits for the round's last commit); otherwise the commit itself, such as the commit of `workflow-manual` Step 6 or of a spec sweep made outside a
 review round (`docs/development.md`, "Keeping the spec current"). Then refresh it once for each such round or
 commit, before the next round or the push, so that its "What moved" section shows what that round
 changed:

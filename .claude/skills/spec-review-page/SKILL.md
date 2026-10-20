@@ -10,8 +10,8 @@ One HTML page that lets a reviewer decide on a spec in about ten minutes. It con
 duplicate. Nothing on the page asks the reviewer for input.
 
 The page is a plain file, `review.html`, written into the spec folder next to the Markdown it
-condenses. It opens from disk in any browser. It needs network access once, for the mermaid script
-and the Google fonts. The template pins the mermaid version and carries its hash, so the browser
+condenses. It opens from disk in any browser. It needs network access for the mermaid script and
+the Google fonts, unless the browser has them cached. The template pins the mermaid version and carries its hash, so the browser
 refuses a changed file. Without network the diagrams show as text, and the page uses system fonts.
 
 ## What the page must be
@@ -38,9 +38,10 @@ Rules that came from reviewer feedback. Do not relax them.
 
 ## Step 1: Locate the spec and the previous page
 
-1. If a spec directory was given, use it. Otherwise `git rev-parse --abbrev-ref HEAD`, take `<n>`
-   from the branch `<type>/<n>-<slug>`, pad it to 3 digits (`printf '%03d' <n>`) and glob
-   `specs/NNN-*/`. If nothing matches, ask for the path.
+1. Take the ticket number `<n>` from the branch `<type>/<n>-<slug>`
+   (`git rev-parse --abbrev-ref HEAD`); step 4 passes it as `--ticket`. If a spec directory was
+   given, use it. Otherwise pad `<n>` to 3 digits (`printf '%03d' <n>`) and glob `specs/NNN-*/`.
+   If nothing matches, ask for the path.
 2. Snapshot: `git log -1 --format='%h %ad' --date=short -- <spec dir>`. If the folder has uncommitted
    changes, use the working tree, pass `--snapshot <hash>-wip` so the page says so, and say it
    again in the change section. The next refresh diffs from `<hash>`, so changes already shown
@@ -102,7 +103,7 @@ Every chip is `<a class="cite" href="#<slug>-L<n>"><label>:<n></a>`. The slug is
 lower-cased, every run of characters outside `a-z0-9` replaced by one hyphen, trimmed:
 `spec.md` → `spec-md`, `contracts/companion-cli.md` → `contracts-companion-cli-md`,
 `checklists/requirements.md` → `checklists-requirements-md`. The label is short and names the
-file: `spec.md:142`, `companion-cli:9`, `checklist:11`, `T053b` for a task line.
+file, or the task id for a task line: `spec.md:142`, `companion-cli:9`, `checklist:11`, `T053b`.
 
 Cite the line where the claim starts, not the heading above it. The build step prints every cited
 line so you can check each one landed. Fix any that did not before you hand the page over.
