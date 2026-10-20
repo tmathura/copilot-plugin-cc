@@ -3,8 +3,8 @@
 // Copilot CLI. The prompt holds the working-tree context, with the exact patches in a folder above the
 // inline limit, and reaches the companion on stdin. The run limit is 840 s from the hook's start; on
 // the limit, or when the hook itself is stopped, the hook stops the companion's process tree and
-// cancels its job, which stops the job's Copilot process; it also cancels the job of a companion that
-// ended before its job did. The hook uses Claude Code's own CLAUDE_PLUGIN_DATA, not an inherited
+// cancels its job, which stops the job's Copilot process, also when the companion saved the job as failed
+// while it was being stopped; it also cancels the job of a companion that ended before its job did. The hook uses Claude Code's own CLAUDE_PLUGIN_DATA, not an inherited
 // companion export. A failed run's message gives the reason from the task's JSON payload.
 
 import { spawn } from "node:child_process";
@@ -170,13 +170,16 @@ function parseStopReviewOutput(rawOutput) {
 // A companion that dies outright cannot stop its Copilot, and its record stays running, so its job is
 // cancelled, which stops the Copilot of the record. The record is read once the companion is gone,
 // when no new Copilot can start. It is found by the gate's run id, which a pid or a prompt cannot
-// fake, and read strictly, so a state that cannot be read is an error, not "no job".
-async function cancelCompanionJob(workspaceRoot, runId, reason) {
+// fake, and read strictly, so a state that cannot be read is an error, not "no job". When the gate
+// stopped the companion itself (`overrideFailed`), a job that the companion saved as failed while it
+// was being stopped is cancelled too, because the gate's stop is what ended it.
+async function cancelCompanionJob(workspaceRoot, runId, reason, { overrideFailed = false } = {}) {
   const job = loadState(workspaceRoot, { strict: true }).jobs.find(
-    (entry) => entry.stopGateRunId === runId && entry.status === "running"
+    (entry) =>
+      entry.stopGateRunId === runId && (entry.status === "running" || (overrideFailed && entry.status === "failed"))
   );
   if (job) {
-    await cancelJob(workspaceRoot, job.id, { reason });
+    await cancelJob(workspaceRoot, job.id, { reason, overrideFailed });
   }
 }
 
@@ -232,7 +235,7 @@ async function runCompanionTask(cwd, prompt, options) {
       const errors = [];
       const keepError = (error) => errors.push(error instanceof Error ? error.message : String(error));
       await terminate(child.pid).catch(keepError);
-      await cancelCompanionJob(options.workspaceRoot, options.runId, reason).catch(keepError);
+      await cancelCompanionJob(options.workspaceRoot, options.runId, reason, { overrideFailed: true }).catch(keepError);
       return errors.length > 0 ? { ...outcome, stopError: errors.join(" ") } : outcome;
     }
     try {

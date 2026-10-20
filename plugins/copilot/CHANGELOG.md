@@ -2,6 +2,12 @@
 
 ## Copilot plugin
 
+### 1.0.15
+
+- When the review gate stops a review that ran past its limit, or that was stopped, its job now
+  always shows as `cancelled` with the gate's reason in `/copilot:status`. Before, on Windows, the
+  job could show as `failed` with the companion's own error.
+
 ### 1.0.14
 
 - On Windows, when a Claude session ends, a slow or stuck `taskkill` can no longer make the hook
