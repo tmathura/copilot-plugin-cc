@@ -7,8 +7,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { collectReviewContext, getWorkingTreeState, resolveReviewTarget, writeReviewPatches } from "../plugins/copilot/scripts/lib/git.mjs";
-import { initGitRepo, makeTempDir, run } from "./helpers.mjs";
-import { DIFF_ARGS, git, gitBytes } from "./runtime-helpers.mjs";
+import { DIFF_ARGS, countLines, git, gitBytes, initGitRepo, makeTempDir, run } from "./helpers.mjs";
 
 function sha256File(filePath) {
   return createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
@@ -218,8 +217,8 @@ test("collectReviewContext gives lightweight context above the file limit that a
   assert.equal(context.inputMode, "self-collect");
   assert.equal(context.fileCount, 3);
   assert.match(context.collectionGuidance, /lightweight summary/i);
-  assert.match(context.collectionGuidance, /Read every patch file listed below with the view tool/);
-  assert.match(context.collectionGuidance, /one changed file/);
+  assert.match(context.collectionGuidance, /Read every file listed below with the view tool/);
+  assert.match(context.collectionGuidance, /Each patch file holds the diff of one changed file/);
   assert.doesNotMatch(context.content, /MARKER_[ABC]/);
   assert.match(context.content, /## Changed Files/);
 });
@@ -575,7 +574,7 @@ test("writeReviewPatches splits a branch diff into exact patches at each file an
 
   const mergeBase = git(cwd, "merge-base", "HEAD", "main").trim();
   assert.ok(readPatches(entries).equals(diffBytes(cwd, `${mergeBase}..HEAD`)));
-  assert.ok(entries.every(({ file, bytes }) => bytes === fs.statSync(file).size));
+  assert.ok(entries.every(({ file, lines }) => lines === countLines(fs.readFileSync(file, "latin1"))));
   const names = ["001", "002", "003", "004", "005", "006"].map((number) => `branch-${number}.patch`);
   assert.deepEqual(entries.map(({ file }) => path.basename(file)), names);
   assert.deepEqual(fs.readdirSync(dir).sort(), names);
@@ -603,7 +602,7 @@ test("writeReviewPatches gives a dirty submodule line its own patch and writes n
   assert.ok(readPatches(patches).equals(diffBytes(cwd)));
   assert.ok(patches.some(({ label }) => label === "Submodule sub contains modified content"), JSON.stringify(entries));
   assert.ok(patches.every(({ label }) => /^(diff --git |Submodule )/.test(label)));
-  assert.deepEqual(entries.at(-1), { file: path.join(dir, "untracked.md"), label: "untracked files", bytes: 0 });
+  assert.deepEqual(entries.at(-1), { file: path.join(dir, "untracked.md"), label: "untracked files", lines: 0 });
 });
 
 test("writeReviewPatches numbers 1000 patches with 4 digits, in diff order", () => {

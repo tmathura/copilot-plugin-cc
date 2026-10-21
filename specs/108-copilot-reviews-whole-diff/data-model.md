@@ -5,7 +5,7 @@
 | Field | Change |
 | --- | --- |
 | `inputMode` | `inline-diff` when the diff is at most `maxInlineDiffBytes` (256 KB) and the file count is at most `maxInlineFiles` (default: no limit); otherwise `self-collect` |
-| `collectionGuidance` | `self-collect`: asks Copilot to read every patch file listed below, one per changed file, to its end, in line ranges where needed |
+| `collectionGuidance` | `self-collect`: asks Copilot to read every patch file listed below, one per changed file, to its last line, in line ranges where needed |
 | others | unchanged |
 
 ## Patch folder (`jobs/<id>.patches`)
@@ -26,4 +26,4 @@
 | --- | --- |
 | `file` | absolute path of the patch file |
 | `label` | the patch's first line (its `diff --git` or `Submodule` line, or the first line of bytes before them), or `untracked files` |
-| `bytes` | the file's size in bytes, shown in the list (research §3) |
+| `lines` | the file's line count, shown in the list; a last line with no new line counts (research §3) |

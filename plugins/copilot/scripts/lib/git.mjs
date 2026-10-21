@@ -334,7 +334,7 @@ function buildAdversarialCollectionGuidance(options = {}) {
     return "Use the repository context below as primary evidence.";
   }
 
-  return "The repository context below is a lightweight summary. Read every patch file listed below with the view tool before finalizing findings. Each one holds the diff of one changed file, and the list gives its size. The view tool cuts a long read, so read each file to its end, in line ranges where needed.";
+  return "The repository context below is a lightweight summary. Read every file listed below with the view tool before finalizing findings. Each patch file holds the diff of one changed file. The list gives the line count of each file. The view tool cuts a long read, so read each file to its last line, in line ranges where needed.";
 }
 
 // Git writes straight to the file: a large patch has no buffer limit, and its bytes stay exact.
@@ -379,6 +379,15 @@ function firstLine(buffer) {
   return buffer.toString("utf8", 0, end === -1 ? buffer.length : end);
 }
 
+// The view tool reads by line number, so the line count tells Copilot where a file ends.
+function countLines(buffer) {
+  let lines = 0;
+  for (let offset = buffer.indexOf(0x0a); offset !== -1; offset = buffer.indexOf(0x0a, offset + 1)) {
+    lines += 1;
+  }
+  return buffer.length > 0 && buffer[buffer.length - 1] !== 0x0a ? lines + 1 : lines;
+}
+
 // One small file per changed file: Copilot's view tool cuts each read of a large file.
 function writeSplitPatch(cwd, args, dir, name) {
   const fullPatch = writeGitOutput(cwd, args, path.join(dir, `${name}.patch`));
@@ -388,7 +397,7 @@ function writeSplitPatch(cwd, args, dir, name) {
   return parts.map((part, index) => {
     const file = path.join(dir, `${name}-${String(index + 1).padStart(width, "0")}.patch`);
     fs.writeFileSync(file, part, { flag: "wx", mode: 0o600 });
-    return { file, label: firstLine(part), bytes: part.length };
+    return { file, label: firstLine(part), lines: countLines(part) };
   });
 }
 
@@ -411,7 +420,7 @@ export function writeReviewPatches(context, dir) {
   return [
     ...writeSplitPatch(repoRoot, [...diffArgs, "--cached"], dir, "staged"),
     ...writeSplitPatch(repoRoot, diffArgs, dir, "unstaged"),
-    { file: untrackedFile, label: "untracked files", bytes: Buffer.byteLength(untrackedText) }
+    { file: untrackedFile, label: "untracked files", lines: countLines(Buffer.from(untrackedText)) }
   ];
 }
 

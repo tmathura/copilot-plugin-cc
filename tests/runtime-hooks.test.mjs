@@ -20,6 +20,7 @@ import {
   isAlive,
   makeLargeRepo,
   makeQueuedTask,
+  patchListEntry,
   patchesOf,
   readJobs,
   setUpGate,
@@ -283,7 +284,7 @@ test("above the inline limit, the gate passes the patch folder to Copilot and re
     const patches = patchesOf(copilotRun);
     assert.deepEqual(Object.keys(patches).sort(), ["unstaged-001.patch", "unstaged-002.patch", "unstaged-003.patch", "untracked.md"]);
     assert.match(patches["unstaged-003.patch"].toString("utf8"), /^diff --git a\/c\.txt b\/c\.txt\n[\s\S]*\+c\.txt v2\n/);
-    const entry = (name, label) => `- ${path.join(patchDir, name)} (${patches[name].length} bytes): ${label}`;
+    const entry = (name, label) => patchListEntry(patchDir, patches, name, label);
     assert.ok(
       copilotRun.prompt.includes(
         [
@@ -298,7 +299,8 @@ test("above the inline limit, the gate passes the patch folder to Copilot and re
       ),
       copilotRun.prompt
     );
-    assert.match(copilotRun.prompt, /Read every patch file listed below with the view tool/);
+    assert.match(copilotRun.prompt, /Read every file listed below with the view tool/);
+    assert.match(copilotRun.prompt, /read each file to its last line, in line ranges where needed/);
     assert.deepEqual(findPatchDirs(dataDir), [], behavior);
     // A run that ended by itself keeps its outcome; only the gate's own stop turns a failure into a cancel.
     assert.equal(readJobs(dataDir).find((job) => job.title === GATE_TITLE).status, blocked ? "failed" : "completed", behavior);

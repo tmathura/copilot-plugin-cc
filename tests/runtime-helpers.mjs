@@ -1,13 +1,12 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): split out of tests/runtime.test.mjs;
 // the shared helpers of the runtime tests, which run the Copilot companion against the fake copilot CLI.
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import assert from "node:assert/strict";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { buildEnv, installFakeCopilot, readFakeChildPids, readFakeCopilotRuns } from "./fake-copilot-fixture.mjs";
-import { initGitRepo, makeTempDir, run } from "./helpers.mjs";
+import { countLines, git, initGitRepo, makeTempDir, run } from "./helpers.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const PLUGIN_ROOT = path.join(ROOT, "plugins", "copilot");
@@ -50,19 +49,7 @@ export const REVIEW_JSON = JSON.stringify({
   next_steps: ["Add the guard."]
 });
 
-export function git(repo, ...args) {
-  const result = run("git", args, { cwd: repo });
-  assert.equal(result.status, 0, result.stderr);
-  return result.stdout;
-}
-
-export const DIFF_ARGS = ["--binary", "--no-ext-diff", "--submodule=diff"];
-// Raw bytes with no buffer limit, to compare with the patch files.
-export function gitBytes(repo, ...args) {
-  const result = spawnSync("git", args, { cwd: repo, maxBuffer: 64 * 1024 * 1024, windowsHide: true });
-  assert.equal(result.status, 0, String(result.stderr));
-  return result.stdout;
-}
+export { git };
 
 export function writeFile(repo, name, text) {
   fs.mkdirSync(path.dirname(path.join(repo, name)), { recursive: true });
@@ -127,6 +114,11 @@ export function addDirsOf(copilotRun) {
 
 export function patchesOf(copilotRun) {
   return Object.fromEntries(Object.entries(copilotRun.addDirFiles).map(([name, data]) => [name, Buffer.from(data, "base64")]));
+}
+
+// One line of the prompt's Patch Files list.
+export function patchListEntry(patchDir, patches, name, label) {
+  return `- ${path.join(patchDir, name)} (${countLines(patches[name].toString("latin1"))} lines): ${label}`;
 }
 
 // The patch folders under the plugin data folder: jobs/<job id>.patches.

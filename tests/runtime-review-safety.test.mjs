@@ -14,20 +14,19 @@ import {
 } from "./fake-copilot-fixture.mjs";
 import { withReviewPatches } from "../plugins/copilot/scripts/copilot-companion.mjs";
 import { collectReviewContext, resolveReviewTarget } from "../plugins/copilot/scripts/lib/git.mjs";
-import { COMPANION_PLUGIN_DATA_ENV, resolveJobPatchDir } from "../plugins/copilot/scripts/lib/state.mjs";
-import { initGitRepo, makeTempDir } from "./helpers.mjs";
+import { resolveJobPatchDir } from "../plugins/copilot/scripts/lib/state.mjs";
+import { DIFF_ARGS, gitBytes, initGitRepo, makeTempDir } from "./helpers.mjs";
 import {
-  DIFF_ARGS,
   REVIEW_JSON,
   SCRIPT,
   addDirsOf,
   assertReadOnlyRun,
   findPatchDirs,
   git,
-  gitBytes,
   isAlive,
   largeText,
   makeRepo,
+  patchListEntry,
   patchesOf,
   readJobs,
   runReview,
@@ -216,9 +215,9 @@ test("above the inline limit, a working-tree review reads the exact patches from
   assert.match(patches["unstaged-001.patch"].toString("utf8"), /-a\.txt STAGED_MARKER\n\+a\.txt UNSTAGED_MARKER/);
   assert.match(patches["untracked.md"].toString("utf8"), /### new\.txt\n```\nuntracked file\n```/);
   assert.match(runs[0].prompt, /lightweight summary/i);
-  assert.match(runs[0].prompt, /Read every patch file listed below with the view tool/);
-  assert.match(runs[0].prompt, /read each file to its end, in line ranges where needed/);
-  const entry = (name, label) => `- ${path.join(patchDir, name)} (${patches[name].length} bytes): ${label}`;
+  assert.match(runs[0].prompt, /Read every file listed below with the view tool/);
+  assert.match(runs[0].prompt, /read each file to its last line, in line ranges where needed/);
+  const entry = (name, label) => patchListEntry(patchDir, patches, name, label);
   assert.ok(
     runs[0].prompt.includes(
       [
@@ -317,8 +316,7 @@ test("above the inline limit, a branch review gets one patch per changed file, w
   // The rename is one patch with both names.
   assert.match(patches["branch-003.patch"].toString("utf8"), /^diff --git a\/b\.txt b\/renamed\.txt\nsimilarity index 100%\nrename from b\.txt\nrename to renamed\.txt\n$/);
   assert.doesNotMatch(joined.toString("utf8"), /LOCAL_MARKER/);
-  const renameBytes = patches["branch-003.patch"].length;
-  assert.ok(runs[0].prompt.includes(`- ${path.join(patchDir, "branch-003.patch")} (${renameBytes} bytes): diff --git a/b.txt b/renamed.txt\n`));
+  assert.ok(runs[0].prompt.includes(`- ${path.join(patchDir, "branch-003.patch")} (4 lines): diff --git a/b.txt b/renamed.txt\n`));
   assert.doesNotMatch(runs[0].prompt, /LOCAL_MARKER/);
 });
 
@@ -334,16 +332,14 @@ test("a patch file that cannot be written stops the review before Copilot starts
     writeFile(repo, name, `${name} v2\n`);
   }
   const workspaceRoot = makeTempDir();
-  const previous = { [COMPANION_PLUGIN_DATA_ENV]: process.env[COMPANION_PLUGIN_DATA_ENV], CLAUDE_PLUGIN_DATA: process.env.CLAUDE_PLUGIN_DATA };
-  delete process.env[COMPANION_PLUGIN_DATA_ENV];
+  // tests/helpers.mjs removes the companion's own data folder export, so this one is used.
+  const previousDataDir = process.env.CLAUDE_PLUGIN_DATA;
   process.env.CLAUDE_PLUGIN_DATA = makeTempDir();
   t.after(() => {
-    for (const [name, value] of Object.entries(previous)) {
-      if (value === undefined) {
-        delete process.env[name];
-      } else {
-        process.env[name] = value;
-      }
+    if (previousDataDir === undefined) {
+      delete process.env.CLAUDE_PLUGIN_DATA;
+    } else {
+      process.env.CLAUDE_PLUGIN_DATA = previousDataDir;
     }
   });
   const patchDir = resolveJobPatchDir(workspaceRoot, "review-write-fail");

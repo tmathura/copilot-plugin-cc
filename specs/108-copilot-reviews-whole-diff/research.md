@@ -83,15 +83,17 @@ different runs, so the test compares only what was read.
 
 ## §3 Prompt list
 
-- **Decision** (changed 2026-10-21, code review round 1): the `## Patch Files` section lists
-  `- <patch path> (<size> bytes): <first line of the patch>` (untracked:
-  `- <path> (<size> bytes): untracked files`). The guidance asks Copilot to read every listed file
-  to its end, in line ranges where needed, because the `view` tool cuts a long read.
-- **Rationale**: Copilot can see which file each patch holds and which it has not read. One
-  changed file above about 40 KB is still one patch (spec edge cases), so the size tells Copilot
-  that a read was cut. Rejected alternatives: the list without sizes and no word about cut reads
-  (the first plan; Copilot and `code-review` found that a large single-file patch gave no hint);
-  splitting one file's patch into parts (more code, and a part would hold half a hunk).
+- **Decision** (changed 2026-10-21, code review rounds 1 and 2): the `## Patch Files` section lists
+  `- <patch path> (<n> lines): <first line of the patch>` (untracked:
+  `- <path> (<n> lines): untracked files`). The guidance asks Copilot to read every listed file to
+  its last line, in line ranges where needed, because the `view` tool cuts a long read.
+- **Rationale**: Copilot can see which file each patch holds and which it has not read. A patch
+  above about 40 KB is still one file (spec edge cases), and `view` reads by line number, so the
+  line count tells Copilot where the file ends and that a read was cut. Rejected alternatives: the
+  list with no count and no word about cut reads (the first plan; Copilot and `code-review` found
+  that a large single-file patch gave no hint); the size in bytes (round 1; `view` takes line
+  numbers, so bytes do not say which line is last, round 2); splitting one file's patch into parts
+  (more code, and a part would hold half a hunk).
 
 ## §4 The port spec
 

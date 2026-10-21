@@ -9,7 +9,7 @@
    that exists already.
 4. In `tests/runtime-review-safety.test.mjs`, a patch write that fails stops the review before
    Copilot starts and removes the folder. Also, a review above 256 KB gets one patch per file, the
-   joined patches equal `git diff`, the prompt lists each patch with its size and `diff --git` line, and the
+   joined patches equal `git diff`, the prompt lists each patch with its line count and `diff --git` line, and the
    folder is gone after the run.
 5. In `tests/runtime-hooks.test.mjs`, the gate above 256 KB gets the same per-file patches and
    removes the folder after success, failure and a stop signal.

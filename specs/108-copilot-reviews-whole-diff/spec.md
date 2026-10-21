@@ -21,8 +21,9 @@
 ### Session 2026-10-21 (code review round 1)
 
 - Q: How does Copilot know that a large patch was cut by the `view` tool? → A: the list gives each
-  file's size, and the guidance asks Copilot to read each file to its end, in line ranges where
-  needed (research §3).
+  file's line count, and the guidance asks Copilot to read each file to its last line, in line
+  ranges where needed (research §3). Round 1 gave the size in bytes; round 2 changed it to lines,
+  because `view` reads by line number.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -92,8 +93,9 @@ only the repo.
 
 ### Edge Cases
 
-- A single changed file whose diff alone is above 256 KB: it gets one large patch. The list gives
-  its size, and Copilot reads it in parts with the `view` tool's line range.
+- A changed file whose patch is above about 40 KB, where `view` cuts a read (also one file whose
+  diff alone is above 256 KB): it gets one large patch. The list gives its line count, and Copilot
+  reads it in parts with the `view` tool's line range.
 - A renamed file: its patch holds the rename header and both names, because the patches are split
   from the full diff and not made with a file filter.
 - A binary file: its patch holds git's binary patch text, as today.
@@ -120,8 +122,8 @@ only the repo.
 - **FR-002**: Above 256 KB, the companion MUST write one patch file per changed file, for the branch
   diff, and for the staged and the unstaged diff. The patches MUST be split from the exact
   `git diff` bytes, so that joined in order they are equal to the full diff.
-- **FR-003**: The prompt MUST list each patch file with its size and the changed file that it
-  holds, and MUST ask Copilot to read every listed file to its end.
+- **FR-003**: The prompt MUST list each patch file with its line count and the changed file that
+  it holds, and MUST ask Copilot to read every listed file to its last line.
 - **FR-004**: The patch folder MUST stay in the plugin's job storage and MUST be removed after the
   run and on a stop signal, as today.
 - **FR-005**: A review MUST NOT give Copilot a shell or `git`.

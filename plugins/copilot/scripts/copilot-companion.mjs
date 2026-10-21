@@ -335,7 +335,7 @@ export async function withReviewPatches(context, request, run) {
       "",
       "## Patch Files",
       "",
-      ...files.map(({ file, label, bytes }) => `- ${file} (${bytes} bytes): ${label}`),
+      ...files.map(({ file, label, lines }) => `- ${file} (${lines} lines): ${label}`),
       ""
     ].join("\n");
     return await run({ reviewInput, addDirs: [patchDir] });
