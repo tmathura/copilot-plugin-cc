@@ -15,14 +15,13 @@ import {
 import { withReviewPatches } from "../plugins/copilot/scripts/copilot-companion.mjs";
 import { collectReviewContext, resolveReviewTarget } from "../plugins/copilot/scripts/lib/git.mjs";
 import { resolveJobPatchDir } from "../plugins/copilot/scripts/lib/state.mjs";
-import { DIFF_ARGS, gitBytes, initGitRepo, makeTempDir } from "./helpers.mjs";
+import { DIFF_ARGS, git, gitBytes, initGitRepo, makeTempDir } from "./helpers.mjs";
 import {
   REVIEW_JSON,
   SCRIPT,
   addDirsOf,
   assertReadOnlyRun,
   findPatchDirs,
-  git,
   isAlive,
   largeText,
   makeRepo,

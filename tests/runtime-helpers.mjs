@@ -49,7 +49,6 @@ export const REVIEW_JSON = JSON.stringify({
   next_steps: ["Add the guard."]
 });
 
-export { git };
 
 export function writeFile(repo, name, text) {
   fs.mkdirSync(path.dirname(path.join(repo, name)), { recursive: true });

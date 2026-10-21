@@ -3,12 +3,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { git } from "./helpers.mjs";
 import {
   FINDING,
   REVIEW_JSON,
   addDirsOf,
   assertReadOnlyRun,
-  git,
   makeRepo,
   readJobs,
   runReview,

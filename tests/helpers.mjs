@@ -46,7 +46,7 @@ export function git(repo, ...args) {
   return result.stdout;
 }
 
-// A last line with no new line still counts, as it does for the view tool.
+// Lines end at a new line; a last line with no new line still counts.
 export function countLines(text) {
   return text === "" ? 0 : text.split("\n").length - (text.endsWith("\n") ? 1 : 0);
 }
