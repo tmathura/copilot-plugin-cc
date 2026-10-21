@@ -178,7 +178,9 @@ fix and test only for a ticket that used bug triage.
     the upstream-to-local file map from `UPSTREAM.md`. The proposed fix must be the upstream change.
   - Verdict `invalid` (the bug does not apply): do not run fix or test. Step 7 reviews
     `assessment.md` only. The PR holds `assessment.md` and the `UPSTREAM.md` row set to `skipped`
-    with the reason. Not a release.
+    with the reason, and no `review.html`. Not a release. If a review round turns the verdict
+    valid, build the folder's first page after that round's commit, as `workflow-manual` Step 6
+    does.
   - Otherwise the PR sets the row to `ported`. Differences from upstream go, with their reason, in
     the README section "Differences from the Codex plugin". The PR lists the upstream files and
     commit, and says they were read line by line.

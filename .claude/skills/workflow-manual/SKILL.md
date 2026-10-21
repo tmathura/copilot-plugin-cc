@@ -187,8 +187,8 @@ With the spec flow or bug triage, after the commit: if the planning folder (`spe
 `.specify/bugs/NNN-<slug>/`) has no `review.html`, run
 `spec-review-page` on it to build the first page, and commit the page as steps 2 and 3 of "Spec
 review page" in REFERENCE.md ("Checking review findings") say. Otherwise refresh the page where
-that rule applies. An upstream port with verdict `invalid` gets no page: its PR holds only
-`assessment.md` and the `UPSTREAM.md` row (REFERENCE.md "Bug triage", Upstream port).
+that rule applies. An upstream port with verdict `invalid` gets no page (REFERENCE.md "Bug
+triage", Upstream port, which also says what to do when the verdict changes).
 
 ## Step 7. Review round
 
