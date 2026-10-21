@@ -45,7 +45,8 @@ Rules that came from reviewer feedback. Do not relax them.
 
 1. If a spec directory was given, use it. Otherwise `git rev-parse --abbrev-ref HEAD`, take `<n>`
    from the branch `<type>/<n>-<slug>`, pad it to 3 digits (`printf '%03d' <n>`) and glob
-   `specs/NNN-*` and `.specify/bugs/NNN-*` (no trailing `/`). If nothing matches, ask for the path. The ticket number `<n>` for step 4 is the
+   `specs/NNN-*` and `.specify/bugs/NNN-*` (no trailing `/`). If nothing matches, or more than one
+   folder matches, ask for the path. The ticket number `<n>` for step 4 is the
    folder's `NNN` without its leading zeros, because the folder carries the issue number. A folder
    with no number yet (`specs/<name>/`, before the issue exists) takes `<n>` from the branch; if
    there is none, ask. Before you read any file in it, check that no folder on the way to it, nor

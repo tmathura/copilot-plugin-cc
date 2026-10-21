@@ -179,14 +179,16 @@ Never hide a timing problem with a sleep or a retry in a test.
 ## Step 6. Commit
 
 Invoke `workflow-commit` with a one-line description of the diff and the list of files this
-ticket changed. With bug triage, the list includes `.specify/bugs/NNN-<slug>/`, the path in the
-issue's `Bug notes:` line.
+ticket changed. With bug triage, the list includes the Markdown files of `.specify/bugs/NNN-<slug>/`,
+the path in the issue's `Bug notes:` line (by name, so a `review.html` or a leftover build file is
+not swept in; the page gets its own commit).
 
 With the spec flow or bug triage, after the commit: if the planning folder (`specs/NNN-<name>/` or
 `.specify/bugs/NNN-<slug>/`) has no `review.html`, run
 `spec-review-page` on it to build the first page, and commit the page as steps 2 and 3 of "Spec
 review page" in REFERENCE.md ("Checking review findings") say. Otherwise refresh the page where
-that rule applies.
+that rule applies. An upstream port with verdict `invalid` gets no page: its PR holds only
+`assessment.md` and the `UPSTREAM.md` row (REFERENCE.md "Bug triage", Upstream port).
 
 ## Step 7. Review round
 
