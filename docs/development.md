@@ -216,6 +216,8 @@ Things to know:
   "Deviations from Assessment" in `fix.md`, in the same commit.
 - The skills ask before they overwrite a report. Do not run `/speckit-bug-fix` again when `fix.md`
   exists.
+- The bug folder gets a `review.html` as a spec folder does, and the same rule refreshes it ("Spec
+  review page" under "Checking review findings" in `.claude/skills/workflow-common/REFERENCE.md`).
 
 ### Keeping the spec current
 

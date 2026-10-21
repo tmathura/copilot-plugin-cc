@@ -232,7 +232,8 @@ words) and the same evidence is rejected again with the earlier reason, with no 
 new evidence is checked again: the text it points at changed, it names a new case, or the issue now
 asks for the change. If you cannot tell, check it again.
 
-**Spec review page.** It applies when a spec folder (`specs/NNN-<name>/`) holds a `review.html` that
+**Spec review page.** It applies when a planning folder (a spec folder `specs/NNN-<name>/`, or a bug
+folder `.specify/bugs/NNN-<slug>/`) holds a `review.html` that
 `spec-review-page` built (it has the skill's marker, as the skill's Step 1 says), and a commit
 changed a Markdown file in that folder: in a review round, any commit of the round (the refresh
 waits for the round's last commit); otherwise the commit itself, such as the commit of `workflow-manual` Step 6 or of a spec sweep made outside a
@@ -249,7 +250,7 @@ changed:
    (Recommended)** / **Abort**: a skipped refresh would push a stale page, and the constitution
    asks for the page to be rebuilt in the same change.
 3. Commit the page on its own: `workflow-commit` with the description `Refresh the spec review page`
-   and the file list `specs/NNN-<name>/review.html`. This rule is the request to commit that
+   and the file list `<folder>/review.html`. This rule is the request to commit that
    `spec-review-page` Step 5 waits for.
 
 A round that changed no Markdown in the folder leaves the page alone, so its "What moved" section
