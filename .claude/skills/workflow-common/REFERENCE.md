@@ -233,9 +233,13 @@ words) and the same evidence is rejected again with the earlier reason, with no 
 new evidence is checked again: the text it points at changed, it names a new case, or the issue now
 asks for the change. If you cannot tell, check it again.
 
-**Spec review page.** It applies when a commit changed a Markdown file in a planning folder (a spec
-folder `specs/NNN-<name>/`, or a bug folder `.specify/bugs/NNN-<slug>/`), except the bug folder of
-an upstream port whose `assessment.md` verdict is `invalid`. The commit is, in a review round, any
+**Spec review page.** It applies to the ticket's own planning folder, the one in the issue's `Spec:`
+or `Bug notes:` line (a spec folder `specs/NNN-<name>/`, or a bug folder `.specify/bugs/NNN-<slug>/`),
+when a commit changed a Markdown file in it. The folder of a merged ticket is history: leave its
+page alone. An upstream port whose `assessment.md` verdict is `invalid` has no page: if a round
+turns the verdict `invalid` and the folder has a page the skill built, `git rm` the page and commit
+it with `workflow-commit`, the description `Remove the spec review page`, before the next round or
+the push. The commit is, in a review round, any
 commit of the round (the page waits for the round's last commit); otherwise the commit itself, such
 as the commit of `workflow-manual` Step 6 or of a spec sweep made outside a review round
 (`docs/development.md`, "Keeping the spec current"). Then, once for each such round or commit,
@@ -507,8 +511,8 @@ Each round:
    ("Code review round"), then the docs check of `workflow-manual` Step 7. Check the findings, fix the confirmed ones, run the commands from "Commands" again, and
    repeat until no confirmed finding is left. Then **commit** with `workflow-commit`. The body lists
    each finding and what happened to it.
-6. **Push and rewrite the PR body** with `workflow-pr`. Before the push, refresh the spec review
-   page, where it applies ("Checking review findings").
+6. **Push and rewrite the PR body** with `workflow-pr`. Before the push, build or refresh the
+   spec review page, where it applies ("Checking review findings").
 7. **Reply to every thread and resolve it.** Say what was done, or why the finding was rejected. Write
    the reply to a file and pass it with `-F body=@<file>`, because backticks in a quoted string run as
    commands:
