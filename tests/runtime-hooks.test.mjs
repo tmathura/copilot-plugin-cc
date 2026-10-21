@@ -283,15 +283,16 @@ test("above the inline limit, the gate passes the patch folder to Copilot and re
     const patches = patchesOf(copilotRun);
     assert.deepEqual(Object.keys(patches).sort(), ["unstaged-001.patch", "unstaged-002.patch", "unstaged-003.patch", "untracked.md"]);
     assert.match(patches["unstaged-003.patch"].toString("utf8"), /^diff --git a\/c\.txt b\/c\.txt\n[\s\S]*\+c\.txt v2\n/);
+    const entry = (name, label) => `- ${path.join(patchDir, name)} (${patches[name].length} bytes): ${label}`;
     assert.ok(
       copilotRun.prompt.includes(
         [
           "## Patch Files",
           "",
-          `- ${path.join(patchDir, "unstaged-001.patch")}: diff --git a/a.txt b/a.txt`,
-          `- ${path.join(patchDir, "unstaged-002.patch")}: diff --git a/b.txt b/b.txt`,
-          `- ${path.join(patchDir, "unstaged-003.patch")}: diff --git a/c.txt b/c.txt`,
-          `- ${path.join(patchDir, "untracked.md")}: untracked files`,
+          entry("unstaged-001.patch", "diff --git a/a.txt b/a.txt"),
+          entry("unstaged-002.patch", "diff --git a/b.txt b/b.txt"),
+          entry("unstaged-003.patch", "diff --git a/c.txt b/c.txt"),
+          entry("untracked.md", "untracked files"),
           ""
         ].join("\n")
       ),

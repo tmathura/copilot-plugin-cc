@@ -334,7 +334,7 @@ function buildAdversarialCollectionGuidance(options = {}) {
     return "Use the repository context below as primary evidence.";
   }
 
-  return "The repository context below is a lightweight summary. Read every patch file listed below with the view tool before finalizing findings. Each one holds the diff of one changed file.";
+  return "The repository context below is a lightweight summary. Read every patch file listed below with the view tool before finalizing findings. Each one holds the diff of one changed file, and the list gives its size. The view tool cuts a long read, so read each file to its end, in line ranges where needed.";
 }
 
 // Git writes straight to the file: a large patch has no buffer limit, and its bytes stay exact.
@@ -348,10 +348,12 @@ function writeGitOutput(cwd, args, file) {
   return file;
 }
 
-const PATCH_HEADERS = ["diff --git ", "Submodule "];
+const PATCH_HEADERS = [Buffer.from("diff --git "), Buffer.from("Submodule ")];
 
 function startsPatch(buffer, offset) {
-  return PATCH_HEADERS.some((header) => buffer.toString("latin1", offset, offset + header.length) === header);
+  return PATCH_HEADERS.some(
+    (header) => buffer.compare(header, 0, header.length, offset, Math.min(offset + header.length, buffer.length)) === 0
+  );
 }
 
 // A patch line starts with a space, "+", "-" or "\", and a binary patch line has no space, so only a
@@ -386,7 +388,7 @@ function writeSplitPatch(cwd, args, dir, name) {
   return parts.map((part, index) => {
     const file = path.join(dir, `${name}-${String(index + 1).padStart(width, "0")}.patch`);
     fs.writeFileSync(file, part, { flag: "wx", mode: 0o600 });
-    return { file, label: firstLine(part) };
+    return { file, label: firstLine(part), bytes: part.length };
   });
 }
 
@@ -400,7 +402,8 @@ export function writeReviewPatches(context, dir) {
 
   const { untracked } = getWorkingTreeState(repoRoot);
   const untrackedFile = path.join(dir, "untracked.md");
-  fs.writeFileSync(untrackedFile, untracked.map((file) => formatUntrackedFile(repoRoot, file)).join("\n\n"), {
+  const untrackedText = untracked.map((file) => formatUntrackedFile(repoRoot, file)).join("\n\n");
+  fs.writeFileSync(untrackedFile, untrackedText, {
     encoding: "utf8",
     flag: "wx",
     mode: 0o600
@@ -408,7 +411,7 @@ export function writeReviewPatches(context, dir) {
   return [
     ...writeSplitPatch(repoRoot, [...diffArgs, "--cached"], dir, "staged"),
     ...writeSplitPatch(repoRoot, diffArgs, dir, "unstaged"),
-    { file: untrackedFile, label: "untracked files" }
+    { file: untrackedFile, label: "untracked files", bytes: Buffer.byteLength(untrackedText) }
   ];
 }
 

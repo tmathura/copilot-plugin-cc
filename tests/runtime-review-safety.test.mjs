@@ -2,7 +2,7 @@
 // the review tests run the Copilot companion against the fake copilot CLI.
 import fs from "node:fs";
 import path from "node:path";
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import test from "node:test";
 import assert from "node:assert/strict";
 
@@ -17,12 +17,14 @@ import { collectReviewContext, resolveReviewTarget } from "../plugins/copilot/sc
 import { COMPANION_PLUGIN_DATA_ENV, resolveJobPatchDir } from "../plugins/copilot/scripts/lib/state.mjs";
 import { initGitRepo, makeTempDir } from "./helpers.mjs";
 import {
+  DIFF_ARGS,
   REVIEW_JSON,
   SCRIPT,
   addDirsOf,
   assertReadOnlyRun,
   findPatchDirs,
   git,
+  gitBytes,
   isAlive,
   largeText,
   makeRepo,
@@ -33,14 +35,6 @@ import {
   waitFor,
   writeFile
 } from "./runtime-helpers.mjs";
-
-const DIFF_ARGS = ["--binary", "--no-ext-diff", "--submodule=diff"];
-// Raw bytes with no buffer limit, to compare with the patch files.
-function gitBytes(repo, ...args) {
-  const result = spawnSync("git", args, { cwd: repo, maxBuffer: 64 * 1024 * 1024, windowsHide: true });
-  assert.equal(result.status, 0, String(result.stderr));
-  return result.stdout;
-}
 
 test("a review changes no file, even with --write and a Copilot that writes when it can", () => {
   for (const [subcommand, args] of [["review", []], ["adversarial-review", ["--write"]]]) {
@@ -223,18 +217,20 @@ test("above the inline limit, a working-tree review reads the exact patches from
   assert.match(patches["untracked.md"].toString("utf8"), /### new\.txt\n```\nuntracked file\n```/);
   assert.match(runs[0].prompt, /lightweight summary/i);
   assert.match(runs[0].prompt, /Read every patch file listed below with the view tool/);
+  assert.match(runs[0].prompt, /read each file to its end, in line ranges where needed/);
+  const entry = (name, label) => `- ${path.join(patchDir, name)} (${patches[name].length} bytes): ${label}`;
   assert.ok(
     runs[0].prompt.includes(
       [
         "## Patch Files",
         "",
-        `- ${path.join(patchDir, "staged-001.patch")}: diff --git a/a.txt b/a.txt`,
-        `- ${path.join(patchDir, "staged-002.patch")}: diff --git a/c.txt b/c.txt`,
-        `- ${path.join(patchDir, "staged-003.patch")}: diff --git a/deleted.txt b/deleted.txt`,
-        `- ${path.join(patchDir, "unstaged-001.patch")}: diff --git a/a.txt b/a.txt`,
-        `- ${path.join(patchDir, "unstaged-002.patch")}: diff --git a/b.txt b/b.txt`,
-        `- ${path.join(patchDir, "unstaged-003.patch")}: diff --git a/latin1.txt b/latin1.txt`,
-        `- ${path.join(patchDir, "untracked.md")}: untracked files`,
+        entry("staged-001.patch", "diff --git a/a.txt b/a.txt"),
+        entry("staged-002.patch", "diff --git a/c.txt b/c.txt"),
+        entry("staged-003.patch", "diff --git a/deleted.txt b/deleted.txt"),
+        entry("unstaged-001.patch", "diff --git a/a.txt b/a.txt"),
+        entry("unstaged-002.patch", "diff --git a/b.txt b/b.txt"),
+        entry("unstaged-003.patch", "diff --git a/latin1.txt b/latin1.txt"),
+        entry("untracked.md", "untracked files"),
         ""
       ].join("\n")
     ),
@@ -321,7 +317,8 @@ test("above the inline limit, a branch review gets one patch per changed file, w
   // The rename is one patch with both names.
   assert.match(patches["branch-003.patch"].toString("utf8"), /^diff --git a\/b\.txt b\/renamed\.txt\nsimilarity index 100%\nrename from b\.txt\nrename to renamed\.txt\n$/);
   assert.doesNotMatch(joined.toString("utf8"), /LOCAL_MARKER/);
-  assert.ok(runs[0].prompt.includes(`- ${path.join(patchDir, "branch-003.patch")}: diff --git a/b.txt b/renamed.txt\n`));
+  const renameBytes = patches["branch-003.patch"].length;
+  assert.ok(runs[0].prompt.includes(`- ${path.join(patchDir, "branch-003.patch")} (${renameBytes} bytes): diff --git a/b.txt b/renamed.txt\n`));
   assert.doesNotMatch(runs[0].prompt, /LOCAL_MARKER/);
 });
 

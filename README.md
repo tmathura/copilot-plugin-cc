@@ -303,7 +303,7 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
   review of one large patch file depended on Copilot asking again after each cut.
 - For a diff above 256 KB, the plugin writes the exact patches to a folder in its own job storage,
   one file per changed file (split at each `diff --git` and `Submodule` line), lists each file in
-  the prompt with the change it holds, lets Copilot read that folder (`--add-dir`), and deletes the
+  the prompt with its size and the change it holds, lets Copilot read that folder (`--add-dir`), and deletes the
   folder after the review. If the review is killed outright (`SIGKILL`, or `taskkill /F` on
   Windows), the folder stays until its job record is removed.
 - `/copilot:review` sends Copilot's `/review` command with the diff in the prompt. Codex uses its

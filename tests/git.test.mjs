@@ -1,6 +1,5 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): renamed for the copilot plugin; adds tests for
 // a path with spaces, and for git calls that start no hook or textconv program and write no index.
-import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -9,6 +8,7 @@ import assert from "node:assert/strict";
 
 import { collectReviewContext, getWorkingTreeState, resolveReviewTarget, writeReviewPatches } from "../plugins/copilot/scripts/lib/git.mjs";
 import { initGitRepo, makeTempDir, run } from "./helpers.mjs";
+import { DIFF_ARGS, git, gitBytes } from "./runtime-helpers.mjs";
 
 function sha256File(filePath) {
   return createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
@@ -522,21 +522,9 @@ test("collectReviewContext leaves .git/index unchanged when cached file data is 
   assert.notEqual(sha256File(indexFile), before, "plain git status refreshes the stale index entry");
 });
 
-function gitChecked(cwd, args) {
-  const result = run("git", args, { cwd });
-  assert.equal(result.status, 0, result.stderr);
-  return result.stdout;
-}
-
 // The diff that writeReviewPatches splits, as raw bytes.
 function diffBytes(cwd, ...args) {
-  const result = spawnSync("git", ["-c", "core.quotePath=false", "diff", "--binary", "--no-ext-diff", "--submodule=diff", ...args], {
-    cwd,
-    maxBuffer: 64 * 1024 * 1024,
-    windowsHide: true
-  });
-  assert.equal(result.status, 0, String(result.stderr));
-  return result.stdout;
+  return gitBytes(cwd, "-c", "core.quotePath=false", "diff", ...DIFF_ARGS, ...args);
 }
 
 function readPatches(entries) {
@@ -549,31 +537,31 @@ function makeSubmoduleRepo() {
   const sub = makeTempDir();
   initGitRepo(sub);
   fs.writeFileSync(path.join(sub, "inner.txt"), "inner v1\n");
-  gitChecked(sub, ["add", "inner.txt"]);
-  gitChecked(sub, ["commit", "-qm", "init"]);
+  git(sub, "add", "inner.txt");
+  git(sub, "commit", "-qm", "init");
 
   const cwd = makeTempDir();
   initGitRepo(cwd);
-  gitChecked(cwd, ["config", "core.autocrlf", "false"]);
+  git(cwd, "config", "core.autocrlf", "false");
   fs.writeFileSync(path.join(cwd, "bin.dat"), Buffer.from([0, 1, 2, 3]));
   fs.writeFileSync(path.join(cwd, "crlf.txt"), "one\r\ntwo\r\n");
   fs.writeFileSync(path.join(cwd, "nonl.txt"), "no end");
   fs.writeFileSync(path.join(cwd, "z.txt"), "z v1\n");
-  gitChecked(cwd, ["add", "bin.dat", "crlf.txt", "nonl.txt", "z.txt"]);
-  gitChecked(cwd, ["-c", "protocol.file.allow=always", "submodule", "add", "-q", sub, "sub"]);
-  gitChecked(cwd, ["commit", "-qm", "init"]);
-  gitChecked(cwd, ["checkout", "-q", "-b", "feature"]);
+  git(cwd, "add", "bin.dat", "crlf.txt", "nonl.txt", "z.txt");
+  git(cwd, "-c", "protocol.file.allow=always", "submodule", "add", "-q", sub, "sub");
+  git(cwd, "commit", "-qm", "init");
+  git(cwd, "checkout", "-q", "-b", "feature");
 
   const inner = path.join(cwd, "sub");
   initGitRepo(inner);
   fs.writeFileSync(path.join(inner, "inner.txt"), "inner v2\n");
-  gitChecked(inner, ["commit", "-qam", "change"]);
+  git(inner, "commit", "-qam", "change");
   fs.writeFileSync(path.join(cwd, "bin.dat"), Buffer.from([0, 9, 8, 7, 6]));
   fs.writeFileSync(path.join(cwd, "crlf.txt"), "one\r\nTWO\r\n");
   fs.writeFileSync(path.join(cwd, "nonl.txt"), "still no end");
   fs.writeFileSync(path.join(cwd, "z.txt"), "z v2\n");
-  gitChecked(cwd, ["add", "bin.dat", "crlf.txt", "nonl.txt", "sub", "z.txt"]);
-  gitChecked(cwd, ["commit", "-qm", "change"]);
+  git(cwd, "add", "bin.dat", "crlf.txt", "nonl.txt", "sub", "z.txt");
+  git(cwd, "commit", "-qm", "change");
   fs.writeFileSync(path.join(inner, "inner.txt"), "inner dirty\n");
   return cwd;
 }
@@ -585,8 +573,9 @@ test("writeReviewPatches splits a branch diff into exact patches at each file an
 
   const entries = writeReviewPatches(context, dir);
 
-  const mergeBase = gitChecked(cwd, ["merge-base", "HEAD", "main"]).trim();
+  const mergeBase = git(cwd, "merge-base", "HEAD", "main").trim();
   assert.ok(readPatches(entries).equals(diffBytes(cwd, `${mergeBase}..HEAD`)));
+  assert.ok(entries.every(({ file, bytes }) => bytes === fs.statSync(file).size));
   const names = ["001", "002", "003", "004", "005", "006"].map((number) => `branch-${number}.patch`);
   assert.deepEqual(entries.map(({ file }) => path.basename(file)), names);
   assert.deepEqual(fs.readdirSync(dir).sort(), names);
@@ -614,22 +603,22 @@ test("writeReviewPatches gives a dirty submodule line its own patch and writes n
   assert.ok(readPatches(patches).equals(diffBytes(cwd)));
   assert.ok(patches.some(({ label }) => label === "Submodule sub contains modified content"), JSON.stringify(entries));
   assert.ok(patches.every(({ label }) => /^(diff --git |Submodule )/.test(label)));
-  assert.deepEqual(entries.at(-1), { file: path.join(dir, "untracked.md"), label: "untracked files" });
+  assert.deepEqual(entries.at(-1), { file: path.join(dir, "untracked.md"), label: "untracked files", bytes: 0 });
 });
 
 test("writeReviewPatches numbers 1000 patches with 4 digits, in diff order", () => {
   const cwd = makeTempDir();
   initGitRepo(cwd);
   fs.writeFileSync(path.join(cwd, "base.txt"), "base\n");
-  gitChecked(cwd, ["add", "base.txt"]);
-  gitChecked(cwd, ["commit", "-qm", "init"]);
-  gitChecked(cwd, ["checkout", "-q", "-b", "feature"]);
+  git(cwd, "add", "base.txt");
+  git(cwd, "commit", "-qm", "init");
+  git(cwd, "checkout", "-q", "-b", "feature");
   const names = Array.from({ length: 1000 }, (_, index) => `f${String(index).padStart(4, "0")}.txt`);
   for (const name of names) {
     fs.writeFileSync(path.join(cwd, name), `${name}\n`);
   }
-  gitChecked(cwd, ["add", "."]);
-  gitChecked(cwd, ["commit", "-qm", "many"]);
+  git(cwd, "add", ".");
+  git(cwd, "commit", "-qm", "many");
   const context = collectReviewContext(cwd, resolveReviewTarget(cwd, { base: "main" }), { maxInlineFiles: 0 });
 
   const entries = writeReviewPatches(context, makeTempDir());

@@ -10,7 +10,7 @@ A review now puts the whole diff in the prompt when it is at most 256 KB, whatev
 the default of `maxInlineFiles` in `collectReviewContext` becomes no limit. Above 256 KB,
 `writeReviewPatches` splits each `git diff` output at its `diff --git` and `Submodule` lines into
 one numbered patch per changed file (research §2), and `withReviewPatches` lists each patch with
-its first line. The
+its size and first line (research §3). The
 folder, its removal and the stop-time gate path stay as they are (research §1 to §3). The "Blind
 plan" rule gets one line for files outside the repo (research §5).
 
@@ -68,7 +68,7 @@ specs/108-copilot-reviews-whole-diff/
 
 ```text
 plugins/copilot/scripts/lib/git.mjs            # default maxInlineFiles; per-file split in writeReviewPatches; guidance text
-plugins/copilot/scripts/copilot-companion.mjs  # withReviewPatches lists each patch with its file
+plugins/copilot/scripts/copilot-companion.mjs  # withReviewPatches lists each patch with its size and file
 plugins/copilot/scripts/stop-review-gate-hook.mjs  # comment only, it already uses withReviewPatches
 .claude/skills/workflow-common/REFERENCE.md    # "Blind plan" line for files outside the repo
 tests/git.test.mjs                             # 3 files inline; split helper

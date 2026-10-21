@@ -83,9 +83,15 @@ different runs, so the test compares only what was read.
 
 ## §3 Prompt list
 
-- **Decision**: the `## Patch Files` section lists `- <patch path>: <first line of the patch>` (untracked:
-  `- <path>: untracked files`). The guidance asks Copilot to read every listed file.
-- **Rationale**: Copilot can see which file each patch holds and which it has not read.
+- **Decision** (changed 2026-10-21, code review round 1): the `## Patch Files` section lists
+  `- <patch path> (<size> bytes): <first line of the patch>` (untracked:
+  `- <path> (<size> bytes): untracked files`). The guidance asks Copilot to read every listed file
+  to its end, in line ranges where needed, because the `view` tool cuts a long read.
+- **Rationale**: Copilot can see which file each patch holds and which it has not read. One
+  changed file above about 40 KB is still one patch (spec edge cases), so the size tells Copilot
+  that a read was cut. Rejected alternatives: the list without sizes and no word about cut reads
+  (the first plan; Copilot and `code-review` found that a large single-file patch gave no hint);
+  splitting one file's patch into parts (more code, and a part would hold half a hunk).
 
 ## §4 The port spec
 

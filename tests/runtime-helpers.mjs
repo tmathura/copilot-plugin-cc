@@ -1,5 +1,6 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): split out of tests/runtime.test.mjs;
 // the shared helpers of the runtime tests, which run the Copilot companion against the fake copilot CLI.
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import assert from "node:assert/strict";
@@ -52,6 +53,14 @@ export const REVIEW_JSON = JSON.stringify({
 export function git(repo, ...args) {
   const result = run("git", args, { cwd: repo });
   assert.equal(result.status, 0, result.stderr);
+  return result.stdout;
+}
+
+export const DIFF_ARGS = ["--binary", "--no-ext-diff", "--submodule=diff"];
+// Raw bytes with no buffer limit, to compare with the patch files.
+export function gitBytes(repo, ...args) {
+  const result = spawnSync("git", args, { cwd: repo, maxBuffer: 64 * 1024 * 1024, windowsHide: true });
+  assert.equal(result.status, 0, String(result.stderr));
   return result.stdout;
 }
 

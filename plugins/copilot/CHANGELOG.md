@@ -7,8 +7,8 @@
 - A review now gives Copilot the whole diff in its prompt up to 256 KB, whatever the number of
   changed files. Before, a change of more than 2 files went to one patch file, which Copilot could
   read only in parts.
-- Above 256 KB, a review gives Copilot one patch file per changed file, with a list that says which
-  change each file holds. This also holds for the review gate.
+- Above 256 KB, a review gives Copilot one patch file per changed file, with a list that gives
+  each file's size and the change it holds. This also holds for the review gate.
 
 ### 1.0.17
 
