@@ -178,9 +178,8 @@ fix and test only for a ticket that used bug triage.
     the upstream-to-local file map from `UPSTREAM.md`. The proposed fix must be the upstream change.
   - Verdict `invalid` (the bug does not apply): do not run fix or test. Step 7 reviews
     `assessment.md` only. The PR holds `assessment.md` and the `UPSTREAM.md` row set to `skipped`
-    with the reason, and no `review.html`. Not a release. If a review round turns the verdict
-    valid, build the folder's first page after that round's commit, as `workflow-manual` Step 6
-    does.
+    with the reason, and no `review.html` while the verdict is `invalid` ("Spec review page"). Not
+    a release.
   - Otherwise the PR sets the row to `ported`. Differences from upstream go, with their reason, in
     the README section "Differences from the Codex plugin". The PR lists the upstream files and
     commit, and says they were read line by line.
@@ -234,14 +233,14 @@ words) and the same evidence is rejected again with the earlier reason, with no 
 new evidence is checked again: the text it points at changed, it names a new case, or the issue now
 asks for the change. If you cannot tell, check it again.
 
-**Spec review page.** It applies when a planning folder (a spec folder `specs/NNN-<name>/`, or a bug
-folder `.specify/bugs/NNN-<slug>/`) holds a `review.html` that
-`spec-review-page` built (it has the skill's marker, as the skill's Step 1 says), and a commit
-changed a Markdown file in that folder: in a review round, any commit of the round (the refresh
-waits for the round's last commit); otherwise the commit itself, such as the commit of `workflow-manual` Step 6 or of a spec sweep made outside a
-review round (`docs/development.md`, "Keeping the spec current"). Then refresh it once for each such round or
-commit, before the next round or the push, so that its "What moved" section shows what that round
-changed:
+**Spec review page.** It applies when a commit changed a Markdown file in a planning folder (a spec
+folder `specs/NNN-<name>/`, or a bug folder `.specify/bugs/NNN-<slug>/`), except the bug folder of
+an upstream port whose `assessment.md` verdict is `invalid`. The commit is, in a review round, any
+commit of the round (the page waits for the round's last commit); otherwise the commit itself, such
+as the commit of `workflow-manual` Step 6 or of a spec sweep made outside a review round
+(`docs/development.md`, "Keeping the spec current"). Then, once for each such round or commit,
+before the next round or the push: if the folder has no `review.html`, build its first page;
+otherwise refresh the page, so that its "What moved" section shows what that round changed:
 
 1. Wait for the last commit. A Codex and Copilot round inside a PR review loop round (step 4 there)
    is part of that round and does not refresh the page itself. The refresh counts the Markdown that
@@ -256,7 +255,8 @@ changed:
    `spec-review-page` Step 5 waits for.
 
 A round that changed no Markdown in the folder leaves the page alone, so its "What moved" section
-is not reset to nothing. A `review.html` without the marker was written by hand: leave it alone.
+is not reset to nothing. A `review.html` without the skill's marker (its Step 1) was written by
+hand: leave it alone.
 
 ## Blind plan
 

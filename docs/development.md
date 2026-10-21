@@ -216,10 +216,11 @@ Things to know:
   "Deviations from Assessment" in `fix.md`, in the same commit.
 - The skills ask before they overwrite a report. Do not run `/speckit-bug-fix` again when `fix.md`
   exists.
-- The bug folder gets a `review.html` as a spec folder does, and the same rule refreshes it ("Spec
-  review page" under "Checking review findings" in `.claude/skills/workflow-common/REFERENCE.md`).
-  An upstream port with verdict `invalid` gets none: its PR holds only `assessment.md` and the
-  `UPSTREAM.md` row.
+- The bug folder gets a `review.html` as a spec folder does, by the same rule, which builds the
+  first page and refreshes it ("Spec review page" under "Checking review findings" in
+  `.claude/skills/workflow-common/REFERENCE.md`). An upstream port with verdict `invalid` gets
+  none: its PR holds only `assessment.md` and the `UPSTREAM.md` row. If a review round changes the
+  verdict, the next round commit builds the page.
 
 ### Keeping the spec current
 
