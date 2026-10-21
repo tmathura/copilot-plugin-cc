@@ -141,7 +141,7 @@ only the repo.
 - **Review input**: the prompt text that Copilot gets: either the inline diff, or a summary and the
   list of patch files.
 - **Patch folder**: `jobs/<job id>.patches` in the plugin's job storage, which holds the per-file
-  patches and `untracked.md`.
+  patches, and for the working tree and the gate also `untracked.md`.
 
 ## Success Criteria *(mandatory)*
 
