@@ -205,7 +205,12 @@ export function makeQueuedTask(cwd, prompt = "fix the bug") {
 export const GATE_HOOK = path.join(PLUGIN_ROOT, "scripts", "stop-review-gate-hook.mjs");
 export const GATE_TITLE = "Copilot Stop Gate Review";
 
-// Three changed files: above the inline limit of two, so the gate writes a patch folder.
+// About 300 KB: a diff that adds it is above the 256 KB inline limit.
+export function largeText(firstLine) {
+  return `${firstLine}\n${Array.from({ length: 3000 }, (_, index) => `line ${index} ${"x".repeat(90)}`).join("\n")}\n`;
+}
+
+// Three changed files and a diff above the inline limit, so the gate writes a patch folder.
 export function makeLargeRepo() {
   const repo = makeTempDir();
   initGitRepo(repo);
@@ -214,9 +219,9 @@ export function makeLargeRepo() {
   }
   git(repo, "add", ".");
   git(repo, "commit", "-q", "-m", "init");
-  for (const name of ["a.txt", "b.txt", "c.txt"]) {
-    writeFile(repo, name, `${name} v2\n`);
-  }
+  writeFile(repo, "a.txt", "a.txt v2\n");
+  writeFile(repo, "b.txt", "b.txt v2\n");
+  writeFile(repo, "c.txt", largeText("c.txt v2"));
   return repo;
 }
 

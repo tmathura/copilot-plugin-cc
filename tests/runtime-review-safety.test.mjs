@@ -12,6 +12,9 @@ import {
   readFakeCopilotRuns,
   readFakeVersionPids
 } from "./fake-copilot-fixture.mjs";
+import { withReviewPatches } from "../plugins/copilot/scripts/copilot-companion.mjs";
+import { collectReviewContext, resolveReviewTarget } from "../plugins/copilot/scripts/lib/git.mjs";
+import { COMPANION_PLUGIN_DATA_ENV, resolveJobPatchDir } from "../plugins/copilot/scripts/lib/state.mjs";
 import { initGitRepo, makeTempDir } from "./helpers.mjs";
 import {
   REVIEW_JSON,
@@ -21,6 +24,7 @@ import {
   findPatchDirs,
   git,
   isAlive,
+  largeText,
   makeRepo,
   patchesOf,
   readJobs,
@@ -198,20 +202,44 @@ test("above the inline limit, a working-tree review reads the exact patches from
   assert.ok(patchDir);
   assert.equal(fs.existsSync(patchDir), false);
   const patches = patchesOf(runs[0]);
-  assert.deepEqual(Object.keys(patches).sort(), ["staged.patch", "unstaged.patch", "untracked.md"]);
-  assert.ok(patches["staged.patch"].equals(gitBytes(repo, "diff", "--cached", ...DIFF_ARGS)));
-  assert.ok(patches["unstaged.patch"].equals(gitBytes(repo, "diff", ...DIFF_ARGS)));
-  assert.ok(patches["staged.patch"].length > 1024 * 1024);
-  assert.ok(patches["unstaged.patch"].includes(Buffer.from([0x2b, 0x63, 0x61, 0x66, 0xe9, 0x0a])));
-  const staged = patches["staged.patch"].toString("utf8");
-  assert.match(staged, /deleted file mode 100644\n[^\n]*\n--- a\/deleted\.txt/);
-  assert.match(staged, /\+a\.txt STAGED_MARKER/);
-  assert.match(staged, /\+BIG_END\n/);
-  assert.match(patches["unstaged.patch"].toString("utf8"), /-a\.txt STAGED_MARKER\n\+a\.txt UNSTAGED_MARKER/);
+  assert.deepEqual(Object.keys(patches).sort(), [
+    "staged-001.patch",
+    "staged-002.patch",
+    "staged-003.patch",
+    "unstaged-001.patch",
+    "unstaged-002.patch",
+    "unstaged-003.patch",
+    "untracked.md"
+  ]);
+  const join = (prefix) => Buffer.concat(["001", "002", "003"].map((number) => patches[`${prefix}-${number}.patch`]));
+  assert.ok(join("staged").equals(gitBytes(repo, "diff", "--cached", ...DIFF_ARGS)));
+  assert.ok(join("unstaged").equals(gitBytes(repo, "diff", ...DIFF_ARGS)));
+  assert.ok(patches["staged-002.patch"].length > 1024 * 1024);
+  assert.ok(patches["unstaged-003.patch"].includes(Buffer.from([0x2b, 0x63, 0x61, 0x66, 0xe9, 0x0a])));
+  assert.match(patches["staged-001.patch"].toString("utf8"), /^diff --git a\/a\.txt b\/a\.txt\n[\s\S]*\+a\.txt STAGED_MARKER/);
+  assert.match(patches["staged-002.patch"].toString("utf8"), /^diff --git a\/c\.txt b\/c\.txt\n[\s\S]*\+BIG_END\n$/);
+  assert.match(patches["staged-003.patch"].toString("utf8"), /^diff --git a\/deleted\.txt b\/deleted\.txt\ndeleted file mode 100644\n[^\n]*\n--- a\/deleted\.txt/);
+  assert.match(patches["unstaged-001.patch"].toString("utf8"), /-a\.txt STAGED_MARKER\n\+a\.txt UNSTAGED_MARKER/);
   assert.match(patches["untracked.md"].toString("utf8"), /### new\.txt\n```\nuntracked file\n```/);
   assert.match(runs[0].prompt, /lightweight summary/i);
-  assert.match(runs[0].prompt, /with the view tool/);
-  assert.ok(runs[0].prompt.includes(`## Patch Files\n\n- ${path.join(patchDir, "staged.patch")}\n`));
+  assert.match(runs[0].prompt, /Read every patch file listed below with the view tool/);
+  assert.ok(
+    runs[0].prompt.includes(
+      [
+        "## Patch Files",
+        "",
+        `- ${path.join(patchDir, "staged-001.patch")}: diff --git a/a.txt b/a.txt`,
+        `- ${path.join(patchDir, "staged-002.patch")}: diff --git a/c.txt b/c.txt`,
+        `- ${path.join(patchDir, "staged-003.patch")}: diff --git a/deleted.txt b/deleted.txt`,
+        `- ${path.join(patchDir, "unstaged-001.patch")}: diff --git a/a.txt b/a.txt`,
+        `- ${path.join(patchDir, "unstaged-002.patch")}: diff --git a/b.txt b/b.txt`,
+        `- ${path.join(patchDir, "unstaged-003.patch")}: diff --git a/latin1.txt b/latin1.txt`,
+        `- ${path.join(patchDir, "untracked.md")}: untracked files`,
+        ""
+      ].join("\n")
+    ),
+    runs[0].prompt
+  );
   assert.doesNotMatch(runs[0].prompt, /STAGED_MARKER|UNSTAGED_MARKER|BIG_END/);
   assert.deepEqual(snapshot(repo), before);
 });
@@ -233,9 +261,10 @@ test(
       }
       git(repo, "add", ".");
       git(repo, "commit", "-q", "-m", "init");
-      for (const name of ["a.txt", "b.txt", "c.txt"]) {
+      for (const name of ["a.txt", "b.txt"]) {
         writeFile(repo, name, `${name} v2\n`);
       }
+      writeFile(repo, "c.txt", largeText("c.txt v2"));
       const binDir = makeTempDir();
       const dataDir = makeTempDir();
       const { recordPath } = installFakeCopilot(binDir, behavior);
@@ -263,7 +292,7 @@ test(
   }
 );
 
-test("above the inline limit, a branch review gets only the branch patch, without local edits", () => {
+test("above the inline limit, a branch review gets one patch per changed file, without local edits", () => {
   const repo = makeTempDir();
   initGitRepo(repo);
   for (const name of ["a.txt", "b.txt", "c.txt"]) {
@@ -272,9 +301,9 @@ test("above the inline limit, a branch review gets only the branch patch, withou
   git(repo, "add", ".");
   git(repo, "commit", "-q", "-m", "init");
   git(repo, "checkout", "-q", "-b", "feature");
-  for (const name of ["a.txt", "b.txt", "c.txt"]) {
-    writeFile(repo, name, `${name} BRANCH_MARKER\n`);
-  }
+  writeFile(repo, "a.txt", "a.txt BRANCH_MARKER\n");
+  writeFile(repo, "c.txt", largeText("c.txt BRANCH_MARKER"));
+  git(repo, "mv", "b.txt", "renamed.txt");
   git(repo, "commit", "-qam", "change");
   writeFile(repo, "a.txt", "a.txt LOCAL_MARKER\n");
 
@@ -284,12 +313,64 @@ test("above the inline limit, a branch review gets only the branch patch, withou
   const [patchDir] = addDirsOf(runs[0]);
   assert.equal(fs.existsSync(patchDir), false);
   const patches = patchesOf(runs[0]);
-  assert.deepEqual(Object.keys(patches), ["branch.patch"]);
+  assert.deepEqual(Object.keys(patches).sort(), ["branch-001.patch", "branch-002.patch", "branch-003.patch"]);
   const mergeBase = git(repo, "merge-base", "HEAD", "main").trim();
-  assert.ok(patches["branch.patch"].equals(gitBytes(repo, "diff", ...DIFF_ARGS, `${mergeBase}..HEAD`)));
-  assert.match(patches["branch.patch"].toString("utf8"), /BRANCH_MARKER/);
-  assert.doesNotMatch(patches["branch.patch"].toString("utf8"), /LOCAL_MARKER/);
+  const joined = Buffer.concat(Object.keys(patches).sort().map((name) => patches[name]));
+  assert.ok(joined.equals(gitBytes(repo, "diff", ...DIFF_ARGS, `${mergeBase}..HEAD`)));
+  assert.match(patches["branch-002.patch"].toString("utf8"), /^diff --git a\/c\.txt b\/c\.txt\n[\s\S]*\+c\.txt BRANCH_MARKER\n/);
+  // The rename is one patch with both names.
+  assert.match(patches["branch-003.patch"].toString("utf8"), /^diff --git a\/b\.txt b\/renamed\.txt\nsimilarity index 100%\nrename from b\.txt\nrename to renamed\.txt\n$/);
+  assert.doesNotMatch(joined.toString("utf8"), /LOCAL_MARKER/);
+  assert.ok(runs[0].prompt.includes(`- ${path.join(patchDir, "branch-003.patch")}: diff --git a/b.txt b/renamed.txt\n`));
   assert.doesNotMatch(runs[0].prompt, /LOCAL_MARKER/);
+});
+
+test("a patch file that cannot be written stops the review before Copilot starts and removes the folder", async (t) => {
+  const repo = makeTempDir();
+  initGitRepo(repo);
+  for (const name of ["a.txt", "b.txt"]) {
+    writeFile(repo, name, `${name} v1\n`);
+  }
+  git(repo, "add", ".");
+  git(repo, "commit", "-q", "-m", "init");
+  for (const name of ["a.txt", "b.txt"]) {
+    writeFile(repo, name, `${name} v2\n`);
+  }
+  const workspaceRoot = makeTempDir();
+  const previous = { [COMPANION_PLUGIN_DATA_ENV]: process.env[COMPANION_PLUGIN_DATA_ENV], CLAUDE_PLUGIN_DATA: process.env.CLAUDE_PLUGIN_DATA };
+  delete process.env[COMPANION_PLUGIN_DATA_ENV];
+  process.env.CLAUDE_PLUGIN_DATA = makeTempDir();
+  t.after(() => {
+    for (const [name, value] of Object.entries(previous)) {
+      if (value === undefined) {
+        delete process.env[name];
+      } else {
+        process.env[name] = value;
+      }
+    }
+  });
+  const patchDir = resolveJobPatchDir(workspaceRoot, "review-write-fail");
+  const context = collectReviewContext(repo, resolveReviewTarget(repo, {}), { maxInlineFiles: 0 });
+  const writeFileSync = fs.writeFileSync;
+  let patchWrites = 0;
+  t.mock.method(fs, "writeFileSync", (file, ...rest) => {
+    if (String(file).endsWith(".patch") && ++patchWrites === 2) {
+      throw Object.assign(new Error("disk full"), { code: "ENOSPC" });
+    }
+    return writeFileSync(file, ...rest);
+  });
+  let started = false;
+
+  await assert.rejects(
+    withReviewPatches(context, { workspaceRoot, jobId: "review-write-fail" }, () => {
+      started = true;
+    }),
+    /disk full/
+  );
+
+  assert.equal(patchWrites, 2);
+  assert.equal(started, false);
+  assert.equal(fs.existsSync(patchDir), false);
 });
 
 test("above the inline limit, a branch review keeps a trailing no-break space on the last changed file name", () => {
@@ -302,7 +383,8 @@ test("above the inline limit, a branch review keeps a trailing no-break space on
   git(repo, "add", ".");
   git(repo, "commit", "-q", "-m", "init");
   git(repo, "checkout", "-q", "-b", "feature");
-  for (const name of names) {
+  writeFile(repo, "a.txt", largeText("a.txt v2"));
+  for (const name of names.slice(1)) {
     writeFile(repo, name, `${name} v2\n`);
   }
   git(repo, "commit", "-qam", "change");

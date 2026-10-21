@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Changed from upstream codex-plugin-cc (Apache-2.0): ported from stop-review-gate-hook.mjs for the
-// Copilot CLI. The prompt holds the working-tree context, with the exact patches in a folder above the
-// inline limit, and reaches the companion on stdin. The run limit is 840 s from the hook's start; on
+// Copilot CLI. The prompt holds the working-tree context, with one exact patch per changed file in a
+// folder above the inline limit, and reaches the companion on stdin. The run limit is 840 s from the hook's start; on
 // the limit, or when the hook itself is stopped, the hook stops the companion's process tree and
 // cancels its job, which stops the job's Copilot process, also when the companion saved the job as
 // failed while it was being stopped; it also cancels the job of a companion that ended before its job
