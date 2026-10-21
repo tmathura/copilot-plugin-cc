@@ -23,6 +23,7 @@ export function run(command, args, options = {}) {
     encoding: "utf8",
     input: options.input,
     shell: false,
+    timeout: options.timeout,
     windowsHide: true
   });
 }

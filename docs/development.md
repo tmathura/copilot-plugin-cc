@@ -216,6 +216,11 @@ Things to know:
   "Deviations from Assessment" in `fix.md`, in the same commit.
 - The skills ask before they overwrite a report. Do not run `/speckit-bug-fix` again when `fix.md`
   exists.
+- The bug folder gets a `review.html` as a spec folder does, by the same rule, which builds the
+  first page and refreshes it ("Spec review page" under "Checking review findings" in
+  `.claude/skills/workflow-common/REFERENCE.md`). An upstream port with verdict `invalid` gets
+  none: its PR holds only `assessment.md` and the `UPSTREAM.md` row. If a review round changes the
+  verdict, the same rule builds or removes the page after that round's commit.
 
 ### Keeping the spec current
 
@@ -232,9 +237,10 @@ one sweep before you push:
    `spec.md`; `plan.md` (summary, Technical Context, Constitution Check, project structure and
    phases); `data-model.md`; `contracts/`; the `tasks.md` task that did the work (add a suffixed
    task, such as `T053b`, if work was added); `checklists/`; and any file the feature added.
-3. Rebuild any page that is built from the spec folder.
-4. Run `/speckit-analyze` and fix what it finds.
-5. Commit the spec changes with the code, in the same commit.
+3. Run `/speckit-analyze` and fix what it finds.
+4. Commit the spec changes with the code, in the same commit.
+5. Then build or refresh the spec review page where it applies ("Spec review page" under "Checking review
+   findings" in `.claude/skills/workflow-common/REFERENCE.md`).
 
 A change written only in a PR body or a commit message does not count.
 

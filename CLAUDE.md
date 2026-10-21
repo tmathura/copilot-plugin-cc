@@ -28,6 +28,7 @@ specs/005-copilot-plugin-port/    the port spec: transport decision, call-site m
 .specify/                         Spec Kit: constitution, templates, scripts, the bug extension, bug notes
 .claude/skills/speckit-*          Spec Kit skills (managed, do not edit)
 .claude/skills/workflow-*         the ticket workflow skills (written for this repo, edit as normal)
+.claude/skills/spec-review-page   builds review.html, a one-page reading aid, in a spec or bug folder
 ```
 
 ## Commands

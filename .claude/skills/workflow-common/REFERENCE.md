@@ -47,6 +47,7 @@ Tools that must be on the PATH:
 | `gh` | 2.48 or later (the review poll uses `gh api --slurp`). `gh auth status` shows a login, and `gh api repos/tmathura/copilot-plugin-cc --jq .permissions.push` prints `true` |
 | `node` | Codex, Copilot and the review poll use it |
 | `specify` | only for Spec Kit |
+| `uv` | Spec Kit setup, and `spec-review-page` (its build command is in the skill's Step 4) |
 
 If `command -v <tool>` prints nothing, stop and tell the user what to install. If a tool was just
 installed and is still not found, ask the user to restart Claude Code. The shell can be older than the
@@ -177,7 +178,8 @@ fix and test only for a ticket that used bug triage.
     the upstream-to-local file map from `UPSTREAM.md`. The proposed fix must be the upstream change.
   - Verdict `invalid` (the bug does not apply): do not run fix or test. Step 7 reviews
     `assessment.md` only. The PR holds `assessment.md` and the `UPSTREAM.md` row set to `skipped`
-    with the reason. Not a release.
+    with the reason, and no `review.html` while the verdict is `invalid` ("Spec review page"). Not
+    a release.
   - Otherwise the PR sets the row to `ported`. Differences from upstream go, with their reason, in
     the README section "Differences from the Codex plugin". The PR lists the upstream files and
     commit, and says they were read line by line.
@@ -230,6 +232,35 @@ A rejected finding that comes back in a later round with the same point (by its 
 words) and the same evidence is rejected again with the earlier reason, with no new check. One with
 new evidence is checked again: the text it points at changed, it names a new case, or the issue now
 asks for the change. If you cannot tell, check it again.
+
+**Spec review page.** It applies to the ticket's own planning folder, the one in the issue's `Spec:`
+or `Bug notes:` line (a spec folder `specs/NNN-<name>/`, or a bug folder `.specify/bugs/NNN-<slug>/`),
+when a commit changed a Markdown file in it: in a review round, any commit of the round (a Codex
+and Copilot round inside a PR review loop round, step 4 there, is part of that round); otherwise
+the commit itself, such as the commit of `workflow-manual` Step 6 or of a spec sweep made outside a
+review round (`docs/development.md`, "Keeping the spec current"). The folder of a merged ticket is
+history: leave its page alone. Once for each such round or commit, after its last commit and before
+the next round or the push, with every change in the folder in a commit (so the folder is clean
+and a new page's snapshot is that commit, not `-wip`), do one of these:
+
+- **An upstream port whose `assessment.md` verdict is now `invalid`** has no page. If the folder
+  has a page the skill built, `git rm` it and commit with `workflow-commit`, the description
+  `Remove the spec review page` and the file list `<folder>/review.html`. Otherwise do nothing.
+  Skip steps 1 and 2 below.
+- **Any other folder:** if it has no `review.html`, build its first page; otherwise refresh the
+  page, so that its "What moved" section shows what that round changed. Do steps 1 and 2 below.
+
+1. Run `spec-review-page` on the folder (pass it). The build must print `missing anchors: 0`. A
+   build that fails is a step skill that fails ("Questions to the user"), but ask only **Retry
+   (Recommended)** / **Abort**: a skipped refresh would push a stale page, and the constitution
+   asks for the page to be rebuilt in the same change.
+2. Commit the page on its own: `workflow-commit` with the description `Refresh the spec review page`
+   and the file list `<folder>/review.html`. This rule is the request to commit that
+   `spec-review-page` Step 5 waits for.
+
+A round that changed no Markdown in the folder leaves the page alone, so its "What moved" section
+is not reset to nothing. A `review.html` without the skill's marker (its Step 1) was written by
+hand: leave it alone.
 
 ## Blind plan
 
@@ -480,7 +511,8 @@ Each round:
    ("Code review round"), then the docs check of `workflow-manual` Step 7. Check the findings, fix the confirmed ones, run the commands from "Commands" again, and
    repeat until no confirmed finding is left. Then **commit** with `workflow-commit`. The body lists
    each finding and what happened to it.
-6. **Push and rewrite the PR body** with `workflow-pr`.
+6. **Push and rewrite the PR body** with `workflow-pr`. Before the push, build, refresh or
+   remove the spec review page, where it applies ("Checking review findings").
 7. **Reply to every thread and resolve it.** Say what was done, or why the finding was rejected. Write
    the reply to a file and pass it with `-F body=@<file>`, because backticks in a quoted string run as
    commands:
@@ -520,7 +552,7 @@ Decide in Step 4, from the files the ticket changes:
 | The PR changes | Release? |
 | --- | --- |
 | Anything under `plugins/copilot/`, or `.claude-plugin/marketplace.json` | Yes. Claude Code updates an installed plugin by its version, so a shipped change with no new version can stay unseen by users. |
-| Only files outside those: `docs/`, `specs/`, `tests/`, `.github/`, `.specify/`, `.claude/`, `scripts/`, `package.json`, `package-lock.json`, `tsconfig.*.json`, `README.md`, `CLAUDE.md`, `UPSTREAM.md`, `NOTICE`, `.gitignore` | No. These are not part of the installed plugin. |
+| Only files outside those: `docs/`, `specs/`, `tests/`, `.github/`, `.specify/`, `.claude/`, `scripts/`, `package.json`, `package-lock.json`, `tsconfig.*.json`, `README.md`, `CLAUDE.md`, `UPSTREAM.md`, `NOTICE`, `.gitignore`, `.gitattributes` | No. These are not part of the installed plugin. |
 
 For a release, pick the level by what users see (SemVer, as the constitution says):
 

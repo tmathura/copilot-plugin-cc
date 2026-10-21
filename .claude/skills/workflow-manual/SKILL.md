@@ -179,8 +179,12 @@ Never hide a timing problem with a sleep or a retry in a test.
 ## Step 6. Commit
 
 Invoke `workflow-commit` with a one-line description of the diff and the list of files this
-ticket changed. With bug triage, the list includes `.specify/bugs/NNN-<slug>/`, the path in the
-issue's `Bug notes:` line.
+ticket changed. With bug triage, the list includes the Markdown files of `.specify/bugs/NNN-<slug>/`,
+the path in the issue's `Bug notes:` line. List a planning folder's files by name, not the folder,
+so a `review.html` or a leftover build file is not swept in; the page gets its own commit.
+
+With the spec flow or bug triage, after the commit, build, refresh or remove the planning folder's
+spec review page as "Spec review page" in REFERENCE.md ("Checking review findings") says.
 
 ## Step 7. Review round
 
@@ -198,7 +202,8 @@ starts a new round on the current head.
    `fix.md` (REFERENCE.md "Bug triage", Edits). Commit with `workflow-commit`, the description
    `Address review round <k>` and a body that gives the outcome of each finding, with the record
    that REFERENCE.md "Code review round" describes. A round that fixes nothing commits as that
-   section says. Then run the next round, until the loop ends by its
+   section says. After the round commit, build, refresh or remove the spec review page where it applies
+   (REFERENCE.md "Checking review findings"). Then run the next round, until the loop ends by its
    rules.
 
 ## Step 8. Push and PR
