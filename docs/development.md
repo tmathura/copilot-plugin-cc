@@ -239,7 +239,7 @@ one sweep before you push:
    task, such as `T053b`, if work was added); `checklists/`; and any file the feature added.
 3. Run `/speckit-analyze` and fix what it finds.
 4. Commit the spec changes with the code, in the same commit.
-5. Then build, refresh or remove the spec review page where it applies ("Spec review page" under "Checking review
+5. Then build or refresh the spec review page where it applies ("Spec review page" under "Checking review
    findings" in `.claude/skills/workflow-common/REFERENCE.md`).
 
 A change written only in a PR body or a commit message does not count.

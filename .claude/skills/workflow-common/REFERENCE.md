@@ -243,13 +243,13 @@ the next round or the push, do one of these:
 
 - **An upstream port whose `assessment.md` verdict is now `invalid`** has no page. If the folder
   has a page the skill built, `git rm` it and commit with `workflow-commit`, the description
-  `Remove the spec review page`. Otherwise do nothing.
+  `Remove the spec review page`. Otherwise do nothing. Skip steps 1 to 3 below.
 - **Any other folder:** if it has no `review.html`, build its first page; otherwise refresh the
-  page, so that its "What moved" section shows what that round changed:
+  page, so that its "What moved" section shows what that round changed. Do steps 1 to 3 below.
 
-1. Wait for the last commit. A Codex and Copilot round inside a PR review loop round (step 4 there)
-   is part of that round and does not refresh the page itself. The refresh counts the Markdown that
-   any commit of the round changed. Every change in the folder must be in a commit, so the folder is
+1. A Codex and Copilot round inside a PR review loop round (step 4 there) is part of that round
+   and does not refresh the page itself. The refresh counts the Markdown that any commit of the
+   round changed. Every change in the folder must be in a commit, so the folder is
    clean and the page's snapshot is that commit, not `-wip`.
 2. Run `spec-review-page` on the folder (pass it). The build must print `missing anchors: 0`. A
    build that fails is a step skill that fails ("Questions to the user"), but ask only **Retry

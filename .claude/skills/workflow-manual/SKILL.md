@@ -183,8 +183,8 @@ ticket changed. With bug triage, the list includes the Markdown files of `.speci
 the path in the issue's `Bug notes:` line. List a planning folder's files by name, not the folder,
 so a `review.html` or a leftover build file is not swept in; the page gets its own commit.
 
-With the spec flow or bug triage, after the commit, build or refresh the planning folder's spec
-review page as "Spec review page" in REFERENCE.md ("Checking review findings") says.
+With the spec flow or bug triage, after the commit, build, refresh or remove the planning folder's
+spec review page as "Spec review page" in REFERENCE.md ("Checking review findings") says.
 
 ## Step 7. Review round
 
