@@ -218,6 +218,8 @@ Things to know:
   exists.
 - The bug folder gets a `review.html` as a spec folder does, and the same rule refreshes it ("Spec
   review page" under "Checking review findings" in `.claude/skills/workflow-common/REFERENCE.md`).
+  An upstream port with verdict `invalid` gets none: its PR holds only `assessment.md` and the
+  `UPSTREAM.md` row.
 
 ### Keeping the spec current
 

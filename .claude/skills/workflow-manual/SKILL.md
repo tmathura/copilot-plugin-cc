@@ -180,8 +180,8 @@ Never hide a timing problem with a sleep or a retry in a test.
 
 Invoke `workflow-commit` with a one-line description of the diff and the list of files this
 ticket changed. With bug triage, the list includes the Markdown files of `.specify/bugs/NNN-<slug>/`,
-the path in the issue's `Bug notes:` line (by name, so a `review.html` or a leftover build file is
-not swept in; the page gets its own commit).
+the path in the issue's `Bug notes:` line. List a planning folder's files by name, not the folder,
+so a `review.html` or a leftover build file is not swept in; the page gets its own commit.
 
 With the spec flow or bug triage, after the commit: if the planning folder (`specs/NNN-<name>/` or
 `.specify/bugs/NNN-<slug>/`) has no `review.html`, run
