@@ -5,7 +5,7 @@
 | Field | Change |
 | --- | --- |
 | `inputMode` | `inline-diff` when the diff is at most `maxInlineDiffBytes` (256 KB) and the file count is at most `maxInlineFiles` (default: no limit); otherwise `self-collect` |
-| `collectionGuidance` | `self-collect`: asks Copilot to read every file listed below (one patch per changed file, and `untracked.md`) to its last line, in line ranges where needed |
+| `collectionGuidance` | `self-collect`: asks Copilot to read every file listed below (one patch per changed file, and for the working tree also `untracked.md`) to its last line, in line ranges where needed |
 | others | unchanged |
 
 ## Patch folder (`jobs/<id>.patches`)
