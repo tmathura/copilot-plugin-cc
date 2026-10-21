@@ -297,9 +297,14 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
   section loses the white space at the end of its last line. Codex removes the leading space of the
   first status line, so an unstaged change there looks staged, and cuts white space from the end of
   a file name. The reason is correctness.
-- For a large diff, Codex runs read-only `git` commands itself. Copilot's reviews have no shell, so
-  the plugin writes the exact patches to a folder in its own job storage, lets Copilot read that
-  folder (`--add-dir`), and deletes the folder after the review. If the review is killed outright
+- A review puts the whole diff in the prompt up to 256 KB, whatever the number of changed files.
+  Codex does so only up to 2 files and runs read-only `git` commands itself above that. Copilot's
+  reviews have no shell, and its `view` tool cuts each read of a large file at about 40 KB, so a
+  review of one large patch file depended on Copilot asking again after each cut.
+- For a diff above 256 KB, the plugin writes the exact patches to a folder in its own job storage,
+  one file per changed file (split at each `diff --git` and `Submodule` line), lists each file in
+  the prompt with its line count and the change it holds, lets Copilot read that folder
+  (`--add-dir`), and deletes the folder after the review. If the review is killed outright
   (`SIGKILL`, or `taskkill /F` on Windows), the folder stays until its job record is removed.
 - `/copilot:review` sends Copilot's `/review` command with the diff in the prompt. Codex uses its
   built-in reviewer, which collects the diff itself. Copilot's `/review` collects the diff with
@@ -424,8 +429,9 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
   process reads the file, and a reader can miss the file during a rename, so the plugin retries both
   for up to 2 seconds.
 - The review gate puts the working-tree diff in its prompt, because Copilot's reviews have no shell
-  to run `git`. Above the inline limit it writes the exact patches to a folder in the plugin's job
-  storage, lets Copilot read that folder, and deletes it when the hook ends. Codex runs `git` itself.
+  to run `git`. Above 256 KB it writes one exact patch per changed file to a folder in the plugin's
+  job storage, lets Copilot read that folder, and deletes it when the hook ends. Codex runs `git`
+  itself.
 - The review gate sends its prompt to the companion on stdin. Claude's last message can be longer
   than the Windows command-line limit. Codex passes the prompt as an argument.
 - The review gate stops its review 14 minutes after the hook starts, not 15, so that the hook can
