@@ -469,8 +469,8 @@ reviewer is one row here and one entry in `poll-reviews.mjs`; to add a reviewer,
 
 | Reviewer | Login | Starts | Trigger it again | Findings live in |
 | --- | --- | --- | --- | --- |
-| Copilot | `copilot-pull-request-reviewer` | Every push | `gh pr edit <n> --add-reviewer "@copilot"` | Threads; "previously missed" list in the review body |
-| CodeRabbit | `coderabbitai` | Pushes, until it pauses itself ("Reviews paused" in its summary comment) | `@coderabbitai review` as a PR comment (one review of the new commits) | Threads; "outside diff range" comments in the review body; the summary comment |
+| Copilot | `copilot-pull-request-reviewer` | Every push. It drops a request that arrives while it still reviews an earlier push; the poll reports that as exit 4 | `gh pr edit <n> --add-reviewer "@copilot"` | Threads; "previously missed" list in the review body |
+| CodeRabbit | `coderabbitai` | Pushes, until it pauses itself ("Reviews paused" in its summary comment). A rate-limited CodeRabbit (status "Review rate limited") has not reviewed the head | `@coderabbitai review` as a PR comment (one review of the new commits) | Threads; "outside diff range" comments in the review body; the summary comment |
 
 Each round:
 
@@ -479,18 +479,24 @@ Each round:
    (`run_in_background: true`). You are called again when it ends:
 
    ```bash
-   node .claude/skills/workflow-common/poll-reviews.mjs <head sha> <pr number>   # 60 tries, 30 s apart
+   node .claude/skills/workflow-common/poll-reviews.mjs <head sha> <pr number> [--no-copilot]   # 60 tries, 30 s apart
    ```
 
    Exit 0: every reviewer is done. Exit 1: timed out; it prints which reviewer is still pending.
    Exit 2: bad arguments (it prints the usage line; the SHA must be the full 40 characters) or `gh`
-   failed (it prints "gh failed"). The poll is a Node script because the worktree guard blocks shell loops that
+   failed (it prints "gh failed"). Exit 4: Copilot dropped its request: 2 minutes after the poll
+   started, the PR timeline has no `copilot_work_started` event since the request (it prints the
+   request time). `--no-copilot` waits for CodeRabbit only. The poll is a Node script because the worktree guard blocks shell loops that
    call `gh`.
 
-   - If Copilot has not started 3 minutes after the push, trigger it again (table above). Do not
-     while a review of this SHA is still running.
+   - Exit 4: trigger Copilot again (table above) and poll again. A second exit 4 for the same head:
+     Copilot is not available for this head. Name it in the PR body's **Review rounds** as
+     "Copilot: not available (request dropped twice)" right away (`workflow-pr`), then poll again
+     with `--no-copilot` until CodeRabbit is done. A new head starts with Copilot again. Exit 4 is
+     not a timeout, never asks, and is counted apart from the timeout re-trigger below.
    - Never push while a reviewer is still working: a push cancels CodeRabbit's review ("Pull request
-     base or head changed"). Make fixes locally and push after the poll ends.
+     base or head changed"). Make fixes locally and push after the poll ends. This holds between an
+     exit-4 poll and the next poll too: CodeRabbit may still be reviewing.
 2. **Read everything.** Read the whole body of every bot review since the last round, on any commit,
    not only the head SHA, because a body can hold findings with no thread (see the table). Read each
    reviewer's summary comment too. Then read every thread, resolved or not:
@@ -536,8 +542,8 @@ unavailable** / **Stop**. An unavailable reviewer counts as done for this head. 
 available, in the PR body's **Review rounds** right away (`workflow-pr`); the constitution
 allows the merge only when the PR says so.
 
-The loop ends only when every reviewer is done with the current head (the poll exits 0, or the user
-marked it unavailable), all its reviews have been read, and one of these is true:
+The loop ends only when every reviewer is done with the current head (the poll exits 0, the user
+marked it unavailable, or a second drop marked Copilot unavailable for that head), all its reviews have been read, and one of these is true:
 
 - No reviewer reported a new finding for that head, and no thread is open. A clean CodeRabbit review
   can be only a success status, with no review object.
