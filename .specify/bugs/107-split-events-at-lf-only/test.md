@@ -18,8 +18,8 @@ and the rest of the suite still work.
 |-------|------------------|--------|-------|
 | Reproduction (post-fix) | `node --test --test-name-pattern="raw U\+202" tests/prompt-mode.test.mjs` | pass | The assessment's input (one JSON event line with a raw separator, then LF) written by the fake Copilot through a pipe to `CopilotPromptModeClient`; one `assistant.message` with the exact text, no protocol error, exit 0 |
 | Reproduction (pre-fix) | the same tests against the old `prompt-mode.mjs` | fail, as expected | U+2028, U+2029 and the lone-CR tests fail on the readline reader (recorded in `fix.md`) |
-| New / updated tests | `node --test --test-name-pattern="raw U\+202\|CRLF line ends\|lone CR\|joined across chunks\|last line with no LF\|not JSON ends the run\|after the run has finished\|after a protocol error\|times out with part\|more than 1 MB" tests/prompt-mode.test.mjs` | pass | 11 of 11, also the existing not-JSON quoting test (run again after review round 1) |
-| Regression suite | `npm test` | pass | 422 tests, 398 pass, 24 skipped, 0 fail |
+| New / updated tests | `node --test --test-name-pattern="raw U\+202\|CRLF line ends\|lone CR\|joined across chunks\|last line with no LF\|not JSON ends the run\|after the run has finished\|after a protocol error\|times out with part\|more than 1 MB" tests/prompt-mode.test.mjs` | pass | 11 of 11 by this pattern, also the existing not-JSON quoting test (run again after review round 2; the new byte-split pipe test is in the full suite) |
+| Regression suite | `npm test` | pass | 423 tests, 399 pass, 24 skipped, 0 fail |
 | Lint / type-check | `npm run build` (tsc over `prompt-mode.mjs`) | pass | |
 | Version and plugin | `npm run check-version`, `claude plugin validate .` | pass | 1.0.19 |
 

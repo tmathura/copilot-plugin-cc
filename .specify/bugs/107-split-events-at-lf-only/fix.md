@@ -15,7 +15,7 @@ which also ended lines at U+2028 and U+2029. Output after the run has finished i
 
 | File | Change | Notes |
 |------|--------|-------|
-| `plugins/copilot/scripts/lib/prompt-mode.mjs` | modified | `readline` removed; `handleChunk` splits at LF, searches only the new chunk, drops one CR; stdout `end` flushes a last line with no LF; both return once the run has exited |
+| `plugins/copilot/scripts/lib/prompt-mode.mjs` | modified | `readline` removed; `handleChunk` splits at LF, searches only the new chunk, joins a line's pieces once, drops one CR, and reads nothing once the run has exited or after a protocol error (it also stops in the middle of a chunk); stdout `end` passes a last line with no LF through `handleChunk` |
 | `tests/fake-copilot-fixture.mjs` | modified | `FAKE_COPILOT_CRLF` ends each event line with CRLF; added to the variables the fake reads from the test, not the outer environment |
 | `tests/prompt-mode.test.mjs` | added tests | separators, CRLF, chunks, lone CR, last line with no LF, timeout with a partial line, output after the run, an event over 1 MB; `startFake` takes extra env |
 | `README.md` | modified | "Differences from the Codex plugin": the LF-only split, with its reason |
@@ -56,14 +56,15 @@ the same CR rule.
 - "a lone CR does not end a line, so two events joined by it fail with the quoting error" — only LF splits (fails on the old reader, which split at the CR).
 - "a last line with no LF is still read: a result is kept, and text that is not JSON fails".
 - "a run that times out with part of a line kept keeps its timeout error".
-- "output after the run has finished changes nothing" — after a stop that fails, a chunk given to `handleChunk` changes nothing.
-- "output after a protocol error is not read" — no event, no result, nothing kept in `lineParts`.
+- "output after the run has finished changes nothing" — after a result and a stop that fails, a late result given to `handleChunk` does not replace it.
+- "output after a protocol error is not read, also in the same chunk" — no event, no result, nothing kept in `lineParts`.
+- "a separator cut inside its UTF-8 bytes across two pipe chunks is read whole".
 - "an event of more than 1 MB, written in many chunks, is read whole".
 - The existing "a line that is not JSON ends the run with an error that quotes it" is unchanged and passes.
 
 ## Local Verification
 
-- Commands run: `npm ci --include=dev`, `npm run build` → pass; `npm test` → 422 tests, 398 pass, 24 skipped, 0 fail (after review round 1); `npm run check-version` → 1.0.19; `claude plugin validate .` → pass.
+- Commands run: `npm ci --include=dev`, `npm run build` → pass; `npm test` → 422 tests, 398 pass, 24 skipped, 0 fail (after review round 2: 423 tests, 399 pass); `npm run check-version` → 1.0.19; `claude plugin validate .` → pass.
 - Against the old `prompt-mode.mjs` (the fix taken out for one run): the U+2028, U+2029 and lone-CR tests fail; the others pass.
 - Manual check: a one-line script fed one JSON event with both separators to `readline` and got 3 line events, none of which parsed (Node 24.21.0).
 
@@ -79,6 +80,12 @@ the same CR rule.
   A stop that fails closes the child's pipes (`releaseChild`), so late output cannot arrive through
   the pipe; the guard is kept for the case the assessment names. The chunk-split test also calls
   `handleChunk` directly, because a pipe may join writes that come close together.
+- 2026-10-27, review round 2 (`code-review`): after a protocol error, `handleChunk` also stops in the
+  middle of a chunk and keeps no partial line. The late-output test now uses the one case that only
+  the exited guard covers (a Copilot that stays alive after its result and cannot be stopped), and
+  the protocol-error test puts the error and a partial line in one chunk; with the guard taken out,
+  the late-output test fails. A new test cuts a U+2028 inside its UTF-8 bytes across two pipe
+  chunks.
 
 ## Follow-ups
 

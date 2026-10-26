@@ -346,36 +346,62 @@ test("a run that times out with part of a line kept keeps its timeout error", as
   );
 });
 
-// A stop that fails ends the run while Copilot still runs. Its pipes are closed then, so the late output
-// is given to handleChunk directly: the guard must hold even if a chunk still arrives.
+// A Copilot that stays alive after its result, and cannot be stopped, ends the run with no protocol
+// error. Its pipes are closed then, so the late output is given to handleChunk directly: only the
+// exited guard keeps it from replacing the result.
 test("output after the run has finished changes nothing", async () => {
-  const { client, events } = startWriter([], {
+  const { client, events } = startWriter([`${RESULT_LINE}\n`], {
     hang: true,
-    timeoutMs: 200,
+    resultGraceMs: 100,
     terminateImpl: () => Promise.reject(new Error("kill EPERM"))
   });
 
   const exit = await client.exitPromise;
-  client.handleChunk(`{"type":"a.late"}\n${RESULT_LINE}\nnot json\n`);
+  client.handleChunk(`{"type":"result","sessionId":"s-2","exitCode":7}\n{"type":"a.late"}\nnot json\n`);
 
   assert.equal(exit.error.message, "Copilot could not be stopped: kill EPERM");
-  assert.match(client.protocolError.message, /did not finish within 0\.2 seconds/);
-  assert.equal(client.result, null);
-  assert.equal(client.resultTimer, null);
-  assert.deepEqual(events, []);
+  assert.equal(client.forcedExit, true);
+  assert.equal(client.protocolError, null);
+  assert.equal(client.result.exitCode, 0);
+  assert.deepEqual(
+    events.map((event) => event.type),
+    ["result"]
+  );
   await terminateProcessTree(client.proc.pid);
 });
 
-test("output after a protocol error is not read", () => {
+test("output after a protocol error is not read, also in the same chunk", () => {
   const { client, events } = startWriter([], { hang: true });
-  client.handleChunk("not json\n");
-  client.handleChunk(`{"type":"a.late"}\n${RESULT_LINE}\n`);
+  client.handleChunk(`not json\n{"type":"a.late"}\n{"type":"par`);
+  client.handleChunk(`tial"}\n${RESULT_LINE}\n{"type":"more`);
 
   assert.match(client.protocolError.message, /not json/);
   assert.deepEqual(events, []);
   assert.equal(client.result, null);
   assert.deepEqual(client.lineParts, []);
   return client.exitPromise;
+});
+
+test("a separator cut inside its UTF-8 bytes across two pipe chunks is read whole", async () => {
+  const source = `
+    const line = Buffer.from(JSON.stringify({ type: "a.sep", data: { content: "x" + String.fromCharCode(0x2028) + "y" } }) + "\\n");
+    const cut = line.indexOf(0xe2) + 1;
+    process.stdout.write(line.subarray(0, cut));
+    setTimeout(() => process.stdout.write(line.subarray(cut)), 100);
+  `;
+  const events = [];
+  const client = CopilotPromptModeClient.start(makeTempDir(), {
+    command: process.execPath,
+    args: ["-e", source],
+    prompt: "hello",
+    onEvent: (event) => events.push(event)
+  });
+
+  await client.exitPromise;
+
+  assert.equal(client.protocolError, null);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].data.content, `x${SEPARATORS[0][1]}y`);
 });
 
 test("an event of more than 1 MB, written in many chunks, is read whole", async () => {
