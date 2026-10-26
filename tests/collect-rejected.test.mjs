@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -27,9 +26,8 @@ function makeRepo({ originMain = true } = {}) {
 
 // --cleanup=verbatim keeps the message byte for byte, so CR and trailing blank lines reach git.
 function commit(repo, message) {
-  const file = path.join(makeTempDir("collect-rejected-msg-"), "message.txt");
-  fs.writeFileSync(file, message);
-  git(repo, "commit", "--allow-empty", "--cleanup=verbatim", "-F", file);
+  const result = run("git", ["commit", "--allow-empty", "--cleanup=verbatim", "-F", "-"], { cwd: repo, input: message });
+  assert.equal(result.status, 0, result.stderr);
   return git(repo, "rev-parse", "--short", "HEAD").trim();
 }
 

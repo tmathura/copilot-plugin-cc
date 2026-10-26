@@ -20,6 +20,9 @@ try {
   output = execFileSync(
     "git",
     [
+      // A signature check would print its text before a record and break the record split.
+      "-c",
+      "log.showSignature=false",
       "log",
       "--first-parent",
       `--grep=^\\[#${issue}\\] Address review round [0-9]`,
