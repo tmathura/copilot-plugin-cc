@@ -123,7 +123,7 @@ export async function pollReviews({
       let timeline;
       try {
         timeline = read(`issues/${pr}/timeline`);
-        // Suites do not change once made; an empty read right after the push is asked again.
+        // Suites do not change once made; an empty read is asked again on the next check.
         if (pushedAt === undefined) {
           const suiteTimes = read(`commits/${sha}/check-suites`)
             .map((s) => time(s.created_at))
@@ -139,12 +139,12 @@ export async function pollReviews({
         .filter(Number.isFinite);
       const requestedAt = Math.max(pushedAt ?? -Infinity, ...requestTimes);
       const started = timeline.some((e) => e.event === "copilot_work_started" && time(e.created_at) >= requestedAt);
-      // Without the push time, the start may be an earlier push's; read again until a suite shows.
-      copilotStarted = started && pushedAt !== undefined;
       if (!started) {
         const at = Number.isFinite(requestedAt) ? new Date(requestedAt).toISOString() : "an unknown time";
         return { code: 4, message: `copilot dropped the request made at ${at}: no copilot_work_started since then` };
       }
+      // Without the push time, the start may be an earlier push's; read again until a suite shows.
+      copilotStarted = pushedAt !== undefined;
     }
     if (attempt < tries) {
       await sleep(intervalMs);

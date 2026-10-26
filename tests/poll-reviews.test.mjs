@@ -290,6 +290,13 @@ test("the timeline is not read before the window, nor after a start is seen", as
   );
   assert.equal(seen.code, 1);
   assert.equal(seen.calls.filter((call) => call.endsWith("/timeline")).length, 1);
+  assert.equal(seen.calls.filter((call) => call.endsWith("/check-suites")).length, 1);
+  const noSuite = await run(
+    { statuses: RABBIT_DONE, timeline: [request(PUSH + 5000), started(PUSH + 35_000)] },
+    { tries: 10 }
+  );
+  assert.equal(noSuite.calls.filter((call) => call.endsWith("/timeline")).length, 6);
+  assert.equal(noSuite.calls.filter((call) => call.endsWith("/check-suites")).length, 6);
 });
 
 test("limit: with no check suite, an earlier push's start counts and the poll times out", async () => {
