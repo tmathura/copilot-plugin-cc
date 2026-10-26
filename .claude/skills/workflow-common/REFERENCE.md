@@ -436,8 +436,12 @@ in. So the round keeps its own record:
   the `rejected:` entries from the round commits only:
 
   ```bash
-  git log --first-parent --grep='^\[#<n>\] Address review round [0-9]' --format='%b' origin/main..HEAD | awk '/^rejected:/{p=1} p; /^$/{p=0}'
+  node .claude/skills/workflow-common/collect-rejected.mjs <n>
   ```
+
+  The collector exits 1 and names the commit and the line when an entry is in another form; handle
+  it as a step skill that fails ("Questions to the user"). Commits are never amended, so the owner
+  decides how to repair the record.
 
   Give `code-review` the range, then this text and the whole list:
   `Earlier review rounds rejected these findings, with these reasons. Do not raise them again in
@@ -509,7 +513,7 @@ Each round:
    (nothing to push), and check the loop's end rule below.
 4. **Run a Codex and Copilot round on the fixes** with `--scope working-tree` and the findings as the focus.
    Check its findings too. If you fix any of them, run the commands from "Commands" again.
-5. **Review the diff:** `code-review` on the working diff, with the list of rejected findings
+5. **Review the diff:** Read "Code review round" before this step. `code-review` on the working diff, with the list of rejected findings
    ("Code review round"), then the docs check of `workflow-manual` Step 7. Check the findings, fix the confirmed ones, run the commands from "Commands" again, and
    repeat until no confirmed finding is left. Then **commit** with `workflow-commit`. The body lists
    each finding and what happened to it.

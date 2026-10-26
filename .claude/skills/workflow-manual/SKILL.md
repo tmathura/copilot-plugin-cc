@@ -6,7 +6,7 @@ argument-hint: "[issue number to resume or start from | new]"
 
 # workflow: manual
 
-First read the repo's `.claude/skills/workflow-common/REFERENCE.md`. It holds the repo facts, the names,
+First read the repo's `.claude/skills/workflow-common/REFERENCE.md`. Read it again after each summary of the conversation. It holds the repo facts, the names,
 the commands and the loop rules. This file does not repeat them.
 
 ## When to ask the user
@@ -114,7 +114,8 @@ by hand). Show the comparison with the plan for approval.
   check.
   The notes stay untracked; `workflow-branch` moves them into the worktree.
 
-Run the Codex and Copilot loop on the approved plan (REFERENCE.md). A bug triage plan goes in a
+Run the Codex and Copilot loop on the approved plan (REFERENCE.md). Before each round, read
+REFERENCE.md "Checking review findings". A bug triage plan goes in a
 prompt file, as a plan-mode plan does. Apply confirmed findings to the plan. Correct Spec Kit files
 by hand.
 
@@ -188,7 +189,8 @@ spec review page as "Spec review page" in REFERENCE.md ("Checking review finding
 
 ## Step 7. Review round
 
-Run the code review round (REFERENCE.md) with the plan in the focus text. A resume at this step
+Run the code review round (REFERENCE.md) with the plan in the focus text. Before each round, read
+REFERENCE.md "Checking review findings" and "Code review round". A resume at this step
 starts a new round on the current head.
 
 1. The docs check: check the diff against `CLAUDE.md` and the docs it links to. With Spec
@@ -227,7 +229,8 @@ draft. Read `isDraft` with `gh pr view <n> --json isDraft`, and the comments fro
 
 ## Step 8b. PR review loop
 
-Run the PR review loop (REFERENCE.md) until it ends.
+Run the PR review loop (REFERENCE.md) until it ends. Before each round, read REFERENCE.md "Checking
+review findings" and "PR review loop".
 
 ## Step 9. Merge (always ask, unless `workflow-auto` answers)
 

@@ -6,7 +6,7 @@ argument-hint: "<issue number> <feature|bugfix> <slug>"
 
 # workflow: branch
 
-First read the repo's `.claude/skills/workflow-common/REFERENCE.md`. Act at once; do not ask to proceed.
+First read the repo's `.claude/skills/workflow-common/REFERENCE.md`. Read it again after each summary of the conversation. Act at once; do not ask to proceed.
 
 ## Input
 
