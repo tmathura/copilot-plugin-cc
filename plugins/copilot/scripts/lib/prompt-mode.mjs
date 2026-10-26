@@ -154,7 +154,7 @@ export class CopilotPromptModeClient {
     this.resultTimer = null;
     this.timeoutTimer = null;
     this.exited = false;
-    this.lineBuffer = "";
+    this.lineParts = [];
     /** @type {Promise<PromptModeExit>} */
     this.exitPromise = new Promise((resolve) => {
       this.resolveExit = resolve;
@@ -200,10 +200,8 @@ export class CopilotPromptModeClient {
     });
     // A last line with no LF is still read, as readline read it.
     this.proc.stdout.on("end", () => {
-      const rest = this.lineBuffer;
-      this.lineBuffer = "";
-      if (!this.exited && rest) {
-        this.handleLine(rest.endsWith("\r") ? rest.slice(0, -1) : rest);
+      if (this.lineParts.length > 0) {
+        this.handleChunk("\n");
       }
     });
 
@@ -220,22 +218,25 @@ export class CopilotPromptModeClient {
   }
 
   // Events end at LF only. readline also ends a line at U+2028 and U+2029, which JSON allows raw in a
-  // string. Output after the run has finished (a stop that failed) must not change it.
+  // string. Output after the run has finished (a stop that failed) must not change it. The pieces of a
+  // long line are joined once, at its LF, so a large event costs no more than its size.
   handleChunk(chunk) {
-    if (this.exited) {
+    if (this.exited || this.protocolError) {
       return;
     }
-    const searchFrom = this.lineBuffer.length;
-    this.lineBuffer += chunk;
     let start = 0;
-    let newlineIndex = this.lineBuffer.indexOf("\n", searchFrom);
+    let newlineIndex = chunk.indexOf("\n");
     while (newlineIndex !== -1) {
-      const line = this.lineBuffer.slice(start, newlineIndex);
+      this.lineParts.push(chunk.slice(start, newlineIndex));
+      const line = this.lineParts.join("");
+      this.lineParts = [];
       start = newlineIndex + 1;
       this.handleLine(line.endsWith("\r") ? line.slice(0, -1) : line);
-      newlineIndex = this.lineBuffer.indexOf("\n", start);
+      newlineIndex = chunk.indexOf("\n", start);
     }
-    this.lineBuffer = this.lineBuffer.slice(start);
+    if (start < chunk.length) {
+      this.lineParts.push(chunk.slice(start));
+    }
   }
 
   handleLine(line) {
