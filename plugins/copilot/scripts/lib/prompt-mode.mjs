@@ -227,15 +227,18 @@ export class CopilotPromptModeClient {
     }
     let start = 0;
     let newlineIndex = chunk.indexOf("\n");
-    while (newlineIndex !== -1 && !this.protocolError) {
+    while (newlineIndex !== -1) {
       this.lineParts.push(chunk.slice(start, newlineIndex));
       const line = this.lineParts.join("");
       this.lineParts = [];
       start = newlineIndex + 1;
       this.handleLine(line.endsWith("\r") ? line.slice(0, -1) : line);
+      if (this.protocolError) {
+        return;
+      }
       newlineIndex = chunk.indexOf("\n", start);
     }
-    if (!this.protocolError && start < chunk.length) {
+    if (start < chunk.length) {
       this.lineParts.push(chunk.slice(start));
     }
   }

@@ -17,7 +17,7 @@ which also ended lines at U+2028 and U+2029. Output after the run has finished i
 |------|--------|-------|
 | `plugins/copilot/scripts/lib/prompt-mode.mjs` | modified | `readline` removed; `handleChunk` splits at LF, searches only the new chunk, joins a line's pieces once, drops one CR, and reads nothing once the run has exited or after a protocol error (it also stops in the middle of a chunk); stdout `end` passes a last line with no LF through `handleChunk` |
 | `tests/fake-copilot-fixture.mjs` | modified | `FAKE_COPILOT_CRLF` ends each event line with CRLF; added to the variables the fake reads from the test, not the outer environment |
-| `tests/prompt-mode.test.mjs` | added tests | separators, CRLF, chunks, lone CR, last line with no LF, timeout with a partial line, output after the run, an event over 1 MB; `startFake` takes extra env |
+| `tests/prompt-mode.test.mjs` | added tests | separators, CRLF, chunks, a separator cut inside its bytes across pipe chunks, lone CR, last line with no LF, timeout with a partial line, output after the run, output after a protocol error, an event over 1 MB; `startFake` takes extra env |
 | `README.md` | modified | "Differences from the Codex plugin": the LF-only split, with its reason |
 | `plugins/copilot/CHANGELOG.md` | modified | `### 1.0.19` entry |
 | `package.json`, `package-lock.json`, `plugins/copilot/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` | modified | version 1.0.19 (`npm run bump-version`) |
@@ -37,6 +37,9 @@ handleChunk(chunk) {
     this.lineParts = [];
     start = newlineIndex + 1;
     this.handleLine(line.endsWith("\r") ? line.slice(0, -1) : line);
+    if (this.protocolError) {
+      return;
+    }
     newlineIndex = chunk.indexOf("\n", start);
   }
   if (start < chunk.length) {
@@ -65,7 +68,7 @@ the same CR rule.
 ## Local Verification
 
 - Commands run: `npm ci --include=dev`, `npm run build` → pass; `npm test` → 422 tests, 398 pass, 24 skipped, 0 fail (after review round 2: 423 tests, 399 pass); `npm run check-version` → 1.0.19; `claude plugin validate .` → pass.
-- Against the old `prompt-mode.mjs` (the fix taken out for one run): the U+2028, U+2029 and lone-CR tests fail; the others pass.
+- Against the old `prompt-mode.mjs` (the fix taken out for one run, before the review rounds): the U+2028, U+2029 and lone-CR tests fail; the others then passed. The tests added in the review rounds that call `handleChunk` directly cannot run on the old reader (it has no `handleChunk`), and the byte-split test fails on it like the other separator tests.
 - Manual check: a one-line script fed one JSON event with both separators to `readline` and got 3 line events, none of which parsed (Node 24.21.0).
 
 ## Deviations from Assessment
@@ -81,11 +84,16 @@ the same CR rule.
   the pipe; the guard is kept for the case the assessment names. The chunk-split test also calls
   `handleChunk` directly, because a pipe may join writes that come close together.
 - 2026-10-27, review round 2 (`code-review`): after a protocol error, `handleChunk` also stops in the
-  middle of a chunk and keeps no partial line. The late-output test now uses the one case that only
-  the exited guard covers (a Copilot that stays alive after its result and cannot be stopped), and
+  middle of a chunk and keeps no partial line. The late-output test now uses a case that only the
+  exited guard covers (a Copilot that stays alive after its result and cannot be stopped; any stop
+  that fails before a protocol error is another), and
   the protocol-error test puts the error and a partial line in one chunk; with the guard taken out,
   the late-output test fails. A new test cuts a U+2028 inside its UTF-8 bytes across two pipe
   chunks.
+- 2026-10-27, review round 3 (`code-review`): the protocol-error check inside `handleChunk` is one
+  return right after `handleLine`, in place of checks in the loop condition and before the last
+  push; the behaviour is the same. The late-output test stops its stand-in Copilot in `t.after`, so
+  a failed assertion leaves no process running.
 
 ## Follow-ups
 

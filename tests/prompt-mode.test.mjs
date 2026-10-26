@@ -347,14 +347,16 @@ test("a run that times out with part of a line kept keeps its timeout error", as
 });
 
 // A Copilot that stays alive after its result, and cannot be stopped, ends the run with no protocol
-// error. Its pipes are closed then, so the late output is given to handleChunk directly: only the
+// error. Its pipes are closed then, so the late output is given to handleChunk directly: here only the
 // exited guard keeps it from replacing the result.
-test("output after the run has finished changes nothing", async () => {
+test("output after the run has finished changes nothing", async (t) => {
   const { client, events } = startWriter([`${RESULT_LINE}\n`], {
     hang: true,
     resultGraceMs: 100,
     terminateImpl: () => Promise.reject(new Error("kill EPERM"))
   });
+  // The stand-in runs on after the failed stop, also when an assertion below fails.
+  t.after(() => terminateProcessTree(client.proc.pid));
 
   const exit = await client.exitPromise;
   client.handleChunk(`{"type":"result","sessionId":"s-2","exitCode":7}\n{"type":"a.late"}\nnot json\n`);
@@ -367,7 +369,6 @@ test("output after the run has finished changes nothing", async () => {
     events.map((event) => event.type),
     ["result"]
   );
-  await terminateProcessTree(client.proc.pid);
 });
 
 test("output after a protocol error is not read, also in the same chunk", () => {
