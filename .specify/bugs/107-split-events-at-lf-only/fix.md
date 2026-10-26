@@ -94,6 +94,8 @@ the same CR rule.
   return right after `handleLine`, in place of checks in the loop condition and before the last
   push; the behaviour is the same. The late-output test stops its stand-in Copilot in `t.after`, so
   a failed assertion leaves no process running.
+- 2026-10-27, review round 4 (`code-review`): every test that starts a stand-in Copilot that never
+  exits stops it in `t.after`, so a failure there cannot leave `npm test` waiting.
 
 ## Follow-ups
 

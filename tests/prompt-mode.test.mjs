@@ -285,9 +285,10 @@ function startWriter(writes, { hang = false, firstDelayMs = 0, ...options } = {}
 }
 
 // The chunks are given to handleChunk directly, because a pipe may join writes that come close together.
-test("events are joined across chunks and split within one, also with CR and LF in separate chunks", async () => {
+test("events are joined across chunks and split within one, also with CR and LF in separate chunks", async (t) => {
   const separator = SEPARATORS[0][1];
   const { client, events } = startWriter([], { hang: true });
+  t.after(() => terminateProcessTree(client.proc.pid));
   for (const chunk of [
     '{"type":"a.one",',
     '"data":{}}\n{"type":"a.two"}\n{"type":"a.three"}\r',
@@ -334,8 +335,9 @@ test("a last line with no LF is still read: a result is kept, and text that is n
   assert.match(broken.client.protocolError.message, /not json at the end/);
 });
 
-test("a run that times out with part of a line kept keeps its timeout error", async () => {
+test("a run that times out with part of a line kept keeps its timeout error", async (t) => {
   const { client, events } = startWriter(['{"type":"a.one"}\n{"type":"par'], { hang: true, timeoutMs: 500 });
+  t.after(() => terminateProcessTree(client.proc.pid));
 
   await client.exitPromise;
 
@@ -371,8 +373,9 @@ test("output after the run has finished changes nothing", async (t) => {
   );
 });
 
-test("output after a protocol error is not read, also in the same chunk", () => {
+test("output after a protocol error is not read, also in the same chunk", (t) => {
   const { client, events } = startWriter([], { hang: true });
+  t.after(() => terminateProcessTree(client.proc.pid));
   client.handleChunk(`not json\n{"type":"a.late"}\n{"type":"par`);
   client.handleChunk(`tial"}\n${RESULT_LINE}\n{"type":"more`);
 
