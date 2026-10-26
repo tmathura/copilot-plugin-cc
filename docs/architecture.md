@@ -91,8 +91,8 @@ Copilot no shell.
 ```mermaid
 flowchart TD
   T["resolveReviewTarget: working tree or branch"] --> C["collectReviewContext"]
-  C -->|small diff| I["diff inline in the prompt"]
-  C -->|large diff| W["withReviewPatches: patch files in jobs/&lt;id&gt;.patches"]
+  C -->|diff up to 256 KB| I["diff inline in the prompt"]
+  C -->|diff above 256 KB| W["withReviewPatches: one patch per changed file in jobs/&lt;id&gt;.patches"]
   W --> D["--add-dir=&lt;patch folder&gt;; Copilot reads it with view"]
   I --> R["read-only run"]
   D --> R

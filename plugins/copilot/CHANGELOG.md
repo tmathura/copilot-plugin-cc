@@ -2,6 +2,14 @@
 
 ## Copilot plugin
 
+### 1.0.18
+
+- A review now gives Copilot the whole diff in its prompt up to 256 KB, whatever the number of
+  changed files. Before, a change of more than 2 files went to one patch file, which Copilot could
+  read only in parts.
+- Above 256 KB, a review gives Copilot one patch file per changed file, with a list that gives
+  each file's line count and the change it holds. This also holds for the review gate.
+
 ### 1.0.17
 
 - The active jobs table in `/copilot:status` keeps a value that holds `\|`, such as a job summary,

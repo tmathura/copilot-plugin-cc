@@ -278,8 +278,10 @@ per ticket, in every planning mode.
    > (only for a bug); the files to change, and what changes in each; the approach, and any simpler
    > option you see; the tests or checks that prove it.
 
-   Put nothing from Claude's plan or reasoning in it. An issue that already has a
-   `## Plan comparison` was planned before: do not run the blind plan again.
+   Put nothing from Claude's plan or reasoning in it. When the task uses files outside the repo,
+   paste their text into the prompt file, because the reviewers' sandbox reads only the repo. Do
+   the same in a plan review prompt file. An issue that already has a `## Plan comparison` was
+   planned before: do not run the blind plan again.
 2. Start each ready reviewer with `exec node "$CODEX" task --prompt-file "<file>"` (`$CODEX` and the
    Copilot script as in "Codex and Copilot review loop"; "Background calls" there), then plan while
    they run. `task` without `--write` is read-only, and it starts a fresh thread, so it cannot see

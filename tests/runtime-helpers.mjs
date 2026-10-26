@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { buildEnv, installFakeCopilot, readFakeChildPids, readFakeCopilotRuns } from "./fake-copilot-fixture.mjs";
-import { initGitRepo, makeTempDir, run } from "./helpers.mjs";
+import { countLines, git, initGitRepo, makeTempDir, run } from "./helpers.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const PLUGIN_ROOT = path.join(ROOT, "plugins", "copilot");
@@ -49,11 +49,6 @@ export const REVIEW_JSON = JSON.stringify({
   next_steps: ["Add the guard."]
 });
 
-export function git(repo, ...args) {
-  const result = run("git", args, { cwd: repo });
-  assert.equal(result.status, 0, result.stderr);
-  return result.stdout;
-}
 
 export function writeFile(repo, name, text) {
   fs.mkdirSync(path.dirname(path.join(repo, name)), { recursive: true });
@@ -118,6 +113,11 @@ export function addDirsOf(copilotRun) {
 
 export function patchesOf(copilotRun) {
   return Object.fromEntries(Object.entries(copilotRun.addDirFiles).map(([name, data]) => [name, Buffer.from(data, "base64")]));
+}
+
+// One line of the prompt's Patch Files list.
+export function patchListEntry(patchDir, patches, name, label) {
+  return `- ${path.join(patchDir, name)} (${countLines(patches[name].toString("latin1"))} lines): ${label}`;
 }
 
 // The patch folders under the plugin data folder: jobs/<job id>.patches.
@@ -205,7 +205,12 @@ export function makeQueuedTask(cwd, prompt = "fix the bug") {
 export const GATE_HOOK = path.join(PLUGIN_ROOT, "scripts", "stop-review-gate-hook.mjs");
 export const GATE_TITLE = "Copilot Stop Gate Review";
 
-// Three changed files: above the inline limit of two, so the gate writes a patch folder.
+// About 300 KB: a diff that adds it is above the 256 KB inline limit.
+export function largeText(firstLine) {
+  return `${firstLine}\n${Array.from({ length: 3000 }, (_, index) => `line ${index} ${"x".repeat(90)}`).join("\n")}\n`;
+}
+
+// Three changed files and a diff above the inline limit, so the gate writes a patch folder.
 export function makeLargeRepo() {
   const repo = makeTempDir();
   initGitRepo(repo);
@@ -214,9 +219,9 @@ export function makeLargeRepo() {
   }
   git(repo, "add", ".");
   git(repo, "commit", "-q", "-m", "init");
-  for (const name of ["a.txt", "b.txt", "c.txt"]) {
-    writeFile(repo, name, `${name} v2\n`);
-  }
+  writeFile(repo, "a.txt", "a.txt v2\n");
+  writeFile(repo, "b.txt", "b.txt v2\n");
+  writeFile(repo, "c.txt", largeText("c.txt v2"));
   return repo;
 }
 

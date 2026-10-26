@@ -20,6 +20,7 @@ import {
   isAlive,
   makeLargeRepo,
   makeQueuedTask,
+  patchListEntry,
   patchesOf,
   readJobs,
   setUpGate,
@@ -279,10 +280,27 @@ test("above the inline limit, the gate passes the patch folder to Copilot and re
     const copilotRun = gateRun();
     const [patchDir] = addDirsOf(copilotRun);
     assert.ok(patchDir.startsWith(path.join(dataDir, "state")), patchDir);
-    assert.deepEqual(Object.keys(patchesOf(copilotRun)).sort(), ["staged.patch", "unstaged.patch", "untracked.md"]);
-    assert.match(patchesOf(copilotRun)["unstaged.patch"].toString("utf8"), /\+c\.txt v2/);
-    assert.ok(copilotRun.prompt.includes(`## Patch Files\n\n- ${path.join(patchDir, "staged.patch")}\n`));
-    assert.match(copilotRun.prompt, /Read the patch files listed below with the view tool/);
+    // One patch per changed file, and none for the empty staged diff.
+    const patches = patchesOf(copilotRun);
+    assert.deepEqual(Object.keys(patches).sort(), ["unstaged-001.patch", "unstaged-002.patch", "unstaged-003.patch", "untracked.md"]);
+    assert.match(patches["unstaged-003.patch"].toString("utf8"), /^diff --git a\/c\.txt b\/c\.txt\n[\s\S]*\+c\.txt v2\n/);
+    const entry = (name, label) => patchListEntry(patchDir, patches, name, label);
+    assert.ok(
+      copilotRun.prompt.includes(
+        [
+          "## Patch Files",
+          "",
+          entry("unstaged-001.patch", "diff --git a/a.txt b/a.txt"),
+          entry("unstaged-002.patch", "diff --git a/b.txt b/b.txt"),
+          entry("unstaged-003.patch", "diff --git a/c.txt b/c.txt"),
+          entry("untracked.md", "untracked files"),
+          ""
+        ].join("\n")
+      ),
+      copilotRun.prompt
+    );
+    assert.match(copilotRun.prompt, /Read every file listed below with the view tool/);
+    assert.match(copilotRun.prompt, /read each file to its last line, in line ranges where needed/);
     assert.deepEqual(findPatchDirs(dataDir), [], behavior);
     // A run that ended by itself keeps its outcome; only the gate's own stop turns a failure into a cancel.
     assert.equal(readJobs(dataDir).find((job) => job.title === GATE_TITLE).status, blocked ? "failed" : "completed", behavior);

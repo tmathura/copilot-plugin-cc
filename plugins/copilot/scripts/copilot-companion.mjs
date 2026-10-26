@@ -330,7 +330,14 @@ export async function withReviewPatches(context, request, run) {
   try {
     const files = writeReviewPatches(context, patchDir);
     // Only new lines go: the last changed file name can end in white space, such as a no-break space.
-    const reviewInput = [context.content.replace(/\n+$/, ""), "", "## Patch Files", "", ...files.map((file) => `- ${file}`), ""].join("\n");
+    const reviewInput = [
+      context.content.replace(/\n+$/, ""),
+      "",
+      "## Patch Files",
+      "",
+      ...files.map(({ file, label, lines }) => `- ${file} (${lines} lines): ${label}`),
+      ""
+    ].join("\n");
     return await run({ reviewInput, addDirs: [patchDir] });
   } finally {
     process.off("SIGTERM", onSignal);

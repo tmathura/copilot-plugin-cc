@@ -1,6 +1,7 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): every git call writes no index and starts no
 // fsmonitor hook or textconv program; non-ASCII file names are not quoted; untracked symlinks are not
-// read; the self-collect guidance points Copilot at patch files, which writeReviewPatches writes; the
+// read; the diff is inline up to the byte limit whatever the file count; above it the self-collect
+// guidance points Copilot at one patch file per changed file, which writeReviewPatches writes; the
 // review sections remove only trailing new lines, so Git Status keeps the leading space of its first line.
 import fs from "node:fs";
 import path from "node:path";
@@ -9,7 +10,9 @@ import { isProbablyText } from "./fs.mjs";
 import { formatCommandFailure, runCommand, runCommandChecked } from "./process.mjs";
 
 const MAX_UNTRACKED_BYTES = 24 * 1024;
-const DEFAULT_INLINE_DIFF_MAX_FILES = 2;
+// Codex runs git itself above upstream's 2 files. Copilot can only view a patch file, which cuts each
+// read at about 40 KB, so any number of files stays inline up to the byte limit.
+const DEFAULT_INLINE_DIFF_MAX_FILES = Infinity;
 const DEFAULT_INLINE_DIFF_MAX_BYTES = 256 * 1024;
 // Reviews run these calls before Copilot starts, so no Copilot control covers what git itself starts.
 // git diff refreshes .git/index even with --no-optional-locks unless diff.autoRefreshIndex is off.
@@ -331,7 +334,7 @@ function buildAdversarialCollectionGuidance(options = {}) {
     return "Use the repository context below as primary evidence.";
   }
 
-  return "The repository context below is a lightweight summary. Read the patch files listed below with the view tool before finalizing findings.";
+  return "The repository context below is a lightweight summary. Read every file listed below with the view tool before finalizing findings. Each patch file holds the diff of one changed file, or git's one-line note on a merge conflict. The list gives the line count of each file. The view tool cuts a long read, so read each file to its last line, in line ranges where needed.";
 }
 
 // Git writes straight to the file: a large patch has no buffer limit, and its bytes stay exact.
@@ -345,25 +348,80 @@ function writeGitOutput(cwd, args, file) {
   return file;
 }
 
+// An unresolved conflict gives a "diff --cc" header or a "* Unmerged path" note, in either diff.
+const PATCH_HEADERS = ["diff --git ", "diff --cc ", "Submodule ", "* Unmerged path "].map((header) => Buffer.from(header));
+
+function startsPatch(buffer, offset) {
+  return PATCH_HEADERS.some(
+    (header) => buffer.compare(header, 0, header.length, offset, Math.min(offset + header.length, buffer.length)) === 0
+  );
+}
+
+// A patch line starts with a space, "+", "-" or "\", and a binary patch line has no space, so only a
+// file, submodule or conflict line starts with these words. Bytes before the first one stay in the
+// first part, so the parts joined are the exact diff.
+function splitPatch(buffer) {
+  const starts = [];
+  for (let offset = 0; offset < buffer.length; ) {
+    if (startsPatch(buffer, offset)) {
+      starts.push(offset);
+    }
+    const end = buffer.indexOf(0x0a, offset);
+    offset = end === -1 ? buffer.length : end + 1;
+  }
+  if (buffer.length > 0) {
+    starts[0] = 0;
+  }
+  return starts.map((start, index) => buffer.subarray(start, starts[index + 1] ?? buffer.length));
+}
+
+function firstLine(buffer) {
+  const end = buffer.indexOf(0x0a);
+  return buffer.toString("utf8", 0, end === -1 ? buffer.length : end);
+}
+
+// The view tool reads by line number, so the line count tells Copilot where a file ends.
+function countLines(buffer) {
+  let lines = 0;
+  for (let offset = buffer.indexOf(0x0a); offset !== -1; offset = buffer.indexOf(0x0a, offset + 1)) {
+    lines += 1;
+  }
+  return buffer.length > 0 && buffer[buffer.length - 1] !== 0x0a ? lines + 1 : lines;
+}
+
+// One small file per changed file: Copilot's view tool cuts each read of a large file.
+function writeSplitPatch(cwd, args, dir, name) {
+  const fullPatch = writeGitOutput(cwd, args, path.join(dir, `${name}.patch`));
+  const parts = splitPatch(fs.readFileSync(fullPatch));
+  fs.rmSync(fullPatch);
+  const width = Math.max(3, String(parts.length).length);
+  return parts.map((part, index) => {
+    const file = path.join(dir, `${name}-${String(index + 1).padStart(width, "0")}.patch`);
+    fs.writeFileSync(file, part, { flag: "wx", mode: 0o600 });
+    return { file, label: firstLine(part), lines: countLines(part) };
+  });
+}
+
 // Above the inline limit Copilot cannot run git itself, so it reads the same patches from files.
 export function writeReviewPatches(context, dir) {
   const { repoRoot } = context;
   const diffArgs = ["diff", "--binary", "--no-ext-diff", "--submodule=diff"];
   if (context.mode === "branch") {
-    return [writeGitOutput(repoRoot, [...diffArgs, context.comparison.commitRange], path.join(dir, "branch.patch"))];
+    return writeSplitPatch(repoRoot, [...diffArgs, context.comparison.commitRange], dir, "branch");
   }
 
   const { untracked } = getWorkingTreeState(repoRoot);
   const untrackedFile = path.join(dir, "untracked.md");
-  fs.writeFileSync(untrackedFile, untracked.map((file) => formatUntrackedFile(repoRoot, file)).join("\n\n"), {
+  const untrackedText = untracked.map((file) => formatUntrackedFile(repoRoot, file)).join("\n\n");
+  fs.writeFileSync(untrackedFile, untrackedText, {
     encoding: "utf8",
     flag: "wx",
     mode: 0o600
   });
   return [
-    writeGitOutput(repoRoot, [...diffArgs, "--cached"], path.join(dir, "staged.patch")),
-    writeGitOutput(repoRoot, diffArgs, path.join(dir, "unstaged.patch")),
-    untrackedFile
+    ...writeSplitPatch(repoRoot, [...diffArgs, "--cached"], dir, "staged"),
+    ...writeSplitPatch(repoRoot, diffArgs, dir, "unstaged"),
+    { file: untrackedFile, label: "untracked files", lines: countLines(Buffer.from(untrackedText)) }
   ];
 }
 
