@@ -295,6 +295,7 @@ test("the timeline is not read before the window, nor after a start is seen", as
     { statuses: RABBIT_DONE, timeline: [request(PUSH + 5000), started(PUSH + 35_000)] },
     { tries: 10 }
   );
+  assert.equal(noSuite.code, 1);
   assert.equal(noSuite.calls.filter((call) => call.endsWith("/timeline")).length, 6);
   assert.equal(noSuite.calls.filter((call) => call.endsWith("/check-suites")).length, 6);
 });

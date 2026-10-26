@@ -470,7 +470,7 @@ reviewer is one row here and one entry in `poll-reviews.mjs`; to add a reviewer,
 | Reviewer | Login | Starts | Trigger it again | Findings live in |
 | --- | --- | --- | --- | --- |
 | Copilot | `copilot-pull-request-reviewer` | Every push. It drops a request that arrives while it still reviews an earlier push; the poll reports that as exit 4 | `gh pr edit <n> --add-reviewer "@copilot"` | Threads; "previously missed" list in the review body |
-| CodeRabbit | `coderabbitai` | Pushes, until it pauses itself ("Reviews paused" in its summary comment). A rate-limited CodeRabbit (status "Review rate limited") has not reviewed the head: wait the time its summary comment gives, then post `@coderabbitai review` | `@coderabbitai review` as a PR comment (one review of the new commits) | Threads; "outside diff range" comments in the review body; the summary comment |
+| CodeRabbit | `coderabbitai` | Pushes, until it pauses itself ("Reviews paused" in its summary comment). A rate-limited CodeRabbit (status "Review rate limited") has not reviewed the head: wait the time its summary comment gives (a background `exec sleep`, as "Background calls" says; a foreground one is blocked), then post `@coderabbitai review` | `@coderabbitai review` as a PR comment (one review of the new commits) | Threads; "outside diff range" comments in the review body; the summary comment |
 
 Each round:
 

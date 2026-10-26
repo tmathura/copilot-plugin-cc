@@ -174,9 +174,8 @@ Both loops run in full, as REFERENCE.md says, with these additions:
 - If a CI job fails in a test that the PR did not touch, rerun only that job once with
   `gh run rerun --job <job id>` (`--failed` would rerun every failed job). The job id is the
   `databaseId` from `gh run view <run id> --json jobs`. If it fails again, it is a real failure.
-- A rate-limited CodeRabbit is handled as REFERENCE.md "Bot reviewers" says. Its wait is a
-  background Bash `exec sleep` (REFERENCE.md "Background calls"; a foreground one is blocked), and
-  it does not count toward the poll timeouts.
+- A rate-limited CodeRabbit is handled as REFERENCE.md "Bot reviewers" says. Its wait does not
+  count toward the poll timeouts.
 
 ## After each merge
 
