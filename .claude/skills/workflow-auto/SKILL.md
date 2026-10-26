@@ -134,7 +134,7 @@ as a decision. With no decision, the ticket runs as before, and the same stop ho
 | A step skill fails | Retry once, then Not done |
 | Bug triage stops (verdict `invalid`, open clarification items, fix `partial` or `not-applied`) | Not done. An upstream port with verdict `invalid` is not a stop: it follows REFERENCE.md "Upstream port". |
 | Bug triage asks to overwrite `test.md` after a later fix | Yes |
-| A bot reviewer's poll times out | Trigger it again and poll again. After 3 timeouts in a row for the same head, the reviewer counts as down: this ticket is Not done, and the run stops early, because every later ticket would wait for it too. |
+| A bot reviewer's poll times out | Trigger it again and poll again. After 3 timeouts in a row for the same head, the reviewer counts as down: this ticket is Not done, and the run stops early, because every later ticket would wait for it too. The poll's exit 4 (Copilot dropped its request) is not a timeout: follow REFERENCE.md "PR review loop" step 1. A second drop for the same head marks Copilot not available for that head; drops never count toward the 3 timeouts and never stop the run. |
 | Codex or Copilot is not installed or not ready (checked at the start, see "Input"), or becomes not ready during the run (REFERENCE.md "Background calls") | Not done. Both local reviewers must run. |
 | Resume stops (changes in the worktree, a merge conflict, `REFERENCE.md` still missing, plugin work with no planning notes), a plan-mode ticket that grows into plugin files, a tool missing from the PATH, or a restart needed | Not done |
 | The issue depends on another issue (`Depends on #n`) that is still open | Listed under "Not done", "waits for #n". No branch, no comment. |
@@ -174,9 +174,8 @@ Both loops run in full, as REFERENCE.md says, with these additions:
 - If a CI job fails in a test that the PR did not touch, rerun only that job once with
   `gh run rerun --job <job id>` (`--failed` would rerun every failed job). The job id is the
   `databaseId` from `gh run view <run id> --json jobs`. If it fails again, it is a real failure.
-- If CodeRabbit says it is rate-limited, wait the time it gives (a background Bash `exec sleep`, as
-  REFERENCE.md "Background calls" says; a foreground one is blocked), then post
-  `@coderabbitai review`. This wait does not count toward the poll timeouts.
+- A rate-limited CodeRabbit is handled as REFERENCE.md "Bot reviewers" says. Its wait does not
+  count toward the poll timeouts.
 
 ## After each merge
 
