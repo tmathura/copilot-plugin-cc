@@ -10,7 +10,6 @@
  */
 import { spawn } from "node:child_process";
 import process from "node:process";
-import readline from "node:readline";
 
 import { terminateProcessTree } from "./process.mjs";
 
@@ -155,6 +154,7 @@ export class CopilotPromptModeClient {
     this.resultTimer = null;
     this.timeoutTimer = null;
     this.exited = false;
+    this.lineBuffer = "";
     /** @type {Promise<PromptModeExit>} */
     this.exitPromise = new Promise((resolve) => {
       this.resolveExit = resolve;
@@ -195,9 +195,16 @@ export class CopilotPromptModeClient {
       this.finish({ exitCode: code, signal, error: null });
     });
 
-    this.readline = readline.createInterface({ input: this.proc.stdout });
-    this.readline.on("line", (line) => {
-      this.handleLine(line);
+    this.proc.stdout.on("data", (chunk) => {
+      this.handleChunk(chunk);
+    });
+    // A last line with no LF is still read, as readline read it.
+    this.proc.stdout.on("end", () => {
+      const rest = this.lineBuffer;
+      this.lineBuffer = "";
+      if (!this.exited && rest) {
+        this.handleLine(rest.endsWith("\r") ? rest.slice(0, -1) : rest);
+      }
     });
 
     // Copilot can exit before it reads the prompt, for example when nobody is logged in.
@@ -210,6 +217,25 @@ export class CopilotPromptModeClient {
         this.close().catch(() => {});
       }, this.options.timeoutMs);
     }
+  }
+
+  // Events end at LF only. readline also ends a line at U+2028 and U+2029, which JSON allows raw in a
+  // string. Output after the run has finished (a stop that failed) must not change it.
+  handleChunk(chunk) {
+    if (this.exited) {
+      return;
+    }
+    const searchFrom = this.lineBuffer.length;
+    this.lineBuffer += chunk;
+    let start = 0;
+    let newlineIndex = this.lineBuffer.indexOf("\n", searchFrom);
+    while (newlineIndex !== -1) {
+      const line = this.lineBuffer.slice(start, newlineIndex);
+      start = newlineIndex + 1;
+      this.handleLine(line.endsWith("\r") ? line.slice(0, -1) : line);
+      newlineIndex = this.lineBuffer.indexOf("\n", start);
+    }
+    this.lineBuffer = this.lineBuffer.slice(start);
   }
 
   handleLine(line) {
@@ -257,7 +283,6 @@ export class CopilotPromptModeClient {
     this.exited = true;
     clearTimeout(this.resultTimer);
     clearTimeout(this.timeoutTimer);
-    this.readline?.close();
     untrackClient(this);
     this.resolveExit(exit);
   }

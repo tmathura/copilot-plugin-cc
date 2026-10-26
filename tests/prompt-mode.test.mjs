@@ -39,7 +39,7 @@ function startFake(behavior, options = {}) {
   const client = CopilotPromptModeClient.start(binDir, {
     command: process.execPath,
     args: [scriptPath, "--output-format", "json", "--session-id=s-1"],
-    env: buildEnv(binDir),
+    env: buildEnv(binDir, options.env),
     prompt: options.prompt ?? "hello",
     resultGraceMs: options.resultGraceMs,
     onEvent: (event) => events.push(event)
@@ -222,3 +222,160 @@ test(
     await waitFor(() => !isAlive(copilotPid) && !isAlive(grandchildPid));
   }
 );
+
+// Raw separators are built at run time, so this file holds none: a tool that reads it by lines would split it.
+const SEPARATORS = [
+  ["U+2028", String.fromCharCode(0x2028)],
+  ["U+2029", String.fromCharCode(0x2029)]
+];
+
+for (const [name, separator] of SEPARATORS) {
+  test(`an event whose JSON string holds a raw ${name} is read as one event`, async () => {
+    const answer = `before${separator}after`;
+    const { client, events } = startFake("ok", { env: { FAKE_COPILOT_ANSWER: answer } });
+
+    const exit = await client.exitPromise;
+
+    assert.equal(client.protocolError, null);
+    assert.equal(exit.exitCode, 0);
+    const messages = events.filter((event) => event.type === "assistant.message");
+    assert.equal(messages.at(-1).data.content, answer);
+    assert.equal(client.result.exitCode, 0);
+  });
+}
+
+test("CRLF line ends are read, and no CR stays in the events", async () => {
+  const { client, events } = startFake("ok", { env: { FAKE_COPILOT_CRLF: "1" } });
+
+  await client.exitPromise;
+
+  assert.equal(client.protocolError, null);
+  assert.equal(events.filter((event) => event.type === "assistant.message").at(-1).data.content, "Fake Copilot answer.");
+  assert.ok(events.every((event) => !JSON.stringify(event).includes("\\r")));
+  assert.equal(client.result.exitCode, 0);
+});
+
+const RESULT_LINE = JSON.stringify({ type: "result", sessionId: "s-1", exitCode: 0 });
+
+// A stand-in Copilot that writes each string as its own chunk, 30 ms apart, then exits or hangs.
+function startWriter(writes, { hang = false, firstDelayMs = 0, ...options } = {}) {
+  const source = `
+    const writes = ${JSON.stringify(writes)};
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    (async () => {
+      await sleep(${firstDelayMs});
+      for (const chunk of writes) {
+        process.stdout.write(chunk);
+        await sleep(30);
+      }
+      if (${hang}) {
+        setInterval(() => {}, 1000);
+      }
+    })();
+  `;
+  const events = [];
+  const client = CopilotPromptModeClient.start(makeTempDir(), {
+    command: process.execPath,
+    args: ["-e", source],
+    prompt: "hello",
+    onEvent: (event) => events.push(event),
+    ...options
+  });
+  return { client, events };
+}
+
+test("events are joined across chunks and split within one, also with CR and LF in separate chunks", async () => {
+  const { client, events } = startWriter([
+    '{"type":"a.one",',
+    '"data":{}}\n{"type":"a.two"}\n{"type":"a.three"}\r',
+    "\n",
+    `${RESULT_LINE}\n`
+  ]);
+
+  await client.exitPromise;
+
+  assert.equal(client.protocolError, null);
+  assert.deepEqual(
+    events.map((event) => event.type),
+    ["a.one", "a.two", "a.three", "result"]
+  );
+});
+
+test("a lone CR does not end a line, so two events joined by it fail with the quoting error", async () => {
+  const { client, events } = startWriter(['{"type":"a.one"}\r{"type":"a.two"}\n']);
+
+  await client.exitPromise;
+
+  assert.match(client.protocolError.message, /Failed to parse Copilot JSON output/);
+  assert.ok(client.protocolError.message.includes('{"type":"a.one"}'));
+  assert.deepEqual(events, []);
+});
+
+test("a last line with no LF is still read: a result is kept, and text that is not JSON fails", async () => {
+  const valid = startWriter(['{"type":"a.one"}\n', RESULT_LINE]);
+  await valid.client.exitPromise;
+  assert.equal(valid.client.protocolError, null);
+  assert.equal(valid.client.result.exitCode, 0);
+  assert.deepEqual(
+    valid.events.map((event) => event.type),
+    ["a.one", "result"]
+  );
+
+  const broken = startWriter(["not json at the end"]);
+  await broken.client.exitPromise;
+  assert.match(broken.client.protocolError.message, /Failed to parse Copilot JSON output/);
+  assert.match(broken.client.protocolError.message, /not json at the end/);
+});
+
+test("a run that times out with part of a line kept keeps its timeout error", async () => {
+  const { client, events } = startWriter(['{"type":"a.one"}\n{"type":"par'], { hang: true, timeoutMs: 500 });
+
+  await client.exitPromise;
+
+  assert.match(client.protocolError.message, /did not finish within 0\.5 seconds/);
+  assert.deepEqual(
+    events.map((event) => event.type),
+    ["a.one"]
+  );
+});
+
+test("output after the run has finished changes nothing", async () => {
+  const { client, events } = startWriter([`${RESULT_LINE}\n`, "not json\n"], {
+    hang: true,
+    firstDelayMs: 600,
+    timeoutMs: 200,
+    terminateImpl: () => Promise.reject(new Error("kill EPERM"))
+  });
+
+  const exit = await client.exitPromise;
+  await new Promise((resolve) => setTimeout(resolve, 900));
+
+  assert.equal(exit.error.message, "Copilot could not be stopped: kill EPERM");
+  assert.match(client.protocolError.message, /did not finish within 0\.2 seconds/);
+  assert.equal(client.result, null);
+  assert.equal(client.resultTimer, null);
+  assert.deepEqual(events, []);
+  await terminateProcessTree(client.proc.pid);
+});
+
+test("an event of more than 1 MB, written in many chunks, is read whole", async () => {
+  const source = `
+    const line = JSON.stringify({ type: "big", data: { content: "x".repeat(1500000) } }) + "\\n";
+    for (let index = 0; index < line.length; index += 65536) {
+      process.stdout.write(line.slice(index, index + 65536));
+    }
+  `;
+  const events = [];
+  const client = CopilotPromptModeClient.start(makeTempDir(), {
+    command: process.execPath,
+    args: ["-e", source],
+    prompt: "hello",
+    onEvent: (event) => events.push(event)
+  });
+
+  await client.exitPromise;
+
+  assert.equal(client.protocolError, null);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].data.content.length, 1500000);
+});

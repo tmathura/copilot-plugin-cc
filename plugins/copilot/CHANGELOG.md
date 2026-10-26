@@ -2,6 +2,12 @@
 
 ## Copilot plugin
 
+### 1.0.19
+
+- A review or task no longer fails with "Failed to parse Copilot JSON output" when Copilot reads,
+  quotes or writes text that holds a line separator (U+2028) or a paragraph separator (U+2029),
+  for example text copied from a web page or a Word document.
+
 ### 1.0.18
 
 - A review now gives Copilot the whole diff in its prompt up to 256 KB, whatever the number of
