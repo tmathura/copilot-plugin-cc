@@ -8,7 +8,7 @@ disable-model-invocation: true
 # workflow: auto
 
 First read the repo's `.claude/skills/workflow-common/REFERENCE.md` and
-`.claude/skills/workflow-manual/SKILL.md`. This skill does not repeat their steps or rules. It only
+`.claude/skills/workflow-manual/SKILL.md`. Read them again after each summary of the conversation. This skill does not repeat their steps or rules. It only
 gives the answers to their questions, so later changes to the workflow apply here too.
 
 ## Input
