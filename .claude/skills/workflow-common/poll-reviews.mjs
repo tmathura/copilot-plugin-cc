@@ -74,6 +74,7 @@ export async function pollReviews({
   const startedAt = now();
   const read = (path) => items(ghPages(`${repo}/${path}`));
   let pushedAt;
+  let copilotStarted = false;
 
   const reviewers = {
     copilot: (reviews) => reviews.some((r) => isCopilot(r.user.login) && r.commit_id === sha),
@@ -117,7 +118,8 @@ export async function pollReviews({
     if (pending.length === 0) {
       return { code: 0, message: `all reviewers done after ${attempt} check(s)` };
     }
-    if (pending.includes("copilot")) {
+    // The timeline is long and paged; read it only when a drop could be reported, until a start shows.
+    if (pending.includes("copilot") && !copilotStarted && now() - startedAt >= dropGraceMs) {
       let timeline;
       try {
         timeline = read(`issues/${pr}/timeline`);
@@ -137,7 +139,9 @@ export async function pollReviews({
         .filter(Number.isFinite);
       const requestedAt = Math.max(pushedAt ?? -Infinity, ...requestTimes);
       const started = timeline.some((e) => e.event === "copilot_work_started" && time(e.created_at) >= requestedAt);
-      if (!started && now() - startedAt >= dropGraceMs) {
+      // Without the push time, the start may be an earlier push's; read again until a suite shows.
+      copilotStarted = started && pushedAt !== undefined;
+      if (!started) {
         const at = Number.isFinite(requestedAt) ? new Date(requestedAt).toISOString() : "an unknown time";
         return { code: 4, message: `copilot dropped the request made at ${at}: no copilot_work_started since then` };
       }

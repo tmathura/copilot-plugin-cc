@@ -274,9 +274,22 @@ test("a check suite found on a later check replaces an earlier push's request", 
   const result = await run({
     statuses: RABBIT_DONE,
     timeline: [request(PUSH - 120_000), started(PUSH - 90_000)],
-    "check-suites": (now) => (now >= START + 30_000 ? [suite(PUSH)] : [])
+    "check-suites": (now) => (now >= START + 150_000 ? [suite(PUSH)] : [])
   });
   assert.equal(result.code, 4);
+  assert.equal(result.waited, 150_000);
+});
+
+test("the timeline is not read before the window, nor after a start is seen", async () => {
+  const early = await run({ statuses: RABBIT_DONE, timeline: new Error("not read") }, { tries: 4 });
+  assert.equal(early.code, 1);
+  assert.ok(!early.calls.some((call) => /timeline|check-suites/.test(call)), early.calls.join(" "));
+  const seen = await run(
+    { statuses: RABBIT_DONE, timeline: [request(PUSH + 5000), started(PUSH + 35_000)], "check-suites": [suite(PUSH)] },
+    { tries: 10 }
+  );
+  assert.equal(seen.code, 1);
+  assert.equal(seen.calls.filter((call) => call.endsWith("/timeline")).length, 1);
 });
 
 test("limit: with no check suite, an earlier push's start counts and the poll times out", async () => {
