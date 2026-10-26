@@ -258,12 +258,11 @@ test("CRLF line ends are read, and no CR stays in the events", async () => {
 const RESULT_LINE = JSON.stringify({ type: "result", sessionId: "s-1", exitCode: 0 });
 
 // A stand-in Copilot that writes each string as its own chunk, 30 ms apart, then exits or hangs.
-function startWriter(writes, { hang = false, firstDelayMs = 0, ...options } = {}) {
+function startWriter(writes, { hang = false, ...options } = {}) {
   const source = `
     const writes = ${JSON.stringify(writes)};
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     (async () => {
-      await sleep(${firstDelayMs});
       for (const chunk of writes) {
         process.stdout.write(chunk);
         await sleep(30);
@@ -284,11 +283,16 @@ function startWriter(writes, { hang = false, firstDelayMs = 0, ...options } = {}
   return { client, events };
 }
 
+// Only a stand-in that still runs is stopped: an exited pid may belong to another program by now.
+function stopIfRunning(child) {
+  return child.exitCode === null && child.signalCode === null ? terminateProcessTree(child.pid) : undefined;
+}
+
 // The chunks are given to handleChunk directly, because a pipe may join writes that come close together.
 test("events are joined across chunks and split within one, also with CR and LF in separate chunks", async (t) => {
   const separator = SEPARATORS[0][1];
   const { client, events } = startWriter([], { hang: true });
-  t.after(() => terminateProcessTree(client.proc.pid));
+  t.after(() => stopIfRunning(client.proc));
   for (const chunk of [
     '{"type":"a.one",',
     '"data":{}}\n{"type":"a.two"}\n{"type":"a.three"}\r',
@@ -337,7 +341,7 @@ test("a last line with no LF is still read: a result is kept, and text that is n
 
 test("a run that times out with part of a line kept keeps its timeout error", async (t) => {
   const { client, events } = startWriter(['{"type":"a.one"}\n{"type":"par'], { hang: true, timeoutMs: 500 });
-  t.after(() => terminateProcessTree(client.proc.pid));
+  t.after(() => stopIfRunning(client.proc));
 
   await client.exitPromise;
 
@@ -358,7 +362,7 @@ test("output after the run has finished changes nothing", async (t) => {
     terminateImpl: () => Promise.reject(new Error("kill EPERM"))
   });
   // The stand-in runs on after the failed stop, also when an assertion below fails.
-  t.after(() => terminateProcessTree(client.proc.pid));
+  t.after(() => stopIfRunning(client.proc));
 
   const exit = await client.exitPromise;
   client.handleChunk(`{"type":"result","sessionId":"s-2","exitCode":7}\n{"type":"a.late"}\nnot json\n`);
@@ -375,7 +379,7 @@ test("output after the run has finished changes nothing", async (t) => {
 
 test("output after a protocol error is not read, also in the same chunk", (t) => {
   const { client, events } = startWriter([], { hang: true });
-  t.after(() => terminateProcessTree(client.proc.pid));
+  t.after(() => stopIfRunning(client.proc));
   client.handleChunk(`not json\n{"type":"a.late"}\n{"type":"par`);
   client.handleChunk(`tial"}\n${RESULT_LINE}\n{"type":"more`);
 
