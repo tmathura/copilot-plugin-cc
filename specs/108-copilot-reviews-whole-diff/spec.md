@@ -25,6 +25,11 @@
   ranges where needed (research §3). Round 1 gave the size in bytes; round 2 changed it to lines,
   because `view` reads by line number.
 
+### Session 2026-10-21 (PR review round 1)
+
+- Q: How does the split treat an unresolved merge? → A: a `diff --cc` header and a
+  `* Unmerged path` line also start a patch, in the staged and the unstaged diff (research §2).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A review of a usual change sees the whole diff (Priority: P1)
@@ -102,7 +107,9 @@ only the repo.
 - A changed submodule: each `Submodule` line is its own patch, and each inner file diff gets its
   own patch, labelled with the submodule path. A file diff after a submodule line is never joined
   to it. The joined bytes stay exact.
-- Bytes before the first file or submodule header, or a non-empty diff with no header: they go
+- An unresolved merge: each `diff --cc` header and `* Unmerged path` note starts its own patch
+  (research §2).
+- Bytes before the first file, submodule or conflict line, or a non-empty diff with none: they go
   into the first patch, so no byte is lost.
 - A patch file that cannot be written: the review fails before Copilot starts, and the folder is
   removed.
@@ -120,8 +127,9 @@ only the repo.
   whatever the number of changed files. This applies to branch scope, working-tree scope and the
   stop-time review gate.
 - **FR-002**: Above 256 KB, the companion MUST write one patch file per changed file, for the branch
-  diff, and for the staged and the unstaged diff. The patches MUST be split from the exact
-  `git diff` bytes, so that joined in order they are equal to the full diff.
+  diff, and for the staged and the unstaged diff; git's note on a merge conflict is a patch of its
+  own (research §2). The patches MUST be split from the exact `git diff` bytes, so that joined in
+  order they are equal to the full diff.
 - **FR-003**: The prompt MUST list each patch file with its line count and the changed file that
   it holds, and MUST ask Copilot to read every listed file to its last line.
 - **FR-004**: The patch folder MUST stay in the plugin's job storage and MUST be removed after the
@@ -149,8 +157,9 @@ only the repo.
 
 - **SC-001**: A review of a change of 3 to 11 files and at most 256 KB gives Copilot 100% of the diff
   in its prompt.
-- **SC-002**: Above 256 KB, each patch file starts at a file or submodule header of the diff (the
-  first one can also hold bytes before it), and the joined bytes are equal to the diff.
+- **SC-002**: Above 256 KB, each patch file starts at a file, submodule or conflict line of the diff
+  (research §2; the first one can also hold bytes before it), and the joined bytes are equal to the
+  diff.
 - **SC-003**: In the PR #106 test, Copilot with the new input says it read every changed file.
 - **SC-004**: No patch folder is left after a review that ends, fails or is stopped by a signal.
 

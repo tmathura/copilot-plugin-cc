@@ -5,8 +5,9 @@
 2. In `tests/git.test.mjs`, a working tree and a branch with 3 changed files give `inline-diff`, and
    the content holds all 3 diffs.
 3. In `tests/git.test.mjs`, `writeReviewPatches` keeps exact bytes with a submodule, a binary file,
-   CRLF and a missing end newline, numbers 1000 patches with 4 digits, and throws on a patch file
-   that exists already.
+   CRLF and a missing end newline, gives each file of an unresolved merge its own patch (a file
+   that the other side deleted and the user edited gets a note patch, then a diff patch), numbers 1000 patches with 4 digits, and throws on a patch file that
+   exists already.
 4. In `tests/runtime-review-safety.test.mjs`, a patch write that fails stops the review before
    Copilot starts and removes the folder. Also, a review above 256 KB gets one patch per file, the
    joined patches equal `git diff`, the prompt lists each patch with its line count and `diff --git` line, and the

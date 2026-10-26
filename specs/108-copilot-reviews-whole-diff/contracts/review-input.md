@@ -11,8 +11,8 @@ branch diff, or the git status, the staged and unstaged diffs and the untracked 
 The guidance line:
 
 > The repository context below is a lightweight summary. Read every file listed below with the
-> view tool before finalizing findings. Each patch file holds the diff of one changed file. The
-> list gives the line count of each file. The view tool cuts a long read, so read each file to
+> view tool before finalizing findings. Each patch file holds the diff of one changed file, or
+> git's one-line note on a merge conflict. The list gives the line count of each file. The view tool cuts a long read, so read each file to
 > its last line, in line ranges where needed.
 
 The review input ends with:

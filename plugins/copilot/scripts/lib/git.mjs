@@ -334,7 +334,7 @@ function buildAdversarialCollectionGuidance(options = {}) {
     return "Use the repository context below as primary evidence.";
   }
 
-  return "The repository context below is a lightweight summary. Read every file listed below with the view tool before finalizing findings. Each patch file holds the diff of one changed file. The list gives the line count of each file. The view tool cuts a long read, so read each file to its last line, in line ranges where needed.";
+  return "The repository context below is a lightweight summary. Read every file listed below with the view tool before finalizing findings. Each patch file holds the diff of one changed file, or git's one-line note on a merge conflict. The list gives the line count of each file. The view tool cuts a long read, so read each file to its last line, in line ranges where needed.";
 }
 
 // Git writes straight to the file: a large patch has no buffer limit, and its bytes stay exact.
@@ -348,7 +348,8 @@ function writeGitOutput(cwd, args, file) {
   return file;
 }
 
-const PATCH_HEADERS = [Buffer.from("diff --git "), Buffer.from("Submodule ")];
+// An unresolved conflict gives a "diff --cc" header or a "* Unmerged path" note, in either diff.
+const PATCH_HEADERS = ["diff --git ", "diff --cc ", "Submodule ", "* Unmerged path "].map((header) => Buffer.from(header));
 
 function startsPatch(buffer, offset) {
   return PATCH_HEADERS.some(
@@ -357,7 +358,7 @@ function startsPatch(buffer, offset) {
 }
 
 // A patch line starts with a space, "+", "-" or "\", and a binary patch line has no space, so only a
-// file or submodule header starts a line with these words. Bytes before the first header stay in the
+// file, submodule or conflict line starts with these words. Bytes before the first one stay in the
 // first part, so the parts joined are the exact diff.
 function splitPatch(buffer) {
   const starts = [];

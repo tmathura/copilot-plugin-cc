@@ -8,7 +8,7 @@
 
 A review now puts the whole diff in the prompt when it is at most 256 KB, whatever the file count:
 the default of `maxInlineFiles` in `collectReviewContext` becomes no limit. Above 256 KB,
-`writeReviewPatches` splits each `git diff` output at its `diff --git` and `Submodule` lines into
+`writeReviewPatches` splits each `git diff` output at its `diff --git`, `diff --cc`, `Submodule` and `* Unmerged path` lines into
 one numbered patch per changed file (research §2), and `withReviewPatches` lists each patch with
 its line count and first line (research §3). The
 folder, its removal and the stop-time gate path stay as they are (research §1 to §3). The "Blind
@@ -44,8 +44,8 @@ plan" rule gets one line for files outside the repo (research §5).
 | II. Only reviewed code | Met | Code written in this repo. No upstream code comes in. |
 | III. Copilot CLI through documented interfaces | Met | Only the prompt text and the existing `--add-dir` change. No new flag. The adapter is not changed. |
 | IV. Safe by default | Met | The review tools stay read-only, with no shell (FR-005). The patch folder stays in job storage and is removed after the run and on a signal (tests T005, T006). Numbered patch names keep repo file names out of the folder's paths. |
-| V. Cross-platform | Met | Paths through `node:path`; the split works on bytes, so CRLF files and binary patches stay exact. CI runs on all three systems. |
-| VI. Tested, including failure paths | Met | Tests cover the inline path with 3 files and the 256 KB boundary, the split for branch, working tree and the gate, exact bytes with a submodule, a binary file, CRLF and a missing end newline, a rename, a patch write that fails before Copilot starts, and the folder removal after success, failure and a signal (T003 to T006). |
+| V. Cross-platform | Met | Paths through `node:path`; the split works on bytes, so CRLF files and git's binary patches stay exact. CI runs on all three systems. |
+| VI. Tested, including failure paths | Met | Tests cover the inline path with 3 files and the 256 KB boundary, the split for branch, working tree and the gate, exact bytes with a submodule, a binary file, CRLF and a missing end newline, an unresolved merge (also an edited file that the other side deleted), a rename, a patch write that fails before Copilot starts, and the folder removal after success, failure and a signal (T003 to T006). |
 
 No principle is "not met". Re-check after Phase 1: unchanged.
 

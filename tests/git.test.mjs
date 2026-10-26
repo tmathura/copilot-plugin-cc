@@ -218,7 +218,7 @@ test("collectReviewContext gives lightweight context above the file limit that a
   assert.equal(context.fileCount, 3);
   assert.match(context.collectionGuidance, /lightweight summary/i);
   assert.match(context.collectionGuidance, /Read every file listed below with the view tool/);
-  assert.match(context.collectionGuidance, /Each patch file holds the diff of one changed file/);
+  assert.match(context.collectionGuidance, /Each patch file holds the diff of one changed file, or git's one-line note on a merge conflict/);
   assert.doesNotMatch(context.content, /MARKER_[ABC]/);
   assert.match(context.content, /## Changed Files/);
 });
@@ -603,6 +603,43 @@ test("writeReviewPatches gives a dirty submodule line its own patch and writes n
   assert.ok(patches.some(({ label }) => label === "Submodule sub contains modified content"), JSON.stringify(entries));
   assert.ok(patches.every(({ label }) => /^(diff --git |Submodule )/.test(label)));
   assert.deepEqual(entries.at(-1), { file: path.join(dir, "untracked.md"), label: "untracked files", lines: 0 });
+});
+
+test("writeReviewPatches gives each file of an unresolved merge its own patch, staged and unstaged", () => {
+  const cwd = makeThreeFileRepo();
+  git(cwd, "checkout", "-qb", "other");
+  writeMarkers(cwd);
+  // The other side deletes c.js, a modify/delete conflict: the unstaged diff gives it no diff --cc header.
+  git(cwd, "rm", "-qf", "c.js");
+  git(cwd, "commit", "-qam", "other");
+  git(cwd, "checkout", "-q", "main");
+  for (const name of ["a.js", "b.js", "c.js"]) {
+    fs.writeFileSync(path.join(cwd, name), `export const value = "main ${name}";\n`);
+  }
+  git(cwd, "commit", "-qam", "main");
+  // --no-ff: a global merge.ff=only would stop the merge before it conflicts.
+  run("git", ["merge", "--no-ff", "other"], { cwd });
+  assert.notEqual(git(cwd, "ls-files", "-u"), "");
+  // An edit to c.js, which our side still has, adds a diff --git patch after its note.
+  fs.writeFileSync(path.join(cwd, "c.js"), 'export const value = "edited c.js";\n');
+  const context = collectReviewContext(cwd, resolveReviewTarget(cwd, { scope: "working-tree" }), { maxInlineFiles: 0 });
+
+  const entries = writeReviewPatches(context, makeTempDir());
+
+  const staged = entries.filter(({ file }) => path.basename(file).startsWith("staged-"));
+  const unstaged = entries.filter(({ file }) => path.basename(file).startsWith("unstaged-"));
+  assert.ok(readPatches(staged).equals(diffBytes(cwd, "--cached")));
+  assert.ok(readPatches(unstaged).equals(diffBytes(cwd)));
+  assert.deepEqual(
+    staged.map(({ label }) => label),
+    ["* Unmerged path a.js", "* Unmerged path b.js", "* Unmerged path c.js"]
+  );
+  assert.deepEqual(unstaged.map(({ label }) => label), [
+    "diff --cc a.js",
+    "diff --cc b.js",
+    "* Unmerged path c.js",
+    "diff --git a/c.js b/c.js"
+  ]);
 });
 
 test("writeReviewPatches numbers 1000 patches with 4 digits, in diff order", () => {

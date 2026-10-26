@@ -42,7 +42,7 @@ different runs, so the test compares only what was read.
   returns each patch with its first line as the label. The number has at least 3 digits, and more
   when there are more patches, so the names sort in diff order.
 - **Split points** (decided 2026-10-21, plan review rounds 1 and 2): a new patch starts at each
-  line that starts with `diff --git ` or `Submodule `. So a changed submodule gives its
+  line that starts with `diff --git ` or `Submodule ` (and the conflict lines below). So a changed submodule gives its
   `Submodule <path> a..b:` header as one small patch, then one patch per inner file
   (`--submodule=diff` prints the inner files as `diff --git a/<path>/<inner> …`, so each label names
   the submodule path). A `Submodule <path> contains modified content` line is its own patch. Bytes
@@ -51,10 +51,22 @@ different runs, so the test compares only what was read.
   leaves a submodule's header at the end of the patch before it and labels it wrongly (round 1);
   keep a submodule header with the `diff --git` line after it, which joins an unrelated file to a
   header that has no diff of its own (round 2).
+- **Conflict headers** (2026-10-21, PR review round 1, Copilot and `code-review`): during an
+  unresolved merge, git prints a `diff --cc <path>` header or a `* Unmerged path <path>` note for a
+  conflicted file. Git decides which one it prints, and whether a `diff --git` patch for the same
+  file follows the note, as on `main`. The split does not depend on it: each of these lines starts
+  a patch, in the staged and the unstaged diff. So a conflicted file gets its own patch, a note
+  patch has one line and no diff (the guidance says so), and a file can get a note patch and then
+  a diff patch; this is accepted. A content line of a combined diff starts with spaces, `+` or `-`,
+  and its other lines (such as `index` and `Binary files differ`) do not start with a split
+  prefix either; a binary conflict gives no binary patch, as on `main`. Git prints the name in the note unquoted, so a conflicted file whose name holds a new
+  line (not possible on Windows) can add a split with a wrong label; the joined bytes stay exact,
+  and this risk is accepted. Rejected alternative: split at `diff --git` and `Submodule` only,
+  which put all conflicted files in one patch.
 - **Rationale**: a split of one diff keeps the bytes exact (joined in order, the parts are the full
   diff) and keeps renames, binary patches and submodule lines as git prints them. A content line
   of a patch starts with a space, `+`, `-` or `\`, and a binary patch line has no space, so no
-  content line starts with `diff --git ` or `Submodule `. Numbered names keep repo file names out of
+  content line starts with `diff --git `, `diff --cc `, `Submodule ` or `* Unmerged path `. Numbered names keep repo file names out of
   the folder's paths, so a name cannot leave the folder or clash.
 - **Failure**: a write that fails partway (for example a patch file that exists already, since
   each file is made with `wx`) throws. `withReviewPatches` already removes the whole folder in its
