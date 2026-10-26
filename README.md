@@ -264,6 +264,10 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
 - Copilot publishes no schema for its JSON output, so the types in
   `scripts/lib/prompt-mode-protocol.d.ts` are written by hand. Codex generates its types with
   `codex app-server generate-ts`, so `npm run build` has no `prebuild` step here.
+- The plugin splits Copilot's JSON output into events only at a line feed, and drops a carriage
+  return before it. Codex reads its app server with `readline`, which also ends a line at a lone
+  carriage return and at the line and paragraph separators (U+2028, U+2029). JSON allows both
+  separators inside a string, so a run whose output held one failed. The reason is correctness.
 - Copilot cannot start its own subagents in a run, because its `task` tool is not in any permission
   profile. Codex can, and the plugin reports their progress.
 - There is no shared broker process (upstream `app-server-broker.mjs`, `broker-endpoint.mjs` and

@@ -42,7 +42,7 @@ export const NOT_LOGGED_IN_STDERR = [
 // Every run records its arguments, environment, prompt, pid and the files of each --add-dir folder
 // (base64, so the bytes stay exact). Each child that a run starts is recorded with the run's pid.
 // FAKE_COPILOT_ANSWER replaces the final answer text. FAKE_COPILOT_EARLIER gives the first turn's
-// message, which comes with the view tool call.
+// message, which comes with the view tool call. FAKE_COPILOT_CRLF ends each event line with CRLF.
 export function installFakeCopilot(binDir, behavior = "ok") {
   const scriptPath = path.join(binDir, "copilot");
   const recordPath = path.join(binDir, "fake-copilot-runs.jsonl");
@@ -103,7 +103,7 @@ function readAddDirFiles() {
 }
 
 function emit(event) {
-  process.stdout.write(JSON.stringify(event) + "\\n");
+  process.stdout.write(JSON.stringify(event) + (process.env.FAKE_COPILOT_CRLF ? "\\r\\n" : "\\n"));
 }
 
 function startChild() {
@@ -281,7 +281,8 @@ const MACHINE_AUTH_VARS = [
   "CLAUDE_PLUGIN_DATA",
   "COPILOT_COMPANION_PLUGIN_DATA",
   "FAKE_COPILOT_BEHAVIOR",
-  "FAKE_COPILOT_ANSWER"
+  "FAKE_COPILOT_ANSWER",
+  "FAKE_COPILOT_CRLF"
 ];
 
 // Windows keeps the search path as "Path"; a second "PATH" key would leave the child with either one.

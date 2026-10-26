@@ -1,0 +1,104 @@
+# Bug Fix: Copilot JSON events with U+2028 or U+2029 are split and fail to parse
+
+- **Slug**: 107-split-events-at-lf-only
+- **Fixed**: 2026-10-27
+- **Assessment**: ./assessment.md
+- **Status**: applied
+
+## Summary
+
+The companion now splits Copilot's stdout into event lines at LF only, with one CR before it
+dropped, through a chunk buffer in the shape of upstream's `handleChunk`, instead of `readline`,
+which also ended lines at U+2028 and U+2029. Output after the run has finished is ignored.
+
+## Changes
+
+| File | Change | Notes |
+|------|--------|-------|
+| `plugins/copilot/scripts/lib/prompt-mode.mjs` | modified | `readline` removed; `handleChunk` splits at LF, searches only the new chunk, joins a line's pieces once, drops one CR, and reads nothing once the run has exited or after a protocol error (it also stops in the middle of a chunk); stdout `end` passes a last line with no LF through `handleChunk` |
+| `tests/fake-copilot-fixture.mjs` | modified | `FAKE_COPILOT_CRLF` ends each event line with CRLF; added to the variables the fake reads from the test, not the outer environment |
+| `tests/prompt-mode.test.mjs` | added tests | separators, CRLF, chunks, a separator cut inside its bytes across pipe chunks, lone CR, last line with no LF, timeout with a partial line, output after the run, output after a protocol error, an event over 1 MB; `startFake` takes extra env |
+| `README.md` | modified | "Differences from the Codex plugin": the LF-only split, with its reason |
+| `plugins/copilot/CHANGELOG.md` | modified | `### 1.0.19` entry |
+| `package.json`, `package-lock.json`, `plugins/copilot/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` | modified | version 1.0.19 (`npm run bump-version`) |
+
+## Diff Highlights (optional)
+
+```js
+handleChunk(chunk) {
+  if (this.exited || this.protocolError) {
+    return;
+  }
+  let start = 0;
+  let newlineIndex = chunk.indexOf("\n");
+  while (newlineIndex !== -1) {
+    this.lineParts.push(chunk.slice(start, newlineIndex));
+    const line = this.lineParts.join("");
+    this.lineParts = [];
+    start = newlineIndex + 1;
+    this.handleLine(line.endsWith("\r") ? line.slice(0, -1) : line);
+    if (this.protocolError) {
+      return;
+    }
+    newlineIndex = chunk.indexOf("\n", start);
+  }
+  if (start < chunk.length) {
+    this.lineParts.push(chunk.slice(start));
+  }
+}
+```
+
+At stdout end, a non-empty `lineParts` is passed through `handleChunk("\n")`, so the last line takes
+the same CR rule.
+
+## Tests Added or Updated
+
+- `tests/prompt-mode.test.mjs` "an event whose JSON string holds a raw U+2028 is read as one event" and the U+2029 case — the bug; both fail on the old reader.
+- "CRLF line ends are read, and no CR stays in the events" — CRLF from Copilot still works.
+- "events are joined across chunks and split within one, also with CR and LF in separate chunks" — gives the exact chunks to `handleChunk`, also an event cut inside its U+2028.
+- "a lone CR does not end a line, so two events joined by it fail with the quoting error" — only LF splits (fails on the old reader, which split at the CR).
+- "a last line with no LF is still read: a result is kept, and text that is not JSON fails".
+- "a run that times out with part of a line kept keeps its timeout error".
+- "output after the run has finished changes nothing" — after a result and a stop that fails, a late result given to `handleChunk` does not replace it.
+- "output after a protocol error is not read, also in the same chunk" — no event, no result, nothing kept in `lineParts`.
+- "a separator cut inside its UTF-8 bytes across two pipe chunks is read whole".
+- "an event of more than 1 MB, written in many chunks, is read whole".
+- The existing "a line that is not JSON ends the run with an error that quotes it" is unchanged and passes.
+
+## Local Verification
+
+- Commands run: `npm ci --include=dev`, `npm run build` → pass; `npm test` → 422 tests, 398 pass, 24 skipped, 0 fail (after review round 2: 423 tests, 399 pass); `npm run check-version` → 1.0.19; `claude plugin validate .` → pass.
+- Against the old `prompt-mode.mjs` (the fix taken out for one run, before the review rounds): the U+2028, U+2029 and lone-CR tests fail; the others then passed. The tests added in the review rounds that call `handleChunk` directly cannot run on the old reader (it has no `handleChunk`), and the byte-split test fails on it like the other separator tests.
+- Manual check: a one-line script fed one JSON event with both separators to `readline` and got 3 line events, none of which parsed (Node 24.21.0).
+
+## Deviations from Assessment
+
+- 2026-10-27, review round 1 (`code-review`): the buffer keeps the pieces of a line in a list,
+  searches only the new chunk for LF and joins the pieces once per line, so a large event no longer
+  costs time that grows with the square of its size; it also stops reading after a protocol error;
+  the stdout `end` flush passes the rest through `handleChunk`, so the CR rule lives in one place.
+  The assessment's shape (cut at LF, drop one CR, flush the last line, ignore output after the run)
+  is unchanged.
+- 2026-10-27, review round 1: the late-output test now gives the chunk to `handleChunk` directly.
+  A stop that fails closes the child's pipes (`releaseChild`), so late output cannot arrive through
+  the pipe; the guard is kept for the case the assessment names. The chunk-split test also calls
+  `handleChunk` directly, because a pipe may join writes that come close together.
+- 2026-10-27, review round 2 (`code-review`): after a protocol error, `handleChunk` also stops in the
+  middle of a chunk and keeps no partial line. The late-output test now uses a case that only the
+  exited guard covers (a Copilot that stays alive after its result and cannot be stopped; any stop
+  that fails before a protocol error is another), and
+  the protocol-error test puts the error and a partial line in one chunk; with the guard taken out,
+  the late-output test fails. A new test cuts a U+2028 inside its UTF-8 bytes across two pipe
+  chunks.
+- 2026-10-27, review round 3 (`code-review`): the protocol-error check inside `handleChunk` is one
+  return right after `handleLine`, in place of checks in the loop condition and before the last
+  push; the behaviour is the same. The late-output test stops its stand-in Copilot in `t.after`, so
+  a failed assertion leaves no process running.
+- 2026-10-27, review round 4 (`code-review`): every test this ticket added that starts a stand-in
+  Copilot that never exits stops it in `t.after`, so a failure there cannot leave `npm test`
+  waiting. Round 5: the hook stops the stand-in only while it still runs, because an exited pid may
+  belong to another program by then. (Older tests from `main` keep their own cleanup.)
+
+## Follow-ups
+
+- Upstream codex-plugin-cc reads its app server with `readline` too; the owner reports it upstream.

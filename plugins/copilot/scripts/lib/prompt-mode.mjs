@@ -10,7 +10,6 @@
  */
 import { spawn } from "node:child_process";
 import process from "node:process";
-import readline from "node:readline";
 
 import { terminateProcessTree } from "./process.mjs";
 
@@ -155,6 +154,7 @@ export class CopilotPromptModeClient {
     this.resultTimer = null;
     this.timeoutTimer = null;
     this.exited = false;
+    this.lineParts = [];
     /** @type {Promise<PromptModeExit>} */
     this.exitPromise = new Promise((resolve) => {
       this.resolveExit = resolve;
@@ -195,9 +195,14 @@ export class CopilotPromptModeClient {
       this.finish({ exitCode: code, signal, error: null });
     });
 
-    this.readline = readline.createInterface({ input: this.proc.stdout });
-    this.readline.on("line", (line) => {
-      this.handleLine(line);
+    this.proc.stdout.on("data", (chunk) => {
+      this.handleChunk(chunk);
+    });
+    // A last line with no LF is still read, as readline read it.
+    this.proc.stdout.on("end", () => {
+      if (this.lineParts.length > 0) {
+        this.handleChunk("\n");
+      }
     });
 
     // Copilot can exit before it reads the prompt, for example when nobody is logged in.
@@ -209,6 +214,32 @@ export class CopilotPromptModeClient {
         this.protocolError ??= new Error(`Copilot did not finish within ${this.options.timeoutMs / 1000} seconds.`);
         this.close().catch(() => {});
       }, this.options.timeoutMs);
+    }
+  }
+
+  // Events end at LF only. readline also ends a line at U+2028 and U+2029, which JSON allows raw in a
+  // string. Output after the run has finished (a stop that failed) must not change it, and output after
+  // a protocol error is not read: the run has already failed. The pieces of a long line are joined
+  // once, at its LF, so a large event costs no more than its size.
+  handleChunk(chunk) {
+    if (this.exited || this.protocolError) {
+      return;
+    }
+    let start = 0;
+    let newlineIndex = chunk.indexOf("\n");
+    while (newlineIndex !== -1) {
+      this.lineParts.push(chunk.slice(start, newlineIndex));
+      const line = this.lineParts.join("");
+      this.lineParts = [];
+      start = newlineIndex + 1;
+      this.handleLine(line.endsWith("\r") ? line.slice(0, -1) : line);
+      if (this.protocolError) {
+        return;
+      }
+      newlineIndex = chunk.indexOf("\n", start);
+    }
+    if (start < chunk.length) {
+      this.lineParts.push(chunk.slice(start));
     }
   }
 
@@ -257,7 +288,6 @@ export class CopilotPromptModeClient {
     this.exited = true;
     clearTimeout(this.resultTimer);
     clearTimeout(this.timeoutTimer);
-    this.readline?.close();
     untrackClient(this);
     this.resolveExit(exit);
   }
