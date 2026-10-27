@@ -50,8 +50,9 @@ return local.status === 0 ? name : `origin/${name}`;
 
 ## Local Verification
 
-- With the code on `main` put back for a moment, the four remote-only tests fail and the local-case
-  test passes; with the fix, all pass.
+- With the code on `main` put back for a moment (run again after review round 3, six tests): the four
+  tests with an `origin/HEAD` and no local branch of its name fail; the local-case test and the
+  no-`origin/HEAD` test (the candidate loop, unchanged) pass. With the fix, all pass.
 - Commands run: `npm ci --include=dev` (0 vulnerabilities), `npm run build` (pass), `npm test`
   (after review round 2: 443 tests, 419 pass, 24 skipped, 0 fail), `npm run check-version` (1.0.21),
   `claude plugin validate .` (pass).
@@ -71,6 +72,8 @@ return local.status === 0 ? name : `origin/${name}`;
   README and the 1.0.21 `CHANGELOG.md` entry name the condition itself: an `origin/HEAD` whose
   branch has no local copy. A test now covers the candidate loop's `origin/<candidate>` return,
   which a checkout with no `origin/HEAD` takes.
+- 2026-10-27, review round 3 (`code-review`): the before-fix check ran again with all six tests,
+  and its record names the two that pass on `main`; the candidate-loop test also checks the label.
 
 ## Follow-ups
 

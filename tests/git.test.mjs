@@ -171,6 +171,7 @@ test("a clone with no origin/HEAD and no local default branch reviews against or
   const target = resolveReviewTarget(clone, {});
 
   assert.equal(target.baseRef, "origin/main");
+  assert.equal(target.label, "branch diff against origin/main");
   assert.match(collectReviewContext(clone, target).content, /console\.log\('feature'\)/);
 });
 
