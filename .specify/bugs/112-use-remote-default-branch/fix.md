@@ -16,7 +16,7 @@ local default branch then compares against the remote-tracking ref, and `git mer
 | File | Change | Notes |
 |------|--------|-------|
 | `plugins/copilot/scripts/lib/git.mjs` | modified | One `show-ref --verify --quiet refs/heads/<name>` call in the `origin/HEAD` branch; a header comment line for the upstream difference |
-| `tests/git.test.mjs` | added tests | Five tests and three small helpers; a header comment line |
+| `tests/git.test.mjs` | added tests | Five tests and four small helpers; a header comment line |
 | `README.md` | modified | One bullet in "Differences from the Codex plugin" (correctness) |
 | `plugins/copilot/CHANGELOG.md` | modified | `### 1.0.21` entry |
 | `package.json`, `package-lock.json`, `plugins/copilot/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` | modified | `npm run bump-version -- 1.0.21` |
@@ -58,7 +58,12 @@ return local.status === 0 ? name : `origin/${name}`;
 
 ## Deviations from Assessment
 
-None.
+- 2026-10-27, review round 1 (`code-review`): the assessment's root cause says that a single-branch
+  clone and many CI checkouts have this shape. They do not: `actions/checkout` and a plain
+  `git clone --single-branch -b <branch>` set no `origin/HEAD`, so they take the candidate loop,
+  as before. The fix does not change them. The README and the 1.0.21 `CHANGELOG.md` entry name only
+  a clone such as `git clone -b <other branch>`; the single-branch test fetches the default branch
+  and sets `origin/HEAD` by hand, as the assessment says.
 
 ## Follow-ups
 
