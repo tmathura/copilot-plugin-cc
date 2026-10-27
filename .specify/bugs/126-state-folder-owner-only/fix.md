@@ -17,7 +17,7 @@ folders and an existing log from an older version, best effort.
 |------|--------|-------|
 | `plugins/copilot/scripts/lib/state.mjs` | modified | `makeOwnerOnly(file, mode)` (best effort, skips links); `ensureStateDir` creates `jobs` with 0700 and tightens `state/<slug>`, then `jobs` only when `state/<slug>` was checked and is no link; `writeJsonAtomic` temp file 0600; header comment |
 | `plugins/copilot/scripts/lib/tracked-jobs.mjs` | modified | Log writes with mode 0600; `createJobLogFile` tightens an existing log; header comment |
-| `tests/state-modes.test.mjs` | added | 19 tests, skipped on Windows |
+| `tests/state-modes.test.mjs` | added | 18 tests, skipped on Windows |
 | `docs/configuration.md` | modified | "Folders": which folders and files are owner-only |
 | `README.md` | modified | A "Differences from the Codex plugin" bullet |
 | `plugins/copilot/CHANGELOG.md` | modified | `### 1.0.23` entry |
@@ -55,7 +55,6 @@ sets umask 022 and a fresh data folder). These fail on the old code:
 
 These pass on the old code too and guard what the fix must not break:
 
-- An existing `state/` keeps 0755.
 - With `chmodSync` or `lstatSync` failing for `state/<slug>`, `jobs` or the log (EPERM, EROFS,
   ENOENT, EACCES), state updates, job files, the log and the read call `resolveJobLogFile` still
   work; an `lstatSync` failure on `state/<slug>` changes neither folder.
@@ -64,7 +63,7 @@ These pass on the old code too and guard what the fix must not break:
 ## Local Verification
 
 - Commands run: `npm ci --include=dev` (0 vulnerabilities), `npm run build` (pass), `npm test`
-  (504 tests: 461 pass, 43 skipped, 0 fail; the 19 new tests skip on this Windows machine),
+  (503 tests: 461 pass, 42 skipped, 0 fail; the 18 new tests skip on this Windows machine),
   `npm run check-version` (1.0.23), `claude plugin validate .` (pass).
 - The new tests run only on macOS and Linux, so CI on Ubuntu and macOS runs them; WSL is not
   reachable from this session.
@@ -75,6 +74,10 @@ These pass on the old code too and guard what the fix must not break:
   `tests/state.test.mjs` and `tests/tracked-jobs.test.mjs`, because both set one module-level
   `CLAUDE_PLUGIN_DATA` that other tests use. The assessment was written in the format of
   `/speckit-bug-assess` without running that skill.
+- 2026-10-27, review round 1: the guard test "an existing `state/` keeps 0755" was removed, because
+  the upgrade test makes the same check; the tests restore unset environment variables by deleting
+  them; the docs name the workspace folder `state/<repo folder name>-<hash>` and say that `jobs`
+  stays as it is when that folder is a link or cannot be checked.
 
 ## Follow-ups
 

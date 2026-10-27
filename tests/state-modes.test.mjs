@@ -1,4 +1,4 @@
-// The state folders and job files are owner-only on macOS and Linux (#126).
+// The state folders and job files are owner-only on macOS and Linux.
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
@@ -24,18 +24,23 @@ function useUmask(t) {
   t.after(() => process.umask(previous));
 }
 
-function useDataDir(t, dataDir) {
-  const previous = { data: process.env.CLAUDE_PLUGIN_DATA, companion: process.env.COPILOT_COMPANION_PLUGIN_DATA };
-  process.env.CLAUDE_PLUGIN_DATA = dataDir;
-  delete process.env.COPILOT_COMPANION_PLUGIN_DATA;
+// Sets or, for undefined, deletes each variable, and puts the old values back after the test.
+// Assigning undefined to process.env would store the string "undefined".
+function useEnv(t, values) {
+  const set = (name, value) => (value === undefined ? delete process.env[name] : (process.env[name] = value));
+  const previous = Object.fromEntries(Object.keys(values).map((name) => [name, process.env[name]]));
+  for (const [name, value] of Object.entries(values)) {
+    set(name, value);
+  }
   t.after(() => {
-    process.env.CLAUDE_PLUGIN_DATA = previous.data;
-    if (previous.companion === undefined) {
-      delete process.env.COPILOT_COMPANION_PLUGIN_DATA;
-    } else {
-      process.env.COPILOT_COMPANION_PLUGIN_DATA = previous.companion;
+    for (const [name, value] of Object.entries(previous)) {
+      set(name, value);
     }
   });
+}
+
+function useDataDir(t, dataDir) {
+  useEnv(t, { CLAUDE_PLUGIN_DATA: dataDir, COPILOT_COMPANION_PLUGIN_DATA: undefined });
 }
 
 // A fresh 0755 data folder and a workspace, with the paths the plugin uses for them.
@@ -96,17 +101,7 @@ test("under CLAUDE_PLUGIN_DATA the state folders and job files are owner-only, a
 
 test("without CLAUDE_PLUGIN_DATA the fallback state folders and job files are owner-only", { skip }, (t) => {
   useUmask(t);
-  const previous = { home: process.env.HOME, data: process.env.CLAUDE_PLUGIN_DATA, companion: process.env.COPILOT_COMPANION_PLUGIN_DATA };
-  process.env.HOME = makeTempDir();
-  delete process.env.CLAUDE_PLUGIN_DATA;
-  delete process.env.COPILOT_COMPANION_PLUGIN_DATA;
-  t.after(() => {
-    process.env.HOME = previous.home;
-    process.env.CLAUDE_PLUGIN_DATA = previous.data;
-    if (previous.companion !== undefined) {
-      process.env.COPILOT_COMPANION_PLUGIN_DATA = previous.companion;
-    }
-  });
+  useEnv(t, { HOME: makeTempDir(), CLAUDE_PLUGIN_DATA: undefined, COPILOT_COMPANION_PLUGIN_DATA: undefined });
   const workspace = makeTempDir();
   const stateDir = resolveStateDir(workspace);
   assert.ok(stateDir.startsWith(path.join(process.env.HOME, ".copilot-companion")));
@@ -210,15 +205,6 @@ test("a jobs folder that cannot be checked still lets the workspace folder be ti
 });
 
 // These pass on the old code too; they guard what the fix must not break.
-
-test("an existing state folder above the workspace folders keeps its mode", { skip }, (t) => {
-  const paths = setUp(t);
-  makeOldFolders(paths);
-
-  writeEverything(paths.workspace);
-
-  assert.equal(modeOf(path.dirname(paths.stateDir)), 0o755);
-});
 
 for (const [name, method, which, code] of [
   ["the workspace folder cannot be tightened", "chmodSync", "state", "EPERM"],
