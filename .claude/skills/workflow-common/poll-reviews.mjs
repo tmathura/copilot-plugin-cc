@@ -15,13 +15,13 @@
 //   Copilot's start gives a false drop.
 // - coderabbit: done when it has a review on the head SHA, or, when its reviews are paused, when it
 //   posted "Review finished" after this script started and is no longer "Currently processing", or when
-//   its commit status or its "CodeRabbit" check run on the head SHA is "success" (a review with no
-//   findings posts no review). A "Review finished" from before this poll started does not count, also
-//   when an earlier poll for the same head saw none. The "Bot reviewers" table gives triggers and where
-//   findings live, so it does not list the check run.
-//   Limits: any successful status or "Review completed" run on the head counts, also while a re-run
-//   of the same head is going, and a status that skipped the review for another reason than a pause
-//   or a limit counts too.
+//   its commit status on the head SHA is "success", or its "CodeRabbit" check run on the head SHA is
+//   "success" with a summary that starts "Result: Success - Review completed" (a review with no
+//   findings posts no review). A pause or a limit never counts. A "Review finished" from before this
+//   poll started does not count, also when an earlier poll for the same head saw none. The "Bot
+//   reviewers" table gives triggers and where findings live, so it does not list the check run.
+//   Limits: a success on the head counts also while a re-run of the same head is going, and a status
+//   that skipped the review for another reason than a pause or a limit counts too.
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -99,19 +99,17 @@ export async function pollReviews({
       const headStatusDone = statuses.some(
         (s) => isCodeRabbit(s.creator?.login) && s.state === "success" && !NOT_REVIEWED.test(s.description ?? "")
       );
-      // A run also ends with success when it skipped the review, so only a run that says it
-      // completed one counts.
-      const headRunDone = runs.some((run) => {
-        const text = `${run.output?.title ?? ""} ${run.output?.summary ?? ""}`;
-        return (
+      // A run also ends with success when it skipped the review, so only the summary text of a real
+      // clean review counts.
+      const headRunDone = runs.some(
+        (run) =>
           run.app?.slug === "coderabbitai" &&
           run.name === "CodeRabbit" &&
           run.status === "completed" &&
           run.conclusion === "success" &&
-          /Review completed/i.test(text) &&
-          !NOT_REVIEWED.test(text)
-        );
-      });
+          /^Result: Success - Review completed\b/.test(run.output?.summary ?? "") &&
+          !NOT_REVIEWED.test(`${run.output?.title ?? ""} ${run.output?.summary ?? ""}`)
+      );
       return reviewedHead || finishedSince || headStatusDone || headRunDone;
     }
   };

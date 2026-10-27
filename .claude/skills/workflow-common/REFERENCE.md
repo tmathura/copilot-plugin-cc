@@ -546,7 +546,8 @@ The loop ends only when every reviewer is done with the current head (the poll e
 marked it unavailable, or a second drop marked Copilot unavailable for that head), all its reviews have been read, and one of these is true:
 
 - No reviewer reported a new finding for that head, and no thread is open. A clean CodeRabbit review
-  can be only a success status or a successful `CodeRabbit` check run, with no review object.
+  can be only a success status, or a successful `CodeRabbit` check run whose summary starts "Result:
+  Success - Review completed", with no review object.
 - Every finding left for that head was rejected with its reason, in this round or an earlier one,
   each thread got a reply and is resolved, and nothing was pushed after that head.
 

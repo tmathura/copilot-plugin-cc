@@ -57,12 +57,13 @@ const copilotReview = (sha = SHA) => ({ user: { login: "copilot-pull-request-rev
 const rabbitStatus = (description) => ({ creator: { login: "coderabbitai[bot]" }, state: "success", description });
 const RABBIT_DONE = [rabbitStatus("Review completed")];
 // The fields of CodeRabbit's check run that the poll reads, with the text of a real clean review.
+const CLEAN = "Result: Success - Review completed";
 const rabbitRun = (overrides = {}) => ({
   app: { slug: "coderabbitai" },
   name: "CodeRabbit",
   status: "completed",
   conclusion: "success",
-  output: { title: "Finished", summary: "Result: Success - Review completed" },
+  output: { title: "Finished", summary: CLEAN },
   ...overrides
 });
 
@@ -438,16 +439,20 @@ test("a clean CodeRabbit review with only a check run ends the wait", async () =
 });
 
 for (const [name, runOfHead] of [
-  // Each pause or limit text comes with "Review completed" in the other field, so NOT_REVIEWED decides.
-  ["a paused title", rabbitRun({ output: { title: "Review paused", summary: "Review completed" } })],
-  ["a rate-limited summary", rabbitRun({ output: { title: "Review completed", summary: "Review rate limited" } })],
-  ["a rate-limit-exceeded summary", rabbitRun({ output: { title: "Review completed", summary: "Rate limit exceeded" } })],
-  ["a limit-reached summary", rabbitRun({ output: { title: "Review completed", summary: "Review limit reached" } })],
-  ["a limit-reached title", rabbitRun({ output: { title: "Review limit reached", summary: "Review completed" } })],
+  // Each pause or limit text comes with the clean summary start, so NOT_REVIEWED decides.
+  ["a paused title", rabbitRun({ output: { title: "Review paused", summary: `${CLEAN}` } })],
+  ["a paused summary", rabbitRun({ output: { title: "Finished", summary: `${CLEAN}. Reviews paused` } })],
+  ["a null title and a paused summary", rabbitRun({ output: { title: null, summary: `${CLEAN}. Reviews paused` } })],
+  ["a rate-limited summary", rabbitRun({ output: { title: "Finished", summary: `${CLEAN}. Review rate limited` } })],
+  ["a rate-limit-exceeded summary", rabbitRun({ output: { title: "Finished", summary: `${CLEAN}. Rate limit exceeded` } })],
+  ["a limit-reached summary", rabbitRun({ output: { title: "Finished", summary: `${CLEAN}. Review limit reached` } })],
+  ["a limit-reached title", rabbitRun({ output: { title: "Review limit reached", summary: CLEAN } })],
+  // Only the summary start of a real clean review counts.
   ["a skipped review", rabbitRun({ output: { title: "Review skipped", summary: "Result: Success - Draft pull request" } })],
+  ["the clean words only in the title", rabbitRun({ output: { title: CLEAN, summary: "" } })],
+  ["other words around 'review completed'", rabbitRun({ output: { title: "Finished", summary: "Result: Success - No review completed" } })],
   ["no output", rabbitRun({ output: undefined })],
   ["a null output", rabbitRun({ output: null })],
-  ["a null title and a paused summary", rabbitRun({ output: { title: null, summary: "Reviews paused" } })],
   ["a failure", rabbitRun({ conclusion: "failure" })],
   ["a neutral conclusion", rabbitRun({ conclusion: "neutral" })],
   ["a skipped conclusion", rabbitRun({ conclusion: "skipped" })],
