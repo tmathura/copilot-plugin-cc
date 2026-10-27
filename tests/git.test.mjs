@@ -594,6 +594,7 @@ test("an untracked file behind a folder link or junction that leads outside the 
       assert.match(output, /### sub\/linkdir\n\(skipped: symlink\)/);
       assert.match(output, /### siblink\n\(skipped: symlink\)/);
       assert.match(output, /### gitlink\n\(skipped: symlink\)/);
+      assert.match(output, /### innerlink\n\(skipped: symlink\)/);
     }
   }
 });

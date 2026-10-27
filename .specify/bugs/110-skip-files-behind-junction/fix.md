@@ -92,6 +92,9 @@ isLink =
   header comment gives the reason for the case-free check (a case-insensitive file system uses a
   folder stored as `.GIT`, and `realpath` keeps that case). A Linux folder named `.Git` is skipped
   too, which fails closed.
+- 2026-10-27, PR review (`code-review`): the POSIX branch of the real-link test also checks the
+  `innerlink` note (a folder link that stays inside is skipped as a link there); CI on macOS and
+  Ubuntu runs it.
 
 ## Follow-ups
 

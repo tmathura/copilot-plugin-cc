@@ -34,6 +34,8 @@ marker in context: false
 
 ## Residual Risks
 
+- The POSIX branch of the real-link test (with the `innerlink` check added in PR review) runs only
+  in CI on macOS and Ubuntu.
 - The tests ran on Windows only here. On macOS and Linux, git lists a folder link as one entry, so
   the real-link tests and the runtime test pass there on `main`'s code too; the mocked
   `realpathSync.native` tests run the new branch there. CI runs all of them on Ubuntu, macOS and
