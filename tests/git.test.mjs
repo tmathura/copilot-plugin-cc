@@ -1,5 +1,6 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): renamed for the copilot plugin; adds tests for
-// a path with spaces, and for git calls that start no hook or textconv program and write no index.
+// a path with spaces, for git calls that start no hook or textconv program and write no index, and
+// for a default branch that only the remote has.
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -77,6 +78,101 @@ test("default branch names with special characters are passed to git literally",
   assert.equal(target.baseRef, branchName);
   assert.match(context.content, /Branch Diff/);
   assert.equal(fs.existsSync(helperOutputPath), false);
+});
+
+test("a default branch name with special characters is passed to git literally when only the remote has it", () => {
+  const cwd = makeTempDir();
+  const branchName = "main&branch-helper&x";
+  const helperOutputPath = path.join(cwd, "branch-helper-output");
+  initGitRepo(cwd);
+  fs.writeFileSync(path.join(cwd, "branch-helper.cmd"), "@echo branch-helper>branch-helper-output\r\n");
+  fs.writeFileSync(path.join(cwd, "app.js"), "console.log('base');\n");
+  run("git", ["add", "app.js", "branch-helper.cmd"], { cwd });
+  run("git", ["commit", "-m", "base"], { cwd });
+  run("git", ["branch", "-m", branchName], { cwd });
+  run("git", ["update-ref", `refs/remotes/origin/${branchName}`, branchName], { cwd });
+  run("git", ["symbolic-ref", "refs/remotes/origin/HEAD", `refs/remotes/origin/${branchName}`], { cwd });
+  run("git", ["checkout", "-b", "feature/test"], { cwd });
+  git(cwd, "branch", "-D", branchName);
+  fs.writeFileSync(path.join(cwd, "app.js"), "console.log('feature');\n");
+  run("git", ["add", "app.js"], { cwd });
+  run("git", ["commit", "-m", "feature"], { cwd });
+
+  const target = resolveReviewTarget(cwd, {});
+  const context = collectReviewContext(cwd, target);
+
+  assert.equal(target.baseRef, `origin/${branchName}`);
+  assert.match(context.content, /Branch Diff/);
+  assert.equal(fs.existsSync(helperOutputPath), false);
+});
+
+// A repo with main and one more commit on feature, with main checked out, so a clone's origin/HEAD is origin/main.
+function makeOriginWithFeature() {
+  const origin = makeTempDir();
+  initGitRepo(origin);
+  fs.writeFileSync(path.join(origin, "app.js"), "console.log('base');\n");
+  git(origin, "add", "app.js");
+  git(origin, "commit", "-m", "base");
+  git(origin, "checkout", "-b", "feature");
+  fs.writeFileSync(path.join(origin, "app.js"), "console.log('feature');\n");
+  git(origin, "commit", "-am", "feature");
+  git(origin, "checkout", "main");
+  return origin;
+}
+
+function cloneFeature(origin, ...options) {
+  const clone = path.join(makeTempDir(), "clone");
+  git(origin, "clone", ...options, "-b", "feature", origin, clone);
+  return clone;
+}
+
+function hasRef(repo, ref) {
+  return run("git", ["show-ref", "--verify", "--quiet", ref], { cwd: repo }).status === 0;
+}
+
+function assertRemoteOnlyMain(clone) {
+  assert.equal(git(clone, "symbolic-ref", "refs/remotes/origin/HEAD").trim(), "refs/remotes/origin/main");
+  assert.equal(hasRef(clone, "refs/remotes/origin/main"), true);
+  assert.equal(hasRef(clone, "refs/heads/main"), false);
+  for (const scope of [undefined, "branch"]) {
+    const target = resolveReviewTarget(clone, { scope });
+    assert.equal(target.baseRef, "origin/main");
+    assert.equal(target.label, "branch diff against origin/main");
+    assert.match(collectReviewContext(clone, target).content, /console\.log\('feature'\)/);
+  }
+}
+
+test("a branch review in a clone with no local default branch runs against origin/<name>", () => {
+  assertRemoteOnlyMain(cloneFeature(makeOriginWithFeature()));
+});
+
+test("a branch review in a single-branch clone runs against origin/<name> once the default branch is fetched", () => {
+  const clone = cloneFeature(makeOriginWithFeature(), "--single-branch");
+  git(clone, "fetch", "origin", "main:refs/remotes/origin/main");
+  git(clone, "remote", "set-head", "origin", "main");
+  assertRemoteOnlyMain(clone);
+});
+
+test("a clone with a local default branch still reviews against <name>", () => {
+  const clone = cloneFeature(makeOriginWithFeature());
+  git(clone, "branch", "main", "origin/main");
+
+  const target = resolveReviewTarget(clone, {});
+
+  assert.equal(target.baseRef, "main");
+  assert.equal(target.label, "branch diff against main");
+  assert.match(collectReviewContext(clone, target).content, /console\.log\('feature'\)/);
+});
+
+// Today's failure, kept on purpose: an origin/HEAD that points at a missing ref is not a usable base.
+test("an origin/HEAD that points at a missing ref gives origin/<name> and fails at merge-base", () => {
+  const clone = cloneFeature(makeOriginWithFeature());
+  git(clone, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/gone");
+
+  const target = resolveReviewTarget(clone, {});
+
+  assert.equal(target.baseRef, "origin/gone");
+  assert.throws(() => collectReviewContext(clone, target), /merge-base HEAD origin\/gone/);
 });
 
 test("resolveReviewTarget honors explicit base overrides", () => {

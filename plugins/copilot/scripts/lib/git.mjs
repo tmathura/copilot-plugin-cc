@@ -2,7 +2,8 @@
 // fsmonitor hook or textconv program; non-ASCII file names are not quoted; untracked symlinks are not
 // read; the diff is inline up to the byte limit whatever the file count; above it the self-collect
 // guidance points Copilot at one patch file per changed file, which writeReviewPatches writes; the
-// review sections remove only trailing new lines, so Git Status keeps the leading space of its first line.
+// review sections remove only trailing new lines, so Git Status keeps the leading space of its first line;
+// the default branch from origin/HEAD is origin/<name> when there is no local branch of that name.
 import fs from "node:fs";
 import path from "node:path";
 
@@ -116,7 +117,9 @@ export function detectDefaultBranch(cwd) {
   if (symbolic.status === 0) {
     const remoteHead = symbolic.stdout.trim();
     if (remoteHead.startsWith("refs/remotes/origin/")) {
-      return remoteHead.replace("refs/remotes/origin/", "");
+      const name = remoteHead.replace("refs/remotes/origin/", "");
+      const local = git(cwd, ["show-ref", "--verify", "--quiet", `refs/heads/${name}`]);
+      return local.status === 0 ? name : `origin/${name}`;
     }
   }
 

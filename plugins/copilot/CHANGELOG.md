@@ -2,6 +2,13 @@
 
 ## Copilot plugin
 
+### 1.0.21
+
+- A branch review now works in a clone that has no local default branch, such as one made with
+  `git clone -b <other branch>`, a single-branch clone or a CI checkout. It compares against
+  `origin/<name>`. Before, it failed with "merge-base HEAD main: ... Not a valid object name main".
+  The review label then says "branch diff against origin/main".
+
 ### 1.0.20
 
 - A process that was killed while it freed the state lock of an ended process no longer blocks every
