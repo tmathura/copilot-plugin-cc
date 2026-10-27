@@ -424,7 +424,8 @@ test("a review and comments with no user are skipped", async () => {
 });
 
 test("a clean CodeRabbit review with only a check run ends the wait", async () => {
-  for (const runOfHead of [rabbitRun(), rabbitRun({ output: undefined }), rabbitRun({ output: null })]) {
+  const skippedFiles = { title: "Finished", summary: "Result: Success - Review completed. Files skipped from review: 1" };
+  for (const runOfHead of [rabbitRun(), rabbitRun({ output: undefined }), rabbitRun({ output: null }), rabbitRun({ output: skippedFiles })]) {
     const alone = await run({ "check-runs": [runOfHead] }, { skipCopilot: true });
     assert.equal(alone.code, 0, alone.message);
     assert.ok(alone.calls.includes(`repos/tmathura/copilot-plugin-cc/commits/${SHA}/check-runs`), alone.calls.join(" "));
