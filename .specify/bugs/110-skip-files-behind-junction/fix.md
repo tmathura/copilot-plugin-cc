@@ -48,11 +48,13 @@ isLink =
   repo or into .git is not read": `linkdir` and `sub/linkdir` to an outside folder, `siblink` to
   `repo2`, `innerlink` to a folder inside, `gitlink` to `.git` (whose config holds a marker); the
   inline context, the lightweight context and `untracked.md` hold no outside or `.git` marker and
-  do hold the inside files (`sub/plain.txt`, `..notes.txt`,
-  `inner/ok.txt`). On Windows the skip notes name the files behind the junctions, and the file behind
-  the inner junction is read; elsewhere the links themselves are skipped.
+  do hold the inside files (`sub/plain.txt`, `..notes.txt`, `inner/ok.txt`, `.github/ci.yml`,
+  `.gitattributes`). On Windows the skip notes name the files behind the junctions, and the file
+  behind the inner junction is read; elsewhere the links themselves are skipped.
 - "an untracked file whose real path is outside the repo is skipped as a symlink" (mocked
   `realpathSync.native`; runs the new branch on every platform).
+- "an untracked file whose real path is in a .git folder, in any case, is skipped as a symlink"
+  (mocked: `.git`, `.GIT` and `vendor/lib/.git`, on every platform).
 - "an untracked file whose real path is on another drive is skipped as a symlink" (Windows only).
 - "an untracked file whose real path cannot be read for the file / for the repo root is skipped as
   unreadable" (two tests).
