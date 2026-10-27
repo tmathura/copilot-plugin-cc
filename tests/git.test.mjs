@@ -586,6 +586,8 @@ test("an untracked file behind a folder link or junction that leads outside the 
     } else {
       assert.match(output, /### linkdir\n\(skipped: symlink\)/);
       assert.match(output, /### sub\/linkdir\n\(skipped: symlink\)/);
+      assert.match(output, /### siblink\n\(skipped: symlink\)/);
+      assert.match(output, /### gitlink\n\(skipped: symlink\)/);
     }
   }
 });
@@ -618,6 +620,19 @@ test("an untracked file whose real path is outside the repo is skipped as a syml
   for (const output of untrackedOutputs(cwd)) {
     assert.match(output, /### plain\.txt\n\(skipped: symlink\)/);
     assert.doesNotMatch(output, /SECRET_MOCKED_MARKER/);
+  }
+});
+
+test("an untracked file whose real path is in a .git folder, in any case, is skipped as a symlink", (t) => {
+  for (const folder of [".git", ".GIT", path.join("vendor", "lib", ".git")]) {
+    const { cwd, root, file } = makeRepoWithUntrackedFile();
+    mockRealpath(t, file, () => path.join(fs.realpathSync.native(root), folder, "config"));
+
+    for (const output of untrackedOutputs(cwd)) {
+      assert.match(output, /### plain\.txt\n\(skipped: symlink\)/, folder);
+      assert.doesNotMatch(output, /SECRET_MOCKED_MARKER/);
+    }
+    t.mock.restoreAll();
   }
 });
 

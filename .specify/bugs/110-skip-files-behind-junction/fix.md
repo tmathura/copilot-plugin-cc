@@ -7,19 +7,19 @@
 
 ## Summary
 
-`formatUntrackedFile` now also skips an untracked file whose real path is outside the repo, after the
-leaf-link check: it compares `fs.realpathSync.native` of the file with that of the repo root. A file
-behind a directory junction (or any folder link) that leads outside gets `(skipped: symlink)`, in
-the inline context, the lightweight context and `untracked.md`.
+`formatUntrackedFile` now also skips an untracked file whose real path is outside the repo or in a
+`.git` folder, after the leaf-link check: it compares `fs.realpathSync.native` of the file with that
+of the repo root. A file behind a directory junction (or any folder link) that leads there gets
+`(skipped: symlink)`, in the inline context, the lightweight context and `untracked.md`.
 
 ## Changes
 
 | File | Change | Notes |
 |------|--------|-------|
-| `plugins/copilot/scripts/lib/git.mjs` | modified | `isOutsideWorkTree` helper (first path part `..` or `.git`, an absolute path, or `""`); real-path check in `formatUntrackedFile` after the leaf check, in the same `try`; header comment |
-| `tests/git.test.mjs` | added tests | Real junctions or folder links (outside, nested, sibling `repo2`, inner, `.git`), `..notes.txt`; mocked `realpathSync.native` (outside, another drive on Windows, a throw for the file and for the root); three helpers |
+| `plugins/copilot/scripts/lib/git.mjs` | modified | `isOutsideWorkTree` helper (first path part `..`, any part `.git` in any case, an absolute path, or `""`); real-path check in `formatUntrackedFile` after the leaf check, in the same `try`; header comment |
+| `tests/git.test.mjs` | added tests | Real junctions or folder links (outside, nested, sibling `repo2`, inner, `.git`), `..notes.txt`; mocked `realpathSync.native` (outside, a `.git` folder as `.git`, `.GIT` and nested, another drive on Windows, a throw for the file and for the root); three helpers |
 | `tests/runtime-review-safety.test.mjs` | added test | A review with the fake copilot CLI, inline and above the inline limit |
-| `README.md` | modified | The "Differences from the Codex plugin" bullet: no untracked file whose real path is outside the repo, also behind a folder link or a junction |
+| `README.md` | modified | The "Differences from the Codex plugin" bullet: no untracked file whose real path is outside the repo or in its `.git` folder, also behind a folder link or a junction |
 | `plugins/copilot/CHANGELOG.md` | modified | `### 1.0.22` entry |
 | `package.json`, `package-lock.json`, `plugins/copilot/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` | modified | `npm run bump-version -- 1.0.22` |
 
@@ -75,6 +75,11 @@ isLink =
   bullet, the header and the CHANGELOG name `.git`. The mocked tests now match paths built from
   git's root, which can differ from the temp folder (`/var` is `/private/var` on macOS). The root's
   `realpath` runs once per untracked file, a small call next to reading the file.
+- 2026-10-27, review round 2 (Codex, `code-review`): the `.git` test now looks at every path part,
+  without case: a case-insensitive file system also finds the folder as `.GIT`, and a nested
+  clone's `.git` (`vendor/lib/.git`) holds a config too. A mocked test covers `.git`, `.GIT` and the
+  nested folder on every platform; with the `.git` line taken out, it and the real-link test fail.
+  The POSIX branch of the real-link test also checks the `siblink` and `gitlink` notes.
 
 ## Follow-ups
 
