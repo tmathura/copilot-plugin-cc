@@ -58,11 +58,16 @@ sets umask 022 and a fresh data folder). These fail on the old code:
 
 These pass on the old code too and guard what the fix must not break:
 
-- An existing `state/` at 0755 keeps 0755 (checked in the upgrade test).
+- An existing `state/` at 0755 keeps 0755. This check passes on the old code, but it is one
+  assertion in the upgrade test, which fails there on its other checks.
+- A `state/<slug>` link and a log link: their targets keep their modes.
+
+These check the failure paths. Each also checks that its mocked failure was reached, so they fail
+on the old code, which never calls `chmodSync` or `lstatSync` there:
+
 - With `chmodSync` or `lstatSync` failing for `state/<slug>`, `jobs` or the log (EPERM, EROFS,
   ENOENT, EACCES), state updates, job files, the log and the read call `resolveJobLogFile` still
   work; an `lstatSync` failure on `state/<slug>` changes neither folder.
-- A `state/<slug>` link and a log link: their targets keep their modes.
 
 ## Local Verification
 
@@ -83,7 +88,12 @@ These pass on the old code too and guard what the fix must not break:
   them; the docs name the workspace folder `state/<repo folder name>-<hash>` and say that `jobs`
   stays as it is when that folder is a link or cannot be checked.
 - 2026-10-27, review round 2: the tests restore the umask and the environment with `t.after`, not
-  in `finally` as the assessment says; `t.after` runs also when the test fails.
+  in `finally` as the assessment says; `t.after` runs also when the test fails. The docs now name
+  the workspace folder `state/<name>-<hash>`, named after the workspace folder, because the name is
+  cleaned and can come from a folder that is no repo.
+- 2026-10-27, review round 3: the failure-path tests also check that the mocked failure was
+  reached, so a mock that misses its path cannot pass unnoticed. They now fail on the old code,
+  which the assessment had listed as passing there.
 
 ## Follow-ups
 

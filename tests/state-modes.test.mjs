@@ -77,14 +77,18 @@ function assertOwnerOnly(paths, logFile) {
   assert.equal(modeOf(logFile), 0o600);
 }
 
+// Returns the number of calls that failed, so a test can show its failure path ran.
 function failFor(t, method, target, code) {
   const real = fs[method];
+  let hits = 0;
   t.mock.method(fs, method, (file, ...rest) => {
     if (path.resolve(String(file)) === path.resolve(target)) {
+      hits += 1;
       throw Object.assign(new Error(`${code}: mocked`), { code });
     }
     return real(file, ...rest);
   });
+  return () => hits;
 }
 
 test("under CLAUDE_PLUGIN_DATA the state folders and job files are owner-only, and the data folder is left alone", { skip }, (t) => {
@@ -200,7 +204,7 @@ test("a jobs folder that cannot be checked still lets the workspace folder be ti
   assert.equal(modeOf(paths.jobsDir), 0o755);
 });
 
-// These pass on the old code too; they guard what the fix must not break.
+// A failure to check or tighten stops nothing. Each test also checks that its failure fired.
 
 for (const [name, method, which, code] of [
   ["the workspace folder cannot be tightened", "chmodSync", "state", "EPERM"],
@@ -218,10 +222,11 @@ for (const [name, method, which, code] of [
     fs.writeFileSync(logFile, "old log\n");
     fs.chmodSync(logFile, 0o644);
     const target = { state: paths.stateDir, jobs: paths.jobsDir, log: logFile }[which];
-    failFor(t, method, target, code);
+    const hits = failFor(t, method, target, code);
 
     const created = writeEverything(paths.workspace);
 
+    assert.ok(hits() > 0, `${method} was never called on ${which}`);
     assert.equal(created, logFile);
     assert.match(fs.readFileSync(logFile, "utf8"), /Starting Copilot Task\./);
     assert.equal(resolveJobLogFile(paths.workspace, "job-1"), logFile);

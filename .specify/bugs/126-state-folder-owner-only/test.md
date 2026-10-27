@@ -1,7 +1,7 @@
 # Bug Verification: the state folder and job files are readable by others under CLAUDE_PLUGIN_DATA
 
 - **Slug**: 126-state-folder-owner-only
-- **Tested**: 2026-10-27 (again after review round 2)
+- **Tested**: 2026-10-27 (again after review round 3)
 - **Assessment**: ./assessment.md
 - **Fix**: ./fix.md
 - **Result**: partial
