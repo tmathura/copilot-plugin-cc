@@ -238,6 +238,35 @@ test("above the inline limit, a working-tree review reads the exact patches from
   assert.deepEqual(snapshot(repo), before);
 });
 
+test("a review sends Copilot no file behind a folder link or junction that leads outside the repo", () => {
+  const base = makeTempDir();
+  const repo = path.join(base, "repo");
+  const outside = path.join(base, "outside");
+  fs.mkdirSync(outside);
+  fs.mkdirSync(repo);
+  fs.writeFileSync(path.join(outside, "key.txt"), "SECRET_OUTSIDE_MARKER\n");
+  makeRepo(repo);
+  // A junction needs no extra rights on Windows; elsewhere git lists the folder link itself.
+  fs.symlinkSync(outside, path.join(repo, "linkdir"), process.platform === "win32" ? "junction" : "dir");
+  const note = process.platform === "win32" ? "### linkdir/key.txt\n(skipped: symlink)" : "### linkdir\n(skipped: symlink)";
+
+  const inline = runReview("review", repo, { env: { FAKE_COPILOT_ANSWER: REVIEW_JSON } });
+  assert.equal(inline.result.status, 0, inline.result.stderr);
+  assert.ok(inline.runs[0].prompt.includes(note), inline.runs[0].prompt);
+  assert.doesNotMatch(inline.runs[0].prompt, /SECRET_OUTSIDE_MARKER/);
+
+  // More than the inline limit, so the untracked files go to untracked.md.
+  writeFile(repo, "big.txt", `${Array.from({ length: 15000 }, (_, index) => `line ${index} ${"x".repeat(90)}`).join("\n")}\n`);
+  git(repo, "add", "big.txt");
+  const above = runReview("review", repo, { env: { FAKE_COPILOT_ANSWER: REVIEW_JSON } });
+  assert.equal(above.result.status, 0, above.result.stderr);
+  const patches = patchesOf(above.runs[0]);
+  assert.ok(patches["untracked.md"].toString("utf8").includes(note));
+  for (const text of [above.runs[0].prompt, ...Object.values(patches).map((data) => data.toString("utf8"))]) {
+    assert.doesNotMatch(text, /SECRET_OUTSIDE_MARKER/);
+  }
+});
+
 test(
   "a review stopped with SIGTERM or SIGINT removes its patch folder, before or while Copilot runs",
   { skip: process.platform === "win32" && "Windows stops the tree with taskkill /T" },
