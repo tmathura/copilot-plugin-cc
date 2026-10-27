@@ -2,6 +2,15 @@
 
 ## Copilot plugin
 
+### 1.0.23
+
+- On macOS and Linux, the plugin's state folders and job files are now readable only by you, also
+  when Claude Code gives the plugin a data folder (`CLAUDE_PLUGIN_DATA`), which is the normal case.
+  Before, only the fallback folder in your home folder was private; under Claude Code's data
+  folder, the job files, which hold your prompts and Copilot's answers, were readable by others
+  if that folder allowed it. The plugin also tightens the folders an older version made. It does
+  not change the data folder itself.
+
 ### 1.0.22
 
 - A review no longer reads an untracked file behind a directory junction on Windows. Git for Windows

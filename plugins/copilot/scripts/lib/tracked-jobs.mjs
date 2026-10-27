@@ -1,11 +1,22 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): renamed for the copilot plugin; job status and
 // progress writes go through one locked update and never revive a cancelled or missing job; a job
 // starts Copilot inside a locked update and saves its pid there; a job record keeps the review gate's
-// run id.
+// run id; the job log is owner-only on macOS and Linux.
 import fs from "node:fs";
 import process from "node:process";
 
-import { assertSessionOpen, readJobFile, resolveJobFile, resolveJobLogFile, updateState, writeJobFile } from "./state.mjs";
+import {
+  assertSessionOpen,
+  makeOwnerOnly,
+  readJobFile,
+  resolveJobFile,
+  resolveJobLogFile,
+  updateState,
+  writeJobFile
+} from "./state.mjs";
+
+// The log holds the job's progress; the mode applies only when a write creates the file.
+const LOG_WRITE = { encoding: "utf8", mode: 0o600 };
 
 export const SESSION_ID_ENV = "COPILOT_COMPANION_SESSION_ID";
 // The review gate names its run, so its job is found by this id, not by its pid or its prompt.
@@ -44,19 +55,21 @@ export function appendLogLine(logFile, message) {
   if (!logFile || !normalized) {
     return;
   }
-  fs.appendFileSync(logFile, `[${nowIso()}] ${normalized}\n`, "utf8");
+  fs.appendFileSync(logFile, `[${nowIso()}] ${normalized}\n`, LOG_WRITE);
 }
 
 export function appendLogBlock(logFile, title, body) {
   if (!logFile || !body) {
     return;
   }
-  fs.appendFileSync(logFile, `\n[${nowIso()}] ${title}\n${String(body).trimEnd()}\n`, "utf8");
+  fs.appendFileSync(logFile, `\n[${nowIso()}] ${title}\n${String(body).trimEnd()}\n`, LOG_WRITE);
 }
 
 export function createJobLogFile(workspaceRoot, jobId, title) {
   const logFile = resolveJobLogFile(workspaceRoot, jobId);
-  fs.writeFileSync(logFile, "", "utf8");
+  fs.writeFileSync(logFile, "", LOG_WRITE);
+  // A log from an older version exists already, so the write above keeps its mode.
+  makeOwnerOnly(logFile, 0o600);
   if (title) {
     appendLogLine(logFile, `Starting ${title}.`);
   }

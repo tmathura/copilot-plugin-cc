@@ -91,6 +91,12 @@ Code, `$CLAUDE_PLUGIN_DATA` can name another plugin's folder.
 The fallback folders are in your home folder, never in the shared temp folder. On macOS and Linux,
 `~/.copilot-companion` is readable only by you.
 
+On macOS and Linux, with or without `CLAUDE_PLUGIN_DATA`, each workspace's state folder
+(`state/<workspace>`) and its `jobs` folder are readable only by you, also when an older version
+made them; new job and log files are too. The `state` folder above them is readable only by you
+when the plugin creates it; the plugin does not change an existing one, nor `<plugin data>` itself.
+A folder or log that the plugin cannot change, or that is a link, stays as it is.
+
 ## Model and effort
 
 `/copilot:rescue` accepts `--model <model>` and `--effort <level>`. `/copilot:review` and

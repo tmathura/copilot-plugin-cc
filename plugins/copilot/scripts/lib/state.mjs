@@ -4,7 +4,8 @@
 // state records closed Claude sessions; on Windows, a file replace or read that meets another process
 // is retried; a companion that a hook starts counts from the hook's start for the closed-session check; a caller's deadline also
 // limits the Windows retries of an update; the companion's own data folder export wins over
-// CLAUDE_PLUGIN_DATA; a lock file is linked into place with its owner already written.
+// CLAUDE_PLUGIN_DATA; a lock file is linked into place with its owner already written; the state and
+// jobs folders and the job files are owner-only on macOS and Linux, also under CLAUDE_PLUGIN_DATA.
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -109,9 +110,40 @@ export function ensurePluginDataDir(env = process.env) {
   return dataDir;
 }
 
+// Best effort: a link's target is not the plugin's to change, and a folder or file it cannot close
+// must not stop status or cancel. Returns false when the path could not be checked or is a link.
+export function makeOwnerOnly(file, mode) {
+  if (process.platform === "win32") {
+    return true;
+  }
+  let stat;
+  try {
+    stat = fs.lstatSync(file);
+  } catch {
+    return false;
+  }
+  if (stat.isSymbolicLink()) {
+    return false;
+  }
+  if ((stat.mode & 0o777) !== mode) {
+    try {
+      fs.chmodSync(file, mode);
+    } catch {
+      // The folder or file stays as it is; it is open whatever the plugin does.
+    }
+  }
+  return true;
+}
+
+// The job files hold the prompts and Copilot's answers. Folders from an older version are tightened
+// too; jobs only when its workspace folder is a real one.
 export function ensureStateDir(cwd) {
   ensurePluginDataDir();
-  fs.mkdirSync(resolveJobsDir(cwd), { recursive: true });
+  const jobsDir = resolveJobsDir(cwd);
+  fs.mkdirSync(jobsDir, { recursive: true, mode: 0o700 });
+  if (makeOwnerOnly(path.dirname(jobsDir), 0o700)) {
+    makeOwnerOnly(jobsDir, 0o700);
+  }
 }
 
 export function loadState(cwd, options = {}) {
@@ -412,7 +444,7 @@ function readTextFile(filePath, lockFile, deadline) {
 function writeJsonAtomic(filePath, value, deadline) {
   const tempFile = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
   try {
-    fs.writeFileSync(tempFile, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+    fs.writeFileSync(tempFile, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
     retryOnWindows(() => fs.renameSync(tempFile, filePath), isBusyFileError, deadline);
   } catch (error) {
     fs.rmSync(tempFile, { force: true });
