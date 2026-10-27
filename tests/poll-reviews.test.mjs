@@ -559,6 +559,14 @@ test("a CodeRabbit review completed after a rate limit ends the wait, in any ord
   assert.equal(result.code, 0);
 });
 
+test("a clean CodeRabbit check run after a rate-limited status ends the wait", async () => {
+  const result = await run(
+    { statuses: [rabbitStatus("Review rate limited")], "check-runs": [rabbitRun()] },
+    { skipCopilot: true }
+  );
+  assert.equal(result.code, 0, result.message);
+});
+
 test("a CodeRabbit rate-limit comment does not end the wait", async () => {
   const result = await run(
     {

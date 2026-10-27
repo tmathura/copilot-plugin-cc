@@ -17,7 +17,8 @@
 //   posted "Review finished" after this script started and is no longer "Currently processing", or when
 //   its commit status on the head SHA is "success", or its "CodeRabbit" check run on the head SHA is
 //   "success" with a summary that starts "Result: Success - Review completed" (a review with no
-//   findings posts no review). A paused or limited status or run never counts. A "Review finished"
+//   findings posts no review). No path counts while a CodeRabbit comment says "Currently
+//   processing". A paused or limited status or run never counts. A "Review finished"
 //   from before this poll started does not count, also when an earlier poll for the same head saw
 //   none. The "Bot reviewers" table gives triggers and where findings live, so it does not list the
 //   check run.
