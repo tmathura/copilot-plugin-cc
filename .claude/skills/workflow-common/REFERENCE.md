@@ -547,7 +547,8 @@ marked it unavailable, or a second drop marked Copilot unavailable for that head
 
 - No reviewer reported a new finding for that head, and no thread is open. A clean CodeRabbit review
   can be only a success status, or a successful `CodeRabbit` check run whose summary starts "Result:
-  Success - Review completed", with no review object.
+  Success - Review completed", with no review object. A status, or a run's title or summary, that
+  says "paused", "rate limit" or "limit reached" is not a review of the head.
 - Every finding left for that head was rejected with its reason, in this round or an earlier one,
   each thread got a reply and is resolved, and nothing was pushed after that head.
 
