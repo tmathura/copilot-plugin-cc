@@ -92,7 +92,7 @@ The fallback folders are in your home folder, never in the shared temp folder. O
 `~/.copilot-companion` is readable only by you.
 
 On macOS and Linux, with or without `CLAUDE_PLUGIN_DATA`, each workspace's state folder
-(`state/<repo folder name>-<hash>`) and its `jobs` folder are readable only by you, also when an
+(`state/<name>-<hash>`, named after the workspace folder) and its `jobs` folder are readable only by you, also when an
 older version made them; new job and log files are too. The `state` folder above them is readable
 only by you when the plugin creates it; the plugin does not change an existing one, nor
 `<plugin data>` itself. A folder or log that the plugin cannot change, or that is a link, stays as

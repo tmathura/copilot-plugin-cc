@@ -39,10 +39,6 @@ function useEnv(t, values) {
   });
 }
 
-function useDataDir(t, dataDir) {
-  useEnv(t, { CLAUDE_PLUGIN_DATA: dataDir, COPILOT_COMPANION_PLUGIN_DATA: undefined });
-}
-
 // A fresh 0755 data folder and a workspace, with the paths the plugin uses for them.
 function setUp(t, { existingData = true } = {}) {
   useUmask(t);
@@ -51,7 +47,7 @@ function setUp(t, { existingData = true } = {}) {
     fs.mkdirSync(dataDir);
     fs.chmodSync(dataDir, 0o755);
   }
-  useDataDir(t, dataDir);
+  useEnv(t, { CLAUDE_PLUGIN_DATA: dataDir, COPILOT_COMPANION_PLUGIN_DATA: undefined });
   const workspace = makeTempDir();
   const stateDir = resolveStateDir(workspace);
   return { dataDir, workspace, stateDir, jobsDir: path.join(stateDir, "jobs") };

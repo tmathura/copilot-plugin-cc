@@ -291,10 +291,10 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
 - A branch review in a clone whose `origin/HEAD` names a branch with no local copy, such as one
   made with `git clone -b <other branch>`, compares against `origin/<name>`. Codex uses the name
   from `origin/HEAD` as a local branch, so `git merge-base` fails. The reason is correctness.
-- On macOS and Linux, each workspace's state and `jobs` folders and new job and log files are
-  readable only by you, also inside the data folder that Claude Code gives the plugin. The job files hold your
-  prompts and Copilot's answers. Codex makes them with the default mode, so other users on a
-  shared host may read them, depending on that data folder.
+- On macOS and Linux, the plugin's state and job files are readable only by you, also inside the
+  data folder that Claude Code gives the plugin ([Folders](docs/configuration.md#folders) lists
+  them). The job files hold your prompts and Copilot's answers. Codex makes them with the default
+  mode, so other users on a shared host may read them, depending on that data folder.
 - A review reads no untracked file whose real path is outside the repo or in a `.git` folder: not
   the target of an untracked symlink, and not a file behind a folder link or, on Windows, a
   directory junction. The link can point outside the repo, for example at a key file, or at

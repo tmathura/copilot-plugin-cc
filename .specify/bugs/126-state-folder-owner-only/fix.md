@@ -9,7 +9,9 @@
 
 On macOS and Linux the plugin now creates its state folders with mode 0700 and its job and log
 files with 0600, also under `CLAUDE_PLUGIN_DATA`, and tightens its own `state/<slug>` and `jobs`
-folders and an existing log from an older version, best effort.
+folders from an older version, best effort. `createJobLogFile` also tightens a log that exists
+already when a job starts it; job ids are new, so in practice an older version's logs keep their
+mode, inside the now-0700 `jobs` folder.
 
 ## Changes
 
@@ -45,7 +47,8 @@ sets umask 022 and a fresh data folder). These fail on the old code:
   `state.json`, `<id>.json` and the log are 0600, and the data folder keeps 0755.
 - Without `CLAUDE_PLUGIN_DATA` (the fallback in a temp `HOME`): the same.
 - A data folder that does not exist yet: it gets the default mode, the folders under it 0700.
-- Folders and a log from an older version (0755, 0644) are tightened; an existing `state/` is not.
+- Folders from an older version (0755), and a 0644 log that `createJobLogFile` starts again, are
+  tightened.
 - Job files rewritten from 0644 become 0600.
 - A log that `appendLogLine` or `appendLogBlock` creates is 0600.
 - The temp file of a state write is 0600 before its rename (a mocked rename that fails).
@@ -55,6 +58,7 @@ sets umask 022 and a fresh data folder). These fail on the old code:
 
 These pass on the old code too and guard what the fix must not break:
 
+- An existing `state/` at 0755 keeps 0755 (checked in the upgrade test).
 - With `chmodSync` or `lstatSync` failing for `state/<slug>`, `jobs` or the log (EPERM, EROFS,
   ENOENT, EACCES), state updates, job files, the log and the read call `resolveJobLogFile` still
   work; an `lstatSync` failure on `state/<slug>` changes neither folder.
@@ -78,6 +82,8 @@ These pass on the old code too and guard what the fix must not break:
   the upgrade test makes the same check; the tests restore unset environment variables by deleting
   them; the docs name the workspace folder `state/<repo folder name>-<hash>` and say that `jobs`
   stays as it is when that folder is a link or cannot be checked.
+- 2026-10-27, review round 2: the tests restore the umask and the environment with `t.after`, not
+  in `finally` as the assessment says; `t.after` runs also when the test fails.
 
 ## Follow-ups
 
