@@ -891,27 +891,46 @@ test("a reclaim level released and taken again while the timeout message reads i
   const reclaimFile = `${lockFile}.reclaim`;
   const pid = deadPid();
   writeLock(lockFile, { pid, token: "dead-owner" });
-  writeLock(reclaimFile, { pid: process.pid, token: TOKEN_LIVE });
+  writeLock(reclaimFile, { pid: 4242, token: TOKEN_1 });
   const existsSync = fs.existsSync;
   const readFileSync = fs.readFileSync;
-  let describing = false;
-  let handedOver = false;
-  // Only the timeout message checks whether a reclaim level exists.
+  const linkSync = fs.linkSync;
+  const calls = [];
+  let step = "before";
+  t.mock.method(fs, "linkSync", (source, target) => {
+    calls.push("link");
+    return linkSync(source, target);
+  });
   t.mock.method(fs, "existsSync", (file) => {
-    describing ||= file === reclaimFile;
+    if (file === reclaimFile) {
+      calls.push("exists");
+      if (step === "released") {
+        // The new owner links the level before the next check.
+        writeLock(reclaimFile, { pid: process.pid, token: TOKEN_LIVE });
+        step = "taken";
+      } else if (step === "before") {
+        step = "reading";
+      }
+    }
     return existsSync(file);
   });
   t.mock.method(fs, "readFileSync", (file, options) => {
-    if (describing && file === reclaimFile && !handedOver) {
-      // The first read meets the moment between the old owner's release and the new owner's link.
-      handedOver = true;
+    if (file === reclaimFile && step === "reading") {
+      // The old owner releases the level while it is read.
+      fs.rmSync(reclaimFile);
+      step = "released";
       throw Object.assign(new Error("ENOENT: no such file"), { code: "ENOENT" });
     }
     return readFileSync(file, options);
   });
 
-  assert.throws(() => updateState(workspace, () => {}, { lockTimeoutMs: 200 }), freeingBy(process.pid, pid));
-  assert.equal(handedOver, true);
+  assert.throws(
+    () => updateState(workspace, () => {}, { lockTimeoutMs: 200, isPidAliveImpl: (owner) => owner === process.pid || owner === 4242 }),
+    freeingBy(process.pid, pid)
+  );
+  assert.equal(step, "taken");
+  // Only the timeout message checks whether a reclaim level exists, after the last link attempt.
+  assert.ok(calls.indexOf("exists") > calls.lastIndexOf("link"), calls.join(" "));
 });
 
 test("a reclaim level released while the timeout message reads it counts as free", (t) => {

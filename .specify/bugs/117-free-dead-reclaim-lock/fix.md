@@ -58,7 +58,7 @@ if (passed.some(([file, token]) => readLockOwner(file)?.token !== token)) {
 
 ## Local Verification
 
-- Commands run: `npm ci --include=dev`, `npm run build` → pass; `npm test` → 434 tests, 410 pass, 24 skipped, 0 fail (after review round 3: 437 tests, 413 pass); `npm run check-version` → 1.0.20; `claude plugin validate .` → pass.
+- Commands run: `npm ci --include=dev`, `npm run build` → pass; `npm test` → 434 tests, 410 pass, 24 skipped, 0 fail (after review round 4: 437 tests, 413 pass); `npm run check-version` → 1.0.20; `claude plugin validate .` → pass.
 - With the re-read of passed levels taken out for one run, both stale-read tests fail.
 
 ## Deviations from Assessment
@@ -80,6 +80,12 @@ if (passed.some(([file, token]) => readLockOwner(file)?.token !== token)) {
   it unreadable, so a level released and taken again during the read names its new live owner, not
   the delete advice; it checks liveness once per level. Tests added for that case and for a walk past
   a dead level to a free next level.
+- 2026-10-27, review round 4 (`code-review`): the double read of round 3 did not close the handover
+  gap (between the last read and the exists check), and its test played a state that cannot happen.
+  Now `readReclaimLevel` checks that a level exists, then reads it, up to three times: a level that is
+  gone is free, a level read whole is used, and only one that exists and stays unreadable gets the
+  delete advice. The test plays the real handover (the old owner releases during the read, the new
+  owner links before the next check) and checks that only the timeout message looks for the level.
 
 ## Follow-ups
 

@@ -310,24 +310,38 @@ function describeLockBlocker(lockFile, options) {
   }
   const seen = new Set();
   let reclaimFile = `${lockFile}.reclaim`;
-  while (fs.existsSync(reclaimFile)) {
-    // A live reclaimer may release this level, and another take it, while it is read: read it twice.
-    const owner = readLockOwner(reclaimFile) ?? readLockOwner(reclaimFile);
-    if (owner && isAlive(owner.pid)) {
-      return `Process ${owner.pid} is freeing the lock of ended process ${holder.pid}; retry when it finishes.`;
+  for (;;) {
+    const level = readReclaimLevel(reclaimFile);
+    if (level.gone) {
+      return `Process ${holder.pid} has ended; retry.`;
     }
-    const next = nextReclaimLevel(lockFile, owner, seen, () => false);
+    if (level.owner && isAlive(level.owner.pid)) {
+      return `Process ${level.owner.pid} is freeing the lock of ended process ${holder.pid}; retry when it finishes.`;
+    }
+    const next = nextReclaimLevel(lockFile, level.owner, seen, () => false);
     if (!next) {
-      if (!fs.existsSync(reclaimFile)) {
-        break;
-      }
       // A damaged reclaim file, or one that an older version left without its owner, names no process
       // to check, so no one can free it.
       return `Process ${holder.pid} has ended, but ${reclaimFile} blocks freeing its lock; if no Copilot companion is running, delete ${reclaimFile} and retry.`;
     }
     reclaimFile = next;
   }
-  return `Process ${holder.pid} has ended; retry.`;
+}
+
+// A live reclaimer hands a level over by a release and a new link, so a read can fall in the moment the
+// level is gone. Each try checks that the level exists, then reads it, so only a level that stays
+// unreadable counts as damaged.
+function readReclaimLevel(reclaimFile) {
+  for (let tries = 0; tries < 3; tries += 1) {
+    if (!fs.existsSync(reclaimFile)) {
+      return { gone: true };
+    }
+    const owner = readLockOwner(reclaimFile);
+    if (owner) {
+      return { owner };
+    }
+  }
+  return {};
 }
 
 function acquireStateLock(cwd, options) {

@@ -17,9 +17,9 @@ are covered by tests, and the rest of the suite passes.
 | Check | Command / Action | Result | Notes |
 |-------|------------------|--------|-------|
 | Reproduction (post-fix) | `node --test --test-name-pattern="whose owner is dead is passed" tests/state.test.mjs` | pass | The assessment's input: `updateState` writes the update, the dead main lock is freed, the dead first level stays |
-| New / updated tests | `node --test --test-name-pattern="reclaim" tests/state.test.mjs` | pass | 19 of 19, also the unreadable-reclaim test (after review round 3) |
+| New / updated tests | `node --test --test-name-pattern="reclaim" tests/state.test.mjs` | pass | 19 of 19, also the unreadable-reclaim test (after review round 4) |
 | Stale-read guard | the same tests with the re-read of passed levels taken out for one run | fail, as expected | both stale-read tests fail without it (recorded in `fix.md`) |
-| Regression suite | `npm test` | pass | 437 tests, 413 pass, 24 skipped, 0 fail (after review round 3) |
+| Regression suite | `npm test` | pass | 437 tests, 413 pass, 24 skipped, 0 fail (after review round 4) |
 | Lint / type-check | `npm run build` | pass | |
 | Version and plugin | `npm run check-version`, `claude plugin validate .` | pass | 1.0.20 |
 
