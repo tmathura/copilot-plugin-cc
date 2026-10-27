@@ -247,11 +247,10 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 // The reclaim locks form a chain. A level whose owner has died is never removed: it points to the next
 // level, named by that owner's token, so every reclaimer, also one that read the chain a while ago,
-// contends on the same first free level. Returns that next level, or null when the walk must stop at
-// this level: it is unreadable, held by a live process, or loops back to a token seen before.
+// contends on the same first free level. The token becomes part of a file name, so only a UUID is used.
 function nextReclaimLevel(lockFile, owner, seen, isAlive) {
   const token = owner?.token.toLowerCase();
-  if (!owner || isAlive(owner.pid) || !UUID.test(token) || seen.has(token)) {
+  if (!owner || !UUID.test(token) || seen.has(token) || isAlive(owner.pid)) {
     return null;
   }
   seen.add(token);
@@ -306,20 +305,25 @@ function describeLockBlocker(lockFile, options) {
   if (!holder) {
     return "The lock has no readable owner; if no Copilot companion is running, delete it and retry.";
   }
-  // A damaged reclaim file, or one that an older version left without its owner, names no process to
-  // check, so no one can free it. The level that blocks is the first one of the chain that is not dead.
-  if (!isAlive(holder.pid)) {
-    const seen = new Set();
-    let reclaimFile = `${lockFile}.reclaim`;
-    while (fs.existsSync(reclaimFile)) {
-      const next = nextReclaimLevel(lockFile, readLockOwner(reclaimFile), seen, isAlive);
-      if (!next) {
-        return `Process ${holder.pid} has ended, but ${reclaimFile} blocks freeing its lock; if no Copilot companion is running, delete ${reclaimFile} and retry.`;
-      }
-      reclaimFile = next;
-    }
+  if (isAlive(holder.pid)) {
+    return `Process ${holder.pid} holds the lock; retry when it finishes.`;
   }
-  return `Process ${holder.pid} holds the lock; retry when it finishes.`;
+  // A damaged reclaim file, or one that an older version left without its owner, names no process to
+  // check, so no one can free it.
+  const seen = new Set();
+  let reclaimFile = `${lockFile}.reclaim`;
+  while (fs.existsSync(reclaimFile)) {
+    const next = nextReclaimLevel(lockFile, readLockOwner(reclaimFile), seen, isAlive);
+    if (!next) {
+      // A live reclaimer may have released this level since the check above.
+      if (!fs.existsSync(reclaimFile)) {
+        break;
+      }
+      return `Process ${holder.pid} has ended, but ${reclaimFile} blocks freeing its lock; if no Copilot companion is running, delete ${reclaimFile} and retry.`;
+    }
+    reclaimFile = next;
+  }
+  return `Process ${holder.pid} has ended, and another process is freeing its lock; retry.`;
 }
 
 function acquireStateLock(cwd, options) {

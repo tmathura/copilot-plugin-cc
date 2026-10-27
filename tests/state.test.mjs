@@ -849,6 +849,22 @@ for (const [name, change, settles] of [
   });
 }
 
+test("a timeout while the reclaim chain is free says that the ended holder's lock is being freed", (t) => {
+  const workspace = makeTempDir();
+  const lockFile = `${resolveStateFile(workspace)}.lock`;
+  const pid = deadPid();
+  writeLock(lockFile, { pid, token: "dead-owner" });
+  const rmSync = fs.rmSync;
+  // The dead lock stays, as if another process kept winning the race to free it.
+  t.mock.method(fs, "rmSync", (file, options) => (file === lockFile ? undefined : rmSync(file, options)));
+
+  assert.throws(
+    () => updateState(workspace, () => {}, { lockTimeoutMs: 200 }),
+    new RegExp(`Process ${pid} has ended, and another process is freeing its lock; retry\\.`)
+  );
+  assert.equal(fs.existsSync(`${lockFile}.reclaim`), false);
+});
+
 test("an unexpected error on the link of a later reclaim level comes out, and no temp file stays", (t) => {
   const workspace = makeTempDir();
   const lockFile = `${resolveStateFile(workspace)}.lock`;

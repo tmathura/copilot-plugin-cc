@@ -49,18 +49,24 @@ if (passed.some(([file, token]) => readLockOwner(file)?.token !== token)) {
 - "an unreadable reclaim level after a dead one stops the walk, and the timeout names it".
 - "a reclaimer that read the first level before another reclaim finished removes no live lock".
 - "a reclaimer whose read of a passed level is stale backs off when the level was taken by a live reclaimer" and "... was released" — both fail with the re-read taken out.
+- "a timeout while the reclaim chain is free says that the ended holder's lock is being freed".
 - "an unexpected error on the link of a later reclaim level comes out, and no temp file stays".
 - Unchanged and passing: the unreadable-reclaim test, "a reclaimer that saw a dead owner does not remove the lock that a live process took since", and the link-order test with no reclaim file.
 
 ## Local Verification
 
-- Commands run: `npm ci --include=dev`, `npm run build` → pass; `npm test` → 433 tests, 409 pass, 24 skipped, 0 fail; `npm run check-version` → 1.0.20; `claude plugin validate .` → pass.
+- Commands run: `npm ci --include=dev`, `npm run build` → pass; `npm test` → 434 tests, 410 pass, 24 skipped, 0 fail (after review round 1); `npm run check-version` → 1.0.20; `claude plugin validate .` → pass.
 - With the re-read of passed levels taken out for one run, both stale-read tests fail.
 
 ## Deviations from Assessment
 
 - 2026-10-27: no `linkImpl` option. The unexpected-link-error test mocks `fs.linkSync` with
   `t.mock.method`, as the existing link-order test does, so the plugin needs no new option.
+- 2026-10-27, review round 1 (`code-review`): a timeout while the holder is dead and the chain ends at
+  a free level now says "Process N has ended, and another process is freeing its lock; retry."
+  (the assessment kept today's "Process N holds the lock" there, which is wrong for a dead holder).
+  `describeLockBlocker` treats a level that was released during its walk as free, and
+  `nextReclaimLevel` runs the UUID and loop checks before the liveness check. Test added.
 
 ## Follow-ups
 
