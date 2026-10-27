@@ -1,11 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
   buildCopilotArgs,
   buildCopilotEnv,
+  buildPersistentTaskThreadName,
   getCopilotAuthStatus,
   getCopilotAvailability,
   findLatestTaskThread,
@@ -411,4 +413,47 @@ test("a BYOK provider counts as logged in without a GitHub login check", async (
   assert.equal(auth.source, "byok");
   assert.equal(auth.provider, "anthropic");
   assert.deepEqual(runs(), []);
+});
+
+test("a task's session name holds no character that Copilot CLI refuses, and keeps the rest", () => {
+  const PREFIX = "Copilot Companion Task";
+  for (const control of ["\u0000", "\u0001", "\u0008", "\u001f", "\u007f"]) {
+    assert.equal(buildPersistentTaskThreadName(`fix${control}it`), `${PREFIX}: fix it`, JSON.stringify(control));
+  }
+  assert.equal(buildPersistentTaskThreadName('Say "hi" now'), `${PREFIX}: Say hi now`);
+  for (const empty of ['""', "", " \t\n"]) {
+    assert.equal(buildPersistentTaskThreadName(empty), PREFIX, JSON.stringify(empty));
+  }
+  assert.ok(buildPersistentTaskThreadName("😀".repeat(60)).length <= 100);
+  assert.equal(buildPersistentTaskThreadName("it's `x` \\ café"), `${PREFIX}: it's \`x\` \\ café`);
+});
+
+test("the fake Copilot CLI refuses the session names that Copilot CLI 1.0.95 refuses", () => {
+  const binDir = makeTempDir();
+  const { scriptPath } = installFakeCopilot(binDir);
+  const runFake = (name) =>
+    spawnSync(process.execPath, [scriptPath, "--output-format", "json", `--name=${name}`], {
+      input: "Reply OK",
+      encoding: "utf8",
+      env: buildEnv(binDir)
+    });
+  const refused = {
+    'a"b': "Session name must not contain double quotes.",
+    "a\tb": "Session name must not contain control characters.",
+    "a\u0001b": "Session name must not contain control characters.",
+    "a\u007fb": "Session name must not contain control characters.",
+    ["x".repeat(101)]: "Session name must be 100 characters or less.",
+    ["😀".repeat(60)]: "Session name must be 100 characters or less.",
+    "": "Session name cannot be empty."
+  };
+  for (const [name, message] of Object.entries(refused)) {
+    const result = runFake(name);
+    assert.equal(result.status, 1, JSON.stringify(name));
+    assert.equal(result.stderr, `${message}\n`);
+    assert.equal(result.stdout, "");
+  }
+  for (const name of ["a'b", "café", "x".repeat(100)]) {
+    const result = runFake(name);
+    assert.equal(result.status, 0, `${JSON.stringify(name)}: ${result.stderr}`);
+  }
 });

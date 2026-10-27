@@ -2,6 +2,17 @@
 
 ## Copilot plugin
 
+### 1.0.24
+
+- A Copilot task whose prompt holds a double quote now runs. Before, it failed at once with
+  "Session name must not contain double quotes.",
+  because the plugin names Copilot's session after the start of the prompt. The name now has a
+  space in place of each double quote and control character; the prompt is unchanged.
+- 1.0.23 was not published, so this release also brings its change: on macOS and Linux, each
+  workspace's state folder, its `jobs` folder, and new job and log files are readable only by you,
+  also when Claude Code gives the plugin a data folder (`CLAUDE_PLUGIN_DATA`). The plugin also
+  tightens those folders when an older version made them.
+
 ### 1.0.23
 
 - On macOS and Linux, each workspace's state folder, its `jobs` folder, and new job and log files

@@ -132,6 +132,40 @@ test("--model and --effort become Copilot arguments, and a bad --effort fails be
   assert.equal(runs().length, 1);
 });
 
+const QUOTED_PROMPT = 'Add the comment line "// Checked by the release run." at the top of math.js. Change no other file.';
+const QUOTED_PROMPT_NAME = "--name=Copilot Companion Task: Add the comment line // Checked by the release run. a...";
+
+// With a flag next to it, the prompt is not split again as one raw argument string, which drops quotes.
+test("a task whose prompt holds double quotes runs, and only its session name loses them", () => {
+  for (const modeArgs of [["--fresh"], ["--write"]]) {
+    const { companion, runs } = setUpTasks();
+
+    const result = companion(["task", ...modeArgs, QUOTED_PROMPT]);
+
+    assert.equal(result.status, 0, result.stderr);
+    const [taskRun] = runs();
+    assert.ok(taskRun.args.includes(QUOTED_PROMPT_NAME), taskRun.args.join(" "));
+    assert.equal(taskRun.prompt, QUOTED_PROMPT);
+  }
+});
+
+test("a background task whose prompt holds double quotes completes", () => {
+  const { companion, runs } = setUpTasks();
+
+  const launch = companion(["task", "--background", "--json", QUOTED_PROMPT]);
+
+  assert.equal(launch.status, 0, launch.stderr);
+  const { jobId } = JSON.parse(launch.stdout);
+  const waited = JSON.parse(
+    companion(["status", jobId, "--wait", "--timeout-ms", "30000", "--poll-interval-ms", "100", "--json"]).stdout
+  );
+  assert.equal(waited.job.status, "completed");
+  const result = companion(["result", jobId]);
+  assert.match(result.stdout, /^Fake Copilot answer\.\n/);
+  assert.doesNotMatch(result.stdout, /Session name/);
+  assert.equal(runs()[0].prompt, QUOTED_PROMPT);
+});
+
 test("--resume-last with no earlier task fails with upstream's message", () => {
   const { companion, runs } = setUpTasks();
 
