@@ -20,7 +20,7 @@
 //   when an earlier poll for the same head saw none. The "Bot reviewers" table gives triggers and where
 //   findings live, so it does not list the check run.
 //   Limits: any successful status or run on the head counts, also while a re-run of the same head is
-//   going, and also a run that skipped the review with words the run check does not know.
+//   going, and also one that skipped the review for another reason than a pause or a limit.
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -33,6 +33,9 @@ const USAGE = "usage: node poll-reviews.mjs <40-character head sha> <pr number> 
 const isCopilot = (login) => /^copilot-pull-request-reviewer(\[bot\])?$/.test(login);
 const isCodeRabbit = (login) => /^coderabbitai(\[bot\])?$/.test(login);
 const time = (value) => Date.parse(value ?? "");
+// A paused or limited CodeRabbit also reports success; that is not a review of the head. Its status
+// says "rate limited" and its comment "Review limit reached"; a check run's words are not known.
+const NOT_REVIEWED = /paused|rate limit|limit reached/i;
 
 // `gh api --paginate --slurp` prints one entry per page; a check-suites or check-runs page wraps its list.
 function items(pages) {
@@ -92,20 +95,16 @@ export async function pollReviews({
         (c) => time(c.updated_at) > startedAt && /Review finished|Review completed/.test(c.body)
       );
       // A review with no findings posts no review object, only a commit status or a check run on the head.
-      // A paused or rate-limited CodeRabbit also reports success; that is not a review of this head.
       const headStatusDone = statuses.some(
-        (s) =>
-          isCodeRabbit(s.creator?.login) && s.state === "success" && !/paused|rate limited/i.test(s.description ?? "")
+        (s) => isCodeRabbit(s.creator?.login) && s.state === "success" && !NOT_REVIEWED.test(s.description ?? "")
       );
-      // The run's words for a pause or a limit are not known, so it also rejects the comment's words
-      // ("Review limit reached") and a skipped review.
       const headRunDone = runs.some(
         (run) =>
           run.app?.slug === "coderabbitai" &&
           run.name === "CodeRabbit" &&
           run.status === "completed" &&
           run.conclusion === "success" &&
-          !/paused|rate limit|limit reached|skipped/i.test(`${run.output?.title ?? ""} ${run.output?.summary ?? ""}`)
+          !NOT_REVIEWED.test(`${run.output?.title ?? ""} ${run.output?.summary ?? ""}`)
       );
       return reviewedHead || finishedSince || headStatusDone || headRunDone;
     }

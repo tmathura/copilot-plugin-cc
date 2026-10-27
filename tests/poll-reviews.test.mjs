@@ -56,7 +56,7 @@ const started = (ms) => ({ event: "copilot_work_started", created_at: at(ms) });
 const copilotReview = (sha = SHA) => ({ user: { login: "copilot-pull-request-reviewer[bot]" }, commit_id: sha });
 const rabbitStatus = (description) => ({ creator: { login: "coderabbitai[bot]" }, state: "success", description });
 const RABBIT_DONE = [rabbitStatus("Review completed")];
-// CodeRabbit's check run of a clean review, as GitHub sends it.
+// The fields of CodeRabbit's check run that the poll reads, with the text of a real clean review.
 const rabbitRun = (overrides = {}) => ({
   app: { slug: "coderabbitai" },
   name: "CodeRabbit",
@@ -441,7 +441,7 @@ for (const [name, runOfHead] of [
   ["a paused summary with no title", rabbitRun({ output: { title: null, summary: "Reviews paused" } })],
   ["a rate-limit-exceeded summary", rabbitRun({ output: { title: "Finished", summary: "Rate limit exceeded" } })],
   ["a limit-reached summary", rabbitRun({ output: { title: "Finished", summary: "Review limit reached" } })],
-  ["a skipped title", rabbitRun({ output: { title: "Review skipped", summary: "" } })],
+  ["a limit-reached title", rabbitRun({ output: { title: "Review limit reached", summary: "" } })],
   ["a failure", rabbitRun({ conclusion: "failure" })],
   ["a neutral conclusion", rabbitRun({ conclusion: "neutral" })],
   ["a skipped conclusion", rabbitRun({ conclusion: "skipped" })],
@@ -507,7 +507,7 @@ test("--no-copilot waits for CodeRabbit only and reads no timeline", async () =>
   assert.equal(done.code, 0);
 });
 
-for (const description of ["Review rate limited", "Review paused"]) {
+for (const description of ["Review rate limited", "Review paused", "Rate limit exceeded", "Review limit reached"]) {
   test(`a CodeRabbit success status "${description}" is not a review of the head`, async () => {
     const result = await run({ statuses: [rabbitStatus(description)] }, { skipCopilot: true, tries: 2 });
     assert.equal(result.code, 1);
