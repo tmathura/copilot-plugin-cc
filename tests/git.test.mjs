@@ -545,7 +545,7 @@ function untrackedOutputs(cwd) {
   ];
 }
 
-test("an untracked file behind a folder link or junction that leads outside the repo is not read", () => {
+test("an untracked file behind a folder link or junction that leads outside the repo or into .git is not read", () => {
   const base = makeTempDir();
   const cwd = path.join(base, "repo");
   const outside = path.join(base, "outside");
@@ -557,6 +557,8 @@ test("an untracked file behind a folder link or junction that leads outside the 
   fs.writeFileSync(path.join(outside, "key.txt"), "SECRET_OUTSIDE_MARKER\n");
   fs.writeFileSync(path.join(sibling, "key.txt"), "SECRET_SIBLING_MARKER\n");
   initGitRepo(cwd);
+  // The repo's .git/config can hold a token, as in a remote URL.
+  run("git", ["config", "review.marker", "SECRET_GIT_MARKER"], { cwd });
   fs.writeFileSync(path.join(cwd, "app.js"), "console.log('v1');\n");
   run("git", ["add", "app.js"], { cwd });
   run("git", ["commit", "-m", "init"], { cwd });
@@ -567,9 +569,10 @@ test("an untracked file behind a folder link or junction that leads outside the 
   fs.symlinkSync(outside, path.join(cwd, "sub", "linkdir"), FOLDER_LINK);
   fs.symlinkSync(sibling, path.join(cwd, "siblink"), FOLDER_LINK);
   fs.symlinkSync(path.join(cwd, "inner"), path.join(cwd, "innerlink"), FOLDER_LINK);
+  fs.symlinkSync(path.join(cwd, ".git"), path.join(cwd, "gitlink"), FOLDER_LINK);
 
   for (const output of untrackedOutputs(cwd)) {
-    assert.doesNotMatch(output, /SECRET_OUTSIDE_MARKER|SECRET_SIBLING_MARKER/);
+    assert.doesNotMatch(output, /SECRET_OUTSIDE_MARKER|SECRET_SIBLING_MARKER|SECRET_GIT_MARKER/);
     assert.match(output, /PLAIN_INSIDE/);
     assert.match(output, /DOTS_INSIDE/);
     assert.match(output, /INNER_INSIDE/);
@@ -578,6 +581,7 @@ test("an untracked file behind a folder link or junction that leads outside the 
       assert.match(output, /### linkdir\/key\.txt\n\(skipped: symlink\)/);
       assert.match(output, /### sub\/linkdir\/key\.txt\n\(skipped: symlink\)/);
       assert.match(output, /### siblink\/key\.txt\n\(skipped: symlink\)/);
+      assert.match(output, /### gitlink\/config\n\(skipped: symlink\)/);
       assert.match(output, /### innerlink\/ok\.txt\n```\nINNER_INSIDE\n```/);
     } else {
       assert.match(output, /### linkdir\n\(skipped: symlink\)/);
@@ -594,6 +598,8 @@ function mockRealpath(t, match, answer) {
   );
 }
 
+// The paths match git's root, which the code uses: a temp folder can differ from it (/var is
+// /private/var on macOS).
 function makeRepoWithUntrackedFile() {
   const cwd = makeTempDir();
   initGitRepo(cwd);
@@ -601,12 +607,13 @@ function makeRepoWithUntrackedFile() {
   run("git", ["add", "app.js"], { cwd });
   run("git", ["commit", "-m", "init"], { cwd });
   fs.writeFileSync(path.join(cwd, "plain.txt"), "SECRET_MOCKED_MARKER\n");
-  return cwd;
+  const root = git(cwd, "rev-parse", "--show-toplevel").trim();
+  return { cwd, root, file: path.join(root, "plain.txt") };
 }
 
 test("an untracked file whose real path is outside the repo is skipped as a symlink", (t) => {
-  const cwd = makeRepoWithUntrackedFile();
-  mockRealpath(t, path.join(cwd, "plain.txt"), () => path.join(makeTempDir(), "plain.txt"));
+  const { cwd, file } = makeRepoWithUntrackedFile();
+  mockRealpath(t, file, () => path.join(makeTempDir(), "plain.txt"));
 
   for (const output of untrackedOutputs(cwd)) {
     assert.match(output, /### plain\.txt\n\(skipped: symlink\)/);
@@ -618,9 +625,9 @@ test(
   "an untracked file whose real path is on another drive is skipped as a symlink",
   { skip: process.platform !== "win32" && "only Windows has drive letters" },
   (t) => {
-    const cwd = makeRepoWithUntrackedFile();
+    const { cwd, file } = makeRepoWithUntrackedFile();
     const otherDrive = path.parse(fs.realpathSync.native(cwd)).root.startsWith("Z") ? "Y:\\" : "Z:\\";
-    mockRealpath(t, path.join(cwd, "plain.txt"), () => `${otherDrive}elsewhere\\plain.txt`);
+    mockRealpath(t, file, () => `${otherDrive}elsewhere\\plain.txt`);
 
     for (const output of untrackedOutputs(cwd)) {
       assert.match(output, /### plain\.txt\n\(skipped: symlink\)/);
@@ -631,9 +638,8 @@ test(
 
 for (const which of ["the file", "the repo root"]) {
   test(`an untracked file whose real path cannot be read for ${which} is skipped as unreadable`, (t) => {
-    const cwd = makeRepoWithUntrackedFile();
-    const root = git(cwd, "rev-parse", "--show-toplevel").trim();
-    mockRealpath(t, which === "the file" ? path.join(root, "plain.txt") : root, () => {
+    const { cwd, root, file } = makeRepoWithUntrackedFile();
+    mockRealpath(t, which === "the file" ? file : root, () => {
       throw Object.assign(new Error("no such file"), { code: "ENOENT" });
     });
 

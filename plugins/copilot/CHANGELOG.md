@@ -6,8 +6,9 @@
 
 - A review no longer reads an untracked file behind a directory junction on Windows. Git for Windows
   lists the files behind a junction, so a junction in the repo that pointed outside it, for example
-  at a folder with a key file, put that file's text in the prompt and in `untracked.md`. Such a file
-  is now shown as `(skipped: symlink)`, as an untracked file link already was.
+  at a folder with a key file, or at the repo's own `.git` folder, put those files' text in the
+  prompt and in `untracked.md`. Such a file is now shown as `(skipped: symlink)`, as an untracked
+  file link already was.
 
 ### 1.0.21
 

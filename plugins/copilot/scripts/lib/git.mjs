@@ -1,7 +1,7 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): every git call writes no index and starts no
 // fsmonitor hook or textconv program; non-ASCII file names are not quoted; untracked symlinks, and
-// untracked files whose real path is outside the repository (behind a folder link or a junction), are
-// not read; the diff is inline up to the byte limit whatever the file count; above it the self-collect
+// untracked files whose real path is outside the repository or in its .git folder (behind a folder
+// link or a junction), are not read; the diff is inline up to the byte limit whatever the file count; above it the self-collect
 // guidance points Copilot at one patch file per changed file, which writeReviewPatches writes; the
 // review sections remove only trailing new lines, so Git Status keeps the leading space of its first line;
 // the default branch from origin/HEAD is origin/<name> when there is no local branch of that name.
@@ -232,10 +232,12 @@ function formatSection(title, body) {
   return [`## ${title}`, "", body.trim() ? body.replace(/\n+$/, "") : "(none)", ""].join("\n");
 }
 
-// A bare startsWith("..") would also match an in-repo name such as "..notes.txt".
-function isOutside(root, file) {
+// Outside the root, or in its .git folder, whose config can hold a token. Comparing the first path
+// part, not a prefix, keeps an in-repo name such as "..notes.txt" inside.
+function isOutsideWorkTree(root, file) {
   const relative = path.relative(root, file);
-  return relative === "" || relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative);
+  const [first] = relative.split(path.sep);
+  return relative === "" || first === ".." || first === ".git" || path.isAbsolute(relative);
 }
 
 function formatUntrackedFile(cwd, relativePath) {
@@ -248,7 +250,7 @@ function formatUntrackedFile(cwd, relativePath) {
     // Windows lists the files behind a junction.
     isLink =
       fs.lstatSync(absolutePath).isSymbolicLink() ||
-      isOutside(fs.realpathSync.native(cwd), fs.realpathSync.native(absolutePath));
+      isOutsideWorkTree(fs.realpathSync.native(cwd), fs.realpathSync.native(absolutePath));
   } catch {
     return `### ${relativePath}\n(skipped: broken symlink or unreadable file)`;
   }

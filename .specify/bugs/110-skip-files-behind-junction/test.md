@@ -17,9 +17,9 @@ the full suite shows no regression.
 | Check | Command / Action | Result | Notes |
 |-------|------------------|--------|-------|
 | Reproduction (post-fix) | The assessment's reproduction, as a Node script outside the repo, on Windows, run on the fixed `git.mjs` | pass | `untracked: ["linkdir/key.txt"]`, marker in context: false; on `main` it was true |
-| New / updated tests | `node --test --test-name-pattern="real path\|folder link or junction" tests/git.test.mjs tests/runtime-review-safety.test.mjs` | pass | 6 of 6 on Windows (the other-drive test runs on Windows only) |
-| Tests fail before the fix | the same tests with `main`'s `git.mjs` put back for a moment | pass | all six fail on Windows |
-| Regression suite | `npm test` | pass | 484 tests: 460 pass, 24 skipped, 0 fail |
+| New / updated tests | `node --test --test-name-pattern="real path\|folder link or junction" tests/git.test.mjs tests/runtime-review-safety.test.mjs` | pass | 6 of 6 on Windows after review round 1, also a junction to `.git` (the other-drive test runs on Windows only) |
+| Tests fail before the fix | the same tests with `main`'s `git.mjs` put back for a moment | pass | all six fail on Windows (run again after review round 1) |
+| Regression suite | `npm test` | pass | 484 tests: 460 pass, 24 skipped, 0 fail (after review round 1) |
 | Lint / type-check | `npm run build` | pass | `tsc` type check |
 | Version and plugin | `npm run check-version`, `claude plugin validate .` | pass | 1.0.22; validation passed |
 

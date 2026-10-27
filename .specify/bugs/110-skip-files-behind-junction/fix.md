@@ -16,8 +16,8 @@ the inline context, the lightweight context and `untracked.md`.
 
 | File | Change | Notes |
 |------|--------|-------|
-| `plugins/copilot/scripts/lib/git.mjs` | modified | `isOutside` helper (`..`, `..` plus `path.sep`, or an absolute path; `""` too); real-path check in `formatUntrackedFile` after the leaf check, in the same `try`; header comment |
-| `tests/git.test.mjs` | added tests | Real junctions or folder links (outside, nested, sibling `repo2`, inner), `..notes.txt`; mocked `realpathSync.native` (outside, another drive on Windows, a throw for the file and for the root); two helpers |
+| `plugins/copilot/scripts/lib/git.mjs` | modified | `isOutsideWorkTree` helper (first path part `..` or `.git`, an absolute path, or `""`); real-path check in `formatUntrackedFile` after the leaf check, in the same `try`; header comment |
+| `tests/git.test.mjs` | added tests | Real junctions or folder links (outside, nested, sibling `repo2`, inner, `.git`), `..notes.txt`; mocked `realpathSync.native` (outside, another drive on Windows, a throw for the file and for the root); three helpers |
 | `tests/runtime-review-safety.test.mjs` | added test | A review with the fake copilot CLI, inline and above the inline limit |
 | `README.md` | modified | The "Differences from the Codex plugin" bullet: no untracked file whose real path is outside the repo, also behind a folder link or a junction |
 | `plugins/copilot/CHANGELOG.md` | modified | `### 1.0.22` entry |
@@ -26,22 +26,24 @@ the inline context, the lightweight context and `untracked.md`.
 ## Diff Highlights (optional)
 
 ```js
-function isOutside(root, file) {
+function isOutsideWorkTree(root, file) {
   const relative = path.relative(root, file);
-  return relative === "" || relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative);
+  const [first] = relative.split(path.sep);
+  return relative === "" || first === ".." || first === ".git" || path.isAbsolute(relative);
 }
 // in formatUntrackedFile, inside the existing try:
 isLink =
   fs.lstatSync(absolutePath).isSymbolicLink() ||
-  isOutside(fs.realpathSync.native(cwd), fs.realpathSync.native(absolutePath));
+  isOutsideWorkTree(fs.realpathSync.native(cwd), fs.realpathSync.native(absolutePath));
 ```
 
 ## Tests Added or Updated
 
 - `tests/git.test.mjs` "an untracked file behind a folder link or junction that leads outside the
-  repo is not read": `linkdir` and `sub/linkdir` to an outside folder, `siblink` to `repo2`,
-  `innerlink` to a folder inside; the inline context, the lightweight context and `untracked.md`
-  hold no outside marker and do hold the inside files (`sub/plain.txt`, `..notes.txt`,
+  repo or into .git is not read": `linkdir` and `sub/linkdir` to an outside folder, `siblink` to
+  `repo2`, `innerlink` to a folder inside, `gitlink` to `.git` (whose config holds a marker); the
+  inline context, the lightweight context and `untracked.md` hold no outside or `.git` marker and
+  do hold the inside files (`sub/plain.txt`, `..notes.txt`,
   `inner/ok.txt`). On Windows the skip notes name the files behind the junctions, and the file behind
   the inner junction is read; elsewhere the links themselves are skipped.
 - "an untracked file whose real path is outside the repo is skipped as a symlink" (mocked
@@ -66,7 +68,13 @@ isLink =
 
 ## Deviations from Assessment
 
-None.
+- 2026-10-27, review round 1 (`code-review`): a junction to the repo's own `.git` folder still sent
+  `.git/config` (which can hold a token) to Copilot: its real path is inside the root. The check
+  now also skips a real path in `<root>/.git`, by its first path part (`isOutsideWorkTree`); the
+  same first-part test replaces the `..` prefix test. The real-link test adds `gitlink`; the README
+  bullet, the header and the CHANGELOG name `.git`. The mocked tests now match paths built from
+  git's root, which can differ from the temp folder (`/var` is `/private/var` on macOS). The root's
+  `realpath` runs once per untracked file, a small call next to reading the file.
 
 ## Follow-ups
 
