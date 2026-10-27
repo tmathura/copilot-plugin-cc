@@ -1,41 +1,42 @@
 # Bug Verification: the state folder and job files are readable by others under CLAUDE_PLUGIN_DATA
 
 - **Slug**: 126-state-folder-owner-only
-- **Tested**: 2026-10-27 (again after review round 3)
+- **Tested**: 2026-10-27 (locally after review round 3, and in CI on PR #150)
 - **Assessment**: ./assessment.md
 - **Fix**: ./fix.md
-- **Result**: partial
+- **Result**: verified
 
 ## Summary
 
-The fix is in place and the full suite passes on Windows with no regression, but the reproduction
-and the 18 mode tests apply only to macOS and Linux and did not run here. CI on Ubuntu and macOS runs
-them; the result becomes verified when they pass there.
+The fix holds. The full suite passes on Windows with no regression. The 18 mode tests, which cover
+the reproduction (a 0755 data folder, umask 022) and skip on Windows, passed in CI on Ubuntu and
+macOS on the PR head 9326446.
 
 ## Checks Performed
 
 | Check | Command / Action | Result | Notes |
 |-------|------------------|--------|-------|
-| Reproduction (post-fix) | The assessment's steps (a 0755 data folder, umask 022) | not-run | Unix modes only; this machine is Windows, and WSL is not reachable from the session. `tests/state-modes.test.mjs` covers the steps in CI |
-| New / updated tests | `node --test tests/state-modes.test.mjs` | skipped | 18 tests, all skipped on Windows; they run in CI on Ubuntu and macOS |
-| Regression suite | `npm test` | pass | 503 tests: 461 pass, 42 skipped, 0 fail |
+| Reproduction (post-fix) | The assessment's steps (a 0755 data folder, umask 022), as the first tests in `tests/state-modes.test.mjs` | pass | In CI on Ubuntu and macOS; not on this Windows machine, which has no Unix modes |
+| New / updated tests | `npm test` in CI (`CI (ubuntu-latest)`, `CI (macos-latest)`, run 40563294064) | pass | All 18 tests ran and passed on both, none skipped |
+| Regression suite | `npm test` | pass | Windows: 503 tests, 461 pass, 42 skipped, 0 fail. Ubuntu and macOS CI: 503 tests, 498 pass, 5 skipped, 0 fail |
 | Lint / type-check | `npm run build` | pass | `tsc` type check |
 | Version and plugin | `npm run check-version`, `claude plugin validate .` | pass | 1.0.23; validation passed |
 
 ## Output Excerpts
 
 ```text
-node --test tests/state-modes.test.mjs
-ℹ tests 18
-ℹ pass 0
-ℹ skipped 18
+CI (ubuntu-latest) and CI (macos-latest), npm test:
+ok 427 - under CLAUDE_PLUGIN_DATA the state folders and job files are owner-only, and the data folder is left alone
+# tests 503
+# pass 498
+# fail 0
+# skipped 5
 ```
 
 ## Residual Risks
 
-- The mode tests have not run yet; a mistake in them shows only in CI.
 - A folder or log that the plugin cannot change stays open (accepted in the assessment).
 
 ## Recommendation
 
-Hold the merge until CI on Ubuntu and macOS passes the 18 mode tests; then the fix is verified.
+Close the bug: verified by the mode tests in CI on Ubuntu and macOS.
