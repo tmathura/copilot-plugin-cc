@@ -77,7 +77,8 @@ function assertOwnerOnly(paths, logFile) {
   assert.equal(modeOf(logFile), 0o600);
 }
 
-// Returns the number of calls that failed, so a test can show its failure path ran.
+// Returns a function that gives the number of calls that failed, so a test can show its failure
+// path ran.
 function failFor(t, method, target, code) {
   const real = fs[method];
   let hits = 0;
