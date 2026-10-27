@@ -19,7 +19,7 @@ and the full suite shows no regression.
 |-------|------------------|--------|-------|
 | Reproduction (post-fix) | The assessment's reproduction, as a Node script outside the repo, on Windows, run on the fixed `git.mjs` | pass | `untracked: ["linkdir/key.txt"]`, marker in context: false; on `main` it was true |
 | New / updated tests | `node --test --test-name-pattern="real path\|folder link or junction" tests/git.test.mjs tests/runtime-review-safety.test.mjs` | pass | 7 of 7 on Windows after review round 2, also junctions and mocked real paths into `.git`, `.GIT` and a nested `.git` (the other-drive test runs on Windows only) |
-| Tests fail before the fix | the same tests with `main`'s `git.mjs` put back for a moment | pass | all fail on Windows (run again after review round 1) |
+| Tests fail before the fix | the same tests with `main`'s `git.mjs` put back for a moment | pass | all 7 fail on Windows (run again after review round 3) |
 | The `.git` check is needed | the fixed `git.mjs` with its `.git` line taken out for a moment | pass | the real-link test and the mocked `.git` test fail (review round 2) |
 | Regression suite | `npm test` | pass | 485 tests: 461 pass, 24 skipped, 0 fail (after review round 2) |
 | Lint / type-check | `npm run build` | pass | `tsc` type check |

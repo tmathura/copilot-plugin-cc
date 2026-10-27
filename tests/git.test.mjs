@@ -564,6 +564,10 @@ test("an untracked file behind a folder link or junction that leads outside the 
   run("git", ["commit", "-m", "init"], { cwd });
   fs.writeFileSync(path.join(cwd, "sub", "plain.txt"), "PLAIN_INSIDE\n");
   fs.writeFileSync(path.join(cwd, "..notes.txt"), "DOTS_INSIDE\n");
+  // Names that only start with ".git" are not the .git folder.
+  fs.mkdirSync(path.join(cwd, ".github"));
+  fs.writeFileSync(path.join(cwd, ".github", "ci.yml"), "GITHUB_INSIDE\n");
+  fs.writeFileSync(path.join(cwd, ".gitattributes"), "GITATTRIBUTES_INSIDE\n");
   fs.writeFileSync(path.join(cwd, "inner", "ok.txt"), "INNER_INSIDE\n");
   fs.symlinkSync(outside, path.join(cwd, "linkdir"), FOLDER_LINK);
   fs.symlinkSync(outside, path.join(cwd, "sub", "linkdir"), FOLDER_LINK);
@@ -575,6 +579,8 @@ test("an untracked file behind a folder link or junction that leads outside the 
     assert.doesNotMatch(output, /SECRET_OUTSIDE_MARKER|SECRET_SIBLING_MARKER|SECRET_GIT_MARKER/);
     assert.match(output, /PLAIN_INSIDE/);
     assert.match(output, /DOTS_INSIDE/);
+    assert.match(output, /GITHUB_INSIDE/);
+    assert.match(output, /GITATTRIBUTES_INSIDE/);
     assert.match(output, /INNER_INSIDE/);
     if (process.platform === "win32") {
       // Git for Windows lists the files behind a junction; one that stays inside is read.

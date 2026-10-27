@@ -235,7 +235,8 @@ function formatSection(title, body) {
 
 // Outside the root, or in a .git folder (the repo's or a nested clone's), whose config can hold a
 // token. Comparing whole path parts, not a prefix, keeps an in-repo name such as "..notes.txt"
-// inside. A case-insensitive file system (Windows, macOS) also finds the folder as ".GIT".
+// inside. A case-insensitive file system (Windows, macOS) uses a folder stored as ".GIT" as the
+// .git folder, and realpath keeps the stored case.
 function isOutsideWorkTree(root, file) {
   const relative = path.relative(root, file);
   const parts = relative.split(path.sep);

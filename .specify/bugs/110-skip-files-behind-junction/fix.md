@@ -19,7 +19,7 @@ of the repo root. A file behind a directory junction (or any folder link) that l
 | `plugins/copilot/scripts/lib/git.mjs` | modified | `isOutsideWorkTree` helper (first path part `..`, any part `.git` in any case, an absolute path, or `""`); real-path check in `formatUntrackedFile` after the leaf check, in the same `try`; header comment |
 | `tests/git.test.mjs` | added tests | Real junctions or folder links (outside, nested, sibling `repo2`, inner, `.git`), `..notes.txt`; mocked `realpathSync.native` (outside, a `.git` folder as `.git`, `.GIT` and nested, another drive on Windows, a throw for the file and for the root); three helpers |
 | `tests/runtime-review-safety.test.mjs` | added test | A review with the fake copilot CLI, inline and above the inline limit |
-| `README.md` | modified | The "Differences from the Codex plugin" bullet: no untracked file whose real path is outside the repo or in its `.git` folder, also behind a folder link or a junction |
+| `README.md` | modified | The "Differences from the Codex plugin" bullet: no untracked file whose real path is outside the repo or in a `.git` folder, also behind a folder link or a junction |
 | `plugins/copilot/CHANGELOG.md` | modified | `### 1.0.22` entry |
 | `package.json`, `package-lock.json`, `plugins/copilot/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` | modified | `npm run bump-version -- 1.0.22` |
 
@@ -63,12 +63,12 @@ isLink =
 
 ## Local Verification
 
-- With `main`'s `git.mjs` put back for a moment, the five new `git.test.mjs` tests and the runtime
-  test fail on Windows; with the fix, all pass.
+- With `main`'s `git.mjs` put back for a moment (run again after review round 3), the six new
+  `git.test.mjs` tests and the runtime test fail on Windows; with the fix, all pass.
 - The reproduction script from `assessment.md` ("Reproduction"): on `main` the marker is in the
   context; with the fix it is not.
-- Commands run: `npm ci --include=dev` (0 vulnerabilities), `npm run build` (pass), `npm test`
-  (484 tests: 460 pass, 24 skipped, 0 fail), `npm run check-version` (1.0.22),
+- Commands run (after review round 3): `npm ci --include=dev` (0 vulnerabilities), `npm run build`
+  (pass), `npm test` (485 tests: 461 pass, 24 skipped, 0 fail), `npm run check-version` (1.0.22),
   `claude plugin validate .` (pass).
 
 ## Deviations from Assessment
@@ -85,6 +85,11 @@ isLink =
   clone's `.git` (`vendor/lib/.git`) holds a config too. A mocked test covers `.git`, `.GIT` and the
   nested folder on every platform; with the `.git` line taken out, it and the real-link test fail.
   The POSIX branch of the real-link test also checks the `siblink` and `gitlink` notes.
+- 2026-10-27, review round 3 (`code-review`): the real-link test also reads `.github/ci.yml` and
+  `.gitattributes`, names that only start with `.git`; the README says "a `.git` folder"; the
+  header comment gives the reason for the case-free check (a case-insensitive file system uses a
+  folder stored as `.GIT`, and `realpath` keeps that case). A Linux folder named `.Git` is skipped
+  too, which fails closed.
 
 ## Follow-ups
 
