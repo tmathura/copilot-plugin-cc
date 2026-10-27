@@ -37,6 +37,9 @@ Each workspace has one folder in the state folder. In it:
 - `state.json` lists the jobs.
 - `jobs/<job id>.json` is the full record of a job, with its result.
 - `jobs/<job id>.log` is the progress log of a job.
+- `state.json.lock` is held for each change of the state. A process that is killed while it frees
+  the lock of an ended process can leave `state.json.lock.reclaim` or
+  `state.json.lock.reclaim.<id>`. These small files are not a stuck lock: the plugin goes past them.
 
 `/copilot:status <job id>` shows the last lines of the log. `/copilot:result <job id>` shows the
 stored result. The plugin keeps all queued and running jobs and the 50 newest finished jobs. It

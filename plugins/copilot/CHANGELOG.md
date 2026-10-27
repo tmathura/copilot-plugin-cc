@@ -2,6 +2,13 @@
 
 ## Copilot plugin
 
+### 1.0.20
+
+- A process that was killed while it freed the state lock of an ended process no longer blocks every
+  later change of the state. Before, each `/copilot:*` command, the SessionEnd hook and a job's last
+  write failed with "... .reclaim belongs to process N, which is no longer running. Delete ... and
+  retry" until the file was deleted by hand. The plugin now goes past such a file.
+
 ### 1.0.19
 
 - A review or task no longer fails with "Failed to parse Copilot JSON output" when Copilot reads,

@@ -243,6 +243,21 @@ function releaseLock(lockFile, token) {
   }
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+// The reclaim locks form a chain. A level whose owner has died is never removed: it points to the next
+// level, named by that owner's token, so every reclaimer, also one that read the chain a while ago,
+// contends on the same first free level. Returns that next level, or null when the walk must stop at
+// this level: it is unreadable, held by a live process, or loops back to a token seen before.
+function nextReclaimLevel(lockFile, owner, seen, isAlive) {
+  const token = owner?.token.toLowerCase();
+  if (!owner || isAlive(owner.pid) || !UUID.test(token) || seen.has(token)) {
+    return null;
+  }
+  seen.add(token);
+  return `${lockFile}.reclaim.${token}`;
+}
+
 // Age alone never frees a lock: a long update by a live process must keep it.
 function reclaimDeadLock(lockFile, options) {
   const isAlive = options.isPidAliveImpl ?? isPidAlive;
@@ -251,26 +266,30 @@ function reclaimDeadLock(lockFile, options) {
     return;
   }
 
-  const reclaimFile = `${lockFile}.reclaim`;
   const reclaimer = { pid: process.pid, token: randomUUID() };
-  const ownerFile = writeOwnerFile(reclaimFile, reclaimer);
-  let linked;
+  const ownerFile = writeOwnerFile(`${lockFile}.reclaim`, reclaimer);
+  const passed = [];
+  const seen = new Set();
+  let reclaimFile = `${lockFile}.reclaim`;
   try {
-    linked = tryLinkLock(ownerFile, reclaimFile);
+    while (!tryLinkLock(ownerFile, reclaimFile)) {
+      const other = readLockOwner(reclaimFile);
+      const next = nextReclaimLevel(lockFile, other, seen, isAlive);
+      if (!next) {
+        return;
+      }
+      passed.push([reclaimFile, other.token]);
+      reclaimFile = next;
+    }
   } finally {
     removeOwnerFile(ownerFile);
   }
-  if (!linked) {
-    const other = readLockOwner(reclaimFile);
-    if (other && !isAlive(other.pid)) {
-      throw new Error(
-        `The state lock ${reclaimFile} belongs to process ${other.pid}, which is no longer running. Delete ${reclaimFile} and retry.`
-      );
-    }
-    return;
-  }
 
   try {
+    // A passed level read while its live owner still held it may have been released and taken since.
+    if (passed.some(([file, token]) => readLockOwner(file)?.token !== token)) {
+      return;
+    }
     // Another reclaimer may have freed the dead lock and a live process taken it since the check above.
     const current = readLockOwner(lockFile);
     if (current && !isAlive(current.pid)) {
@@ -284,14 +303,21 @@ function reclaimDeadLock(lockFile, options) {
 function describeLockBlocker(lockFile, options) {
   const isAlive = options.isPidAliveImpl ?? isPidAlive;
   const holder = readLockOwner(lockFile);
-  const reclaimFile = `${lockFile}.reclaim`;
   if (!holder) {
     return "The lock has no readable owner; if no Copilot companion is running, delete it and retry.";
   }
   // A damaged reclaim file, or one that an older version left without its owner, names no process to
-  // check, so no one can free it.
-  if (!isAlive(holder.pid) && fs.existsSync(reclaimFile)) {
-    return `Process ${holder.pid} has ended, but ${reclaimFile} blocks freeing its lock; if no Copilot companion is running, delete ${reclaimFile} and retry.`;
+  // check, so no one can free it. The level that blocks is the first one of the chain that is not dead.
+  if (!isAlive(holder.pid)) {
+    const seen = new Set();
+    let reclaimFile = `${lockFile}.reclaim`;
+    while (fs.existsSync(reclaimFile)) {
+      const next = nextReclaimLevel(lockFile, readLockOwner(reclaimFile), seen, isAlive);
+      if (!next) {
+        return `Process ${holder.pid} has ended, but ${reclaimFile} blocks freeing its lock; if no Copilot companion is running, delete ${reclaimFile} and retry.`;
+      }
+      reclaimFile = next;
+    }
   }
   return `Process ${holder.pid} holds the lock; retry when it finishes.`;
 }
