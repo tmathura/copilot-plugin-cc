@@ -1,7 +1,7 @@
 # Bug Verification: a task whose prompt holds a double quote fails before Copilot starts
 
 - **Slug**: 151-safe-session-name
-- **Tested**: 2026-10-27
+- **Tested**: 2026-10-27 (again after review round 1)
 - **Assessment**: ./assessment.md
 - **Fix**: ./fix.md
 - **Result**: verified

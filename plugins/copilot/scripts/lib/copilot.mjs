@@ -2,7 +2,8 @@
 // prompt mode. This module alone builds Copilot arguments and decides permissions. It has no broker,
 // no session transfer and no thread list, so the latest task comes from the plugin's job state, never
 // a review gate job; the login check is one tiny read-only prompt, and a caller can start Copilot
-// inside its own locked step; a task's session name drops the characters Copilot CLI refuses.
+// inside its own locked step; a task's session name has a space in place of each character that
+// Copilot CLI refuses.
 /**
  * @typedef {import("./prompt-mode-protocol").PromptModeEvent} PromptModeEvent
  * @typedef {import("./prompt-mode-protocol").ResultEvent} ResultEvent

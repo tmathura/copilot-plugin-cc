@@ -449,8 +449,8 @@ test("the fake Copilot CLI refuses the session names that Copilot CLI 1.0.95 ref
   for (const [name, message] of Object.entries(refused)) {
     const result = runFake(name);
     assert.equal(result.status, 1, JSON.stringify(name));
-    assert.equal(result.stderr, `${message}\n`);
-    assert.equal(result.stdout, "");
+    assert.equal(result.stderr, `${message}\n`, JSON.stringify(name));
+    assert.equal(result.stdout, "", JSON.stringify(name));
   }
   for (const name of ["a'b", "café", "x".repeat(100)]) {
     const result = runFake(name);

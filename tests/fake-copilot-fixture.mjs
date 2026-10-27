@@ -40,8 +40,9 @@ export const NOT_LOGGED_IN_STDERR = [
 //   write-attempt       writes a file in its working folder if the create tool is available
 //   reject-flags        rejects its arguments and exits 1 before it reads the prompt
 // Every run records its arguments, environment, prompt, pid and the files of each --add-dir folder
-// (base64, so the bytes stay exact). Then, like Copilot CLI 1.0.95, it exits 1 for a --name that is
-// empty, longer than 100 characters, or holds a double quote or an ASCII control character. Each child that a run starts is recorded with the run's pid.
+// (base64, so the bytes stay exact). Each child that a run starts is recorded with the run's pid.
+// After the record, like Copilot CLI 1.0.95, a run exits 1 for a --name that is empty, longer than
+// 100 characters, or holds a double quote or an ASCII control character.
 // FAKE_COPILOT_ANSWER replaces the final answer text. FAKE_COPILOT_EARLIER gives the first turn's
 // message, which comes with the view tool call. FAKE_COPILOT_CRLF ends each event line with CRLF.
 export function installFakeCopilot(binDir, behavior = "ok") {

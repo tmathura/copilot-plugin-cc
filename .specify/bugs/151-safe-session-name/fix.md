@@ -44,7 +44,7 @@ These fail on the old code:
 - `tests/runtime-task.test.mjs`, "a background task whose prompt holds double quotes completes": job
   status `completed`, the result is the answer with no refusal, and the prompt keeps its quotes.
 - `tests/copilot.test.mjs`, "a task's session name holds no character that Copilot CLI refuses, and
-  keeps the rest": U+0000, U+0001, U+0008, U+001F and U+007F become a space; `"` goes; a prompt of
+  keeps the rest": U+0000, U+0001, U+0008, U+001F, U+007F and `"` become a space; a prompt of
   only `""` gives the bare prefix.
 
 These pass on the old code too:
@@ -71,6 +71,10 @@ These pass on the old code too:
   scope. So a prompt given as one string never reached `--name` with its quotes; the failure hits a
   prompt that comes with an option, as in the release run (`--background --write --json`), and
   would hit every prompt once #111 is fixed.
+- 2026-10-27, review round 1: for the same reason, the assessment's Reproduction (`task 'Say
+  "hi".'`, one argument) does not show the bug on main, and its Symptom ("A `/copilot:rescue` or
+  `task` whose prompt holds a double quote ... fails") says too much: only a prompt that comes with
+  an option keeps its quotes until the name is built. `test.md` reproduces it with `task --fresh`.
 
 ## Follow-ups
 
