@@ -425,7 +425,8 @@ test("a review and comments with no user are skipped", async () => {
 
 test("a clean CodeRabbit review with only a check run ends the wait", async () => {
   const skippedFiles = { title: "Finished", summary: "Result: Success - Review completed. Files skipped from review: 1" };
-  for (const runOfHead of [rabbitRun(), rabbitRun({ output: undefined }), rabbitRun({ output: null }), rabbitRun({ output: skippedFiles })]) {
+  const noTitle = { title: null, summary: "Result: Success - Review completed" };
+  for (const runOfHead of [rabbitRun(), rabbitRun({ output: skippedFiles }), rabbitRun({ output: noTitle })]) {
     const alone = await run({ "check-runs": [runOfHead] }, { skipCopilot: true });
     assert.equal(alone.code, 0, alone.message);
     assert.ok(alone.calls.includes(`repos/tmathura/copilot-plugin-cc/commits/${SHA}/check-runs`), alone.calls.join(" "));
@@ -437,12 +438,16 @@ test("a clean CodeRabbit review with only a check run ends the wait", async () =
 });
 
 for (const [name, runOfHead] of [
-  ["a paused title", rabbitRun({ output: { title: "Review paused", summary: "" } })],
-  ["a rate-limited summary", rabbitRun({ output: { title: "Finished", summary: "Review rate limited" } })],
-  ["a paused summary with no title", rabbitRun({ output: { title: null, summary: "Reviews paused" } })],
-  ["a rate-limit-exceeded summary", rabbitRun({ output: { title: "Finished", summary: "Rate limit exceeded" } })],
-  ["a limit-reached summary", rabbitRun({ output: { title: "Finished", summary: "Review limit reached" } })],
-  ["a limit-reached title", rabbitRun({ output: { title: "Review limit reached", summary: "" } })],
+  // Each pause or limit text comes with "Review completed" in the other field, so NOT_REVIEWED decides.
+  ["a paused title", rabbitRun({ output: { title: "Review paused", summary: "Review completed" } })],
+  ["a rate-limited summary", rabbitRun({ output: { title: "Review completed", summary: "Review rate limited" } })],
+  ["a rate-limit-exceeded summary", rabbitRun({ output: { title: "Review completed", summary: "Rate limit exceeded" } })],
+  ["a limit-reached summary", rabbitRun({ output: { title: "Review completed", summary: "Review limit reached" } })],
+  ["a limit-reached title", rabbitRun({ output: { title: "Review limit reached", summary: "Review completed" } })],
+  ["a skipped review", rabbitRun({ output: { title: "Review skipped", summary: "Result: Success - Draft pull request" } })],
+  ["no output", rabbitRun({ output: undefined })],
+  ["a null output", rabbitRun({ output: null })],
+  ["a null title and a paused summary", rabbitRun({ output: { title: null, summary: "Reviews paused" } })],
   ["a failure", rabbitRun({ conclusion: "failure" })],
   ["a neutral conclusion", rabbitRun({ conclusion: "neutral" })],
   ["a skipped conclusion", rabbitRun({ conclusion: "skipped" })],
@@ -514,6 +519,14 @@ for (const description of ["Review rate limited", "Review paused", "Rate limit e
     assert.equal(result.code, 1);
   });
 }
+
+test("a CodeRabbit success status that mentions skipped files ends the wait", async () => {
+  const result = await run(
+    { statuses: [rabbitStatus("Review completed. Files skipped from review: 1")] },
+    { skipCopilot: true }
+  );
+  assert.equal(result.code, 0, result.message);
+});
 
 test("a CodeRabbit review completed after a rate limit ends the wait, in any order", async () => {
   const result = await run(
