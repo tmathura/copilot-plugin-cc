@@ -164,6 +164,16 @@ test("a clone with a local default branch still reviews against <name>", () => {
   assert.match(collectReviewContext(clone, target).content, /console\.log\('feature'\)/);
 });
 
+test("a clone with no origin/HEAD and no local default branch reviews against origin/main", () => {
+  const clone = cloneFeature(makeOriginWithFeature());
+  git(clone, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
+
+  const target = resolveReviewTarget(clone, {});
+
+  assert.equal(target.baseRef, "origin/main");
+  assert.match(collectReviewContext(clone, target).content, /console\.log\('feature'\)/);
+});
+
 // Today's failure, kept on purpose: an origin/HEAD that points at a missing ref is not a usable base.
 test("an origin/HEAD that points at a missing ref gives origin/<name> and fails at merge-base", () => {
   const clone = cloneFeature(makeOriginWithFeature());

@@ -17,9 +17,9 @@ regression.
 | Check | Command / Action | Result | Notes |
 |-------|------------------|--------|-------|
 | Reproduction (post-fix) | The assessment's reproduction, as a Node script outside the repo, run on the fixed `git.mjs` | pass | `baseRef: origin/main`, context collected; on `main` it failed at `merge-base HEAD main` |
-| New / updated tests | `node --test --test-name-pattern="default branch\|origin" tests/git.test.mjs` | pass | 7 of 7, also the existing special-character and no-default-branch tests |
+| New / updated tests | `node --test --test-name-pattern="default branch\|origin" tests/git.test.mjs` | pass | 8 of 8 (after review round 2), also the existing special-character and no-default-branch tests |
 | Tests fail before the fix | the same file with `main`'s `git.mjs` put back for a moment | pass | the 4 remote-only tests fail; the local-case test passes, as planned |
-| Regression suite | `npm test` | pass | 442 tests: 418 pass, 24 skipped, 0 fail |
+| Regression suite | `npm test` | pass | 443 tests: 419 pass, 24 skipped, 0 fail (after review round 2) |
 | Lint / type-check | `npm run build` | pass | `tsc` type check |
 | Version and plugin | `npm run check-version`, `claude plugin validate .` | pass | 1.0.21; validation passed |
 

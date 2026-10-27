@@ -4,9 +4,8 @@
 
 ### 1.0.21
 
-- A branch review now works in a clone that has the remote's default branch only as
-  `origin/<name>`, such as one made with `git clone -b <other branch>`. It compares against
-  `origin/<name>`. Before, it failed with "merge-base HEAD main: ... Not a valid object name main".
+- A branch review now works in a clone whose `origin/HEAD` names a branch with no local copy, such
+  as one made with `git clone -b <other branch>`. It compares against `origin/<name>`. Before, it failed with "merge-base HEAD main: ... Not a valid object name main".
   The review label then says "branch diff against origin/main".
 
 ### 1.0.20

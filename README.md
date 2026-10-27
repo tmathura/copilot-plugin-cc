@@ -288,9 +288,9 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
   tell Claude to use the same git options when it estimates the size of a review.
 - A review does not list a file whose only change is a new timestamp. The plugin does not let `git`
   refresh the index, so it compares the content instead.
-- A branch review in a clone with no local default branch, such as `git clone -b <other branch>`,
-  compares against `origin/<name>`. Codex takes the name from `origin/HEAD` and
-  uses it as a local branch, so `git merge-base` fails. The reason is correctness.
+- A branch review in a clone whose `origin/HEAD` names a branch with no local copy, such as one
+  made with `git clone -b <other branch>`, compares against `origin/<name>`. Codex uses the name
+  from `origin/HEAD` as a local branch, so `git merge-base` fails. The reason is correctness.
 - A review does not read the target of an untracked symlink. The link can point outside the repo,
   for example at a key file. Codex puts the target's text in the prompt.
 - A review reads an untracked file whose name has non-ASCII letters, a tab or a newline. It shows a
