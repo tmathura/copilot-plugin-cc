@@ -15,9 +15,15 @@
 //   Copilot's start gives a false drop.
 // - coderabbit: done when it has a review on the head SHA, or, when its reviews are paused, when it
 //   posted "Review finished" after this script started and is no longer "Currently processing", or when
-//   its commit status on the head SHA is "success" (a review with no findings posts no review).
-//   A "Review finished" from before this poll started does not count, also when an earlier poll
-//   for the same head saw none.
+//   its commit status on the head SHA is "success", or its "CodeRabbit" check run on the head SHA is
+//   "success" with a summary that starts "Result: Success - Review completed" (a review with no
+//   findings posts no review). No path counts while a CodeRabbit comment says "Currently
+//   processing". A paused or limited status or run never counts. A "Review finished"
+//   from before this poll started does not count, also when an earlier poll for the same head saw
+//   none. The "Bot reviewers" table gives triggers and where findings live, so it does not list the
+//   check run.
+//   Limits: a success on the head counts also while a re-run of the same head is going, and a status
+//   that skipped the review for another reason than a pause or a limit counts too.
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -30,10 +36,13 @@ const USAGE = "usage: node poll-reviews.mjs <40-character head sha> <pr number> 
 const isCopilot = (login) => /^copilot-pull-request-reviewer(\[bot\])?$/.test(login);
 const isCodeRabbit = (login) => /^coderabbitai(\[bot\])?$/.test(login);
 const time = (value) => Date.parse(value ?? "");
+// A paused or limited CodeRabbit also reports success; that is not a review of the head. Its status
+// says "rate limited" and its comment "Review limit reached"; a check run's words are not known.
+const NOT_REVIEWED = /paused|rate limit|limit reached/i;
 
-// `gh api --paginate --slurp` prints one entry per page; a check-suites page wraps its list.
+// `gh api --paginate --slurp` prints one entry per page; a check-suites or check-runs page wraps its list.
 function items(pages) {
-  return pages.flatMap((page) => (Array.isArray(page) ? page : (page?.check_suites ?? [])));
+  return pages.flatMap((page) => (Array.isArray(page) ? page : (page?.check_suites ?? page?.check_runs ?? [])));
 }
 
 export function parseArgs(argv) {
@@ -77,23 +86,33 @@ export async function pollReviews({
   let copilotStarted = false;
 
   const reviewers = {
-    copilot: (reviews) => reviews.some((r) => isCopilot(r.user.login) && r.commit_id === sha),
-    coderabbit: (reviews, comments, statuses) => {
-      const mine = comments.filter((c) => isCodeRabbit(c.user.login));
+    // A deleted account leaves `user: null`; its login is then undefined and matches no reviewer.
+    copilot: (reviews) => reviews.some((r) => isCopilot(r.user?.login) && r.commit_id === sha),
+    coderabbit: (reviews, comments, statuses, runs) => {
+      const mine = comments.filter((c) => isCodeRabbit(c.user?.login));
       if (mine.some((c) => /Currently processing/.test(c.body))) {
         return false;
       }
-      const reviewedHead = reviews.some((r) => isCodeRabbit(r.user.login) && r.commit_id === sha);
+      const reviewedHead = reviews.some((r) => isCodeRabbit(r.user?.login) && r.commit_id === sha);
       const finishedSince = mine.some(
         (c) => time(c.updated_at) > startedAt && /Review finished|Review completed/.test(c.body)
       );
-      // A review with no findings posts no review object, only a commit status on the head.
-      // A paused or rate-limited CodeRabbit also reports success; that is not a review of this head.
+      // A review with no findings posts no review object, only a commit status or a check run on the head.
       const headStatusDone = statuses.some(
-        (s) =>
-          isCodeRabbit(s.creator?.login) && s.state === "success" && !/paused|rate limited/i.test(s.description ?? "")
+        (s) => isCodeRabbit(s.creator?.login) && s.state === "success" && !NOT_REVIEWED.test(s.description ?? "")
       );
-      return reviewedHead || finishedSince || headStatusDone;
+      // A run also ends with success when it skipped the review, so only the summary text of a real
+      // clean review counts.
+      const headRunDone = runs.some(
+        (run) =>
+          run.app?.slug === "coderabbitai" &&
+          run.name === "CodeRabbit" &&
+          run.status === "completed" &&
+          run.conclusion === "success" &&
+          /^Result: Success - Review completed\b/.test(run.output?.summary ?? "") &&
+          !NOT_REVIEWED.test(`${run.output?.title ?? ""} ${run.output?.summary ?? ""}`)
+      );
+      return reviewedHead || finishedSince || headStatusDone || headRunDone;
     }
   };
   if (skipCopilot) {
@@ -105,15 +124,17 @@ export async function pollReviews({
     let reviews;
     let comments;
     let statuses;
+    let runs;
     try {
       reviews = read(`pulls/${pr}/reviews`);
       comments = read(`issues/${pr}/comments`);
       statuses = read(`commits/${sha}/statuses`);
+      runs = read(`commits/${sha}/check-runs`);
     } catch (error) {
       return { code: 2, message: `gh failed: ${error.message}` };
     }
     pending = Object.entries(reviewers)
-      .filter(([, done]) => !done(reviews, comments, statuses))
+      .filter(([, done]) => !done(reviews, comments, statuses, runs))
       .map(([name]) => name);
     if (pending.length === 0) {
       return { code: 0, message: `all reviewers done after ${attempt} check(s)` };

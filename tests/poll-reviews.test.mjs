@@ -56,14 +56,24 @@ const started = (ms) => ({ event: "copilot_work_started", created_at: at(ms) });
 const copilotReview = (sha = SHA) => ({ user: { login: "copilot-pull-request-reviewer[bot]" }, commit_id: sha });
 const rabbitStatus = (description) => ({ creator: { login: "coderabbitai[bot]" }, state: "success", description });
 const RABBIT_DONE = [rabbitStatus("Review completed")];
+// The fields of CodeRabbit's check run that the poll reads, with the text of a real clean review.
+const CLEAN = "Result: Success - Review completed";
+const rabbitRun = (overrides = {}) => ({
+  app: { slug: "coderabbitai" },
+  name: "CodeRabbit",
+  status: "completed",
+  conclusion: "success",
+  output: { title: "Finished", summary: CLEAN },
+  ...overrides
+});
 
 // A fake `gh api --paginate --slurp`: each value is the items of one page, or a function of the
-// local clock, or an Error to throw. Check suites come wrapped, as GitHub sends them.
+// local clock, or an Error to throw. Check suites and check runs come wrapped, as GitHub sends them.
 function fakeGh(data, clock) {
   const calls = [];
   const ghPages = (apiPath) => {
     calls.push(apiPath);
-    const key = ["reviews", "comments", "statuses", "timeline", "check-suites"].find((name) =>
+    const key = ["reviews", "comments", "statuses", "timeline", "check-suites", "check-runs"].find((name) =>
       apiPath.endsWith(`/${name}`)
     );
     let value = data[key] ?? [];
@@ -73,7 +83,10 @@ function fakeGh(data, clock) {
     if (value instanceof Error) {
       throw value;
     }
-    return key === "check-suites" ? [{ total_count: value.length, check_suites: value }] : [value];
+    if (key === "check-suites") {
+      return [{ total_count: value.length, check_suites: value }];
+    }
+    return key === "check-runs" ? [{ total_count: value.length, check_runs: value }] : [value];
   };
   return { ghPages, calls };
 }
@@ -373,6 +386,128 @@ test("a check-suites page with no list or no page at all does not break the poll
   assert.equal(result.code, 1, result.message);
 });
 
+test("check runs are read over every page, and a page with no list or no page at all does not break the poll", async () => {
+  const clock = { now: START };
+  const ghPages = (apiPath) =>
+    apiPath.endsWith("/check-runs")
+      ? [{ total_count: 0 }, null, { total_count: 2, check_runs: [rabbitRun({ name: "CI" })] }, { total_count: 2, check_runs: [rabbitRun()] }]
+      : [[]];
+  const result = await pollReviews({
+    sha: SHA,
+    pr: "56",
+    tries: 2,
+    intervalMs: 30_000,
+    skipCopilot: true,
+    ghPages,
+    now: () => clock.now,
+    sleep: async (ms) => {
+      clock.now += ms;
+    }
+  });
+  assert.equal(result.code, 0, result.message);
+});
+
+test("a review and comments with no user are skipped", async () => {
+  const ghost = (body) => ({ user: null, updated_at: at(START + 1000), body });
+  const ghosts = {
+    reviews: [{ user: null, commit_id: SHA }],
+    comments: [ghost("Currently processing"), ghost("Review finished.")]
+  };
+  const done = await run({
+    ...ghosts,
+    reviews: [...ghosts.reviews, copilotReview()],
+    statuses: RABBIT_DONE
+  });
+  assert.equal(done.code, 0, done.message);
+  const pending = await run(ghosts, { tries: 2 });
+  assert.equal(pending.code, 1);
+  assert.equal(pending.message, "timed out; still pending: copilot, coderabbit");
+});
+
+test("a clean CodeRabbit review with only a check run ends the wait", async () => {
+  const skippedFiles = { title: "Finished", summary: "Result: Success - Review completed. Files skipped from review: 1" };
+  const noTitle = { title: null, summary: "Result: Success - Review completed" };
+  // A whole summary as CodeRabbit sent it, with its run id and step table.
+  const full = {
+    title: "Finished",
+    summary: [
+      "Result: Success - Review completed",
+      "Run ID: `d71b15b7-55e9-4532-9639-587a756f303a`",
+      "",
+      "| Step | Status | Time |",
+      "| --- | --- | --- |",
+      "| Prepare review scope | Completed | 6s 850ms |",
+      "| Prepare repository workspace | Completed | 2ms |",
+      "| Run analysis checks | Completed | 1m 31s 433ms |",
+      "| Generate review feedback | Completed | 1m 23s 712ms |",
+      "| Publish review results | Completed | 2s 196ms |",
+      "| Time taken | | 3m 4s 195ms |"
+    ].join("\n")
+  };
+  for (const runOfHead of [rabbitRun(), rabbitRun({ output: skippedFiles }), rabbitRun({ output: noTitle }), rabbitRun({ output: full })]) {
+    const alone = await run({ "check-runs": [runOfHead] }, { skipCopilot: true });
+    assert.equal(alone.code, 0, alone.message);
+    assert.ok(alone.calls.includes(`repos/tmathura/copilot-plugin-cc/commits/${SHA}/check-runs`), alone.calls.join(" "));
+  }
+  const withCopilot = await run({ reviews: [copilotReview()], "check-runs": [rabbitRun()] });
+  assert.equal(withCopilot.code, 0, withCopilot.message);
+  const copilotPending = await run({ "check-runs": [rabbitRun()] }, { tries: 2 });
+  assert.equal(copilotPending.message, "timed out; still pending: copilot");
+});
+
+for (const [name, runOfHead] of [
+  // Each pause or limit text comes with the clean summary start, so NOT_REVIEWED decides.
+  ["a paused title", rabbitRun({ output: { title: "Review paused", summary: `${CLEAN}` } })],
+  ["a paused summary", rabbitRun({ output: { title: "Finished", summary: `${CLEAN}. Reviews paused` } })],
+  ["a null title and a paused summary", rabbitRun({ output: { title: null, summary: `${CLEAN}. Reviews paused` } })],
+  ["a rate-limited summary", rabbitRun({ output: { title: "Finished", summary: `${CLEAN}. Review rate limited` } })],
+  ["a rate-limit-exceeded summary", rabbitRun({ output: { title: "Finished", summary: `${CLEAN}. Rate limit exceeded` } })],
+  ["a limit-reached summary", rabbitRun({ output: { title: "Finished", summary: `${CLEAN}. Review limit reached` } })],
+  ["a limit-reached title", rabbitRun({ output: { title: "Review limit reached", summary: CLEAN } })],
+  // Only the summary start of a real clean review counts.
+  ["a skipped review", rabbitRun({ output: { title: "Review skipped", summary: "Result: Success - Draft pull request" } })],
+  ["the clean words only in the title", rabbitRun({ output: { title: CLEAN, summary: "" } })],
+  ["the clean words after other text", rabbitRun({ output: { title: "Finished", summary: `Skipped. ${CLEAN}` } })],
+  ["other words around 'review completed'", rabbitRun({ output: { title: "Finished", summary: "Result: Success - No review completed" } })],
+  ["no output", rabbitRun({ output: undefined })],
+  ["a null output", rabbitRun({ output: null })],
+  ["a failure", rabbitRun({ conclusion: "failure" })],
+  ["a neutral conclusion", rabbitRun({ conclusion: "neutral" })],
+  ["a skipped conclusion", rabbitRun({ conclusion: "skipped" })],
+  ["no conclusion", rabbitRun({ conclusion: null })],
+  ["a run in progress", rabbitRun({ status: "in_progress", conclusion: null })],
+  ["a run in progress that says success", rabbitRun({ status: "in_progress" })],
+  ["another app", rabbitRun({ app: { slug: "github-actions" } })],
+  ["no app", rabbitRun({ app: null })],
+  ["another name", rabbitRun({ name: "CodeRabbit lint" })]
+]) {
+  test(`a CodeRabbit check run with ${name} does not end the wait`, async () => {
+    const result = await run({ "check-runs": [runOfHead] }, { skipCopilot: true, tries: 2 });
+    assert.equal(result.code, 1, result.message);
+  });
+}
+
+test("a successful CodeRabbit check run does not end the wait while it is still processing", async () => {
+  const processing = { user: { login: "coderabbitai[bot]" }, updated_at: at(START), body: "Currently processing new changes" };
+  const result = await run({ comments: [processing], "check-runs": [rabbitRun()] }, { skipCopilot: true, tries: 2 });
+  assert.equal(result.code, 1, result.message);
+});
+
+test("a CodeRabbit check run that shows on the second try ends the wait then", async () => {
+  const result = await run({ "check-runs": (now) => (now > START ? [rabbitRun()] : []) }, { skipCopilot: true });
+  assert.equal(result.code, 0, result.message);
+  assert.equal(result.waited, 30_000);
+  assert.equal(result.calls.filter((call) => call.endsWith("/check-runs")).length, 2);
+});
+
+for (const name of ["reviews", "comments", "statuses", "check-runs"]) {
+  test(`a failed ${name} read exits 2`, async () => {
+    const result = await run({ statuses: RABBIT_DONE, reviews: [copilotReview()], [name]: new Error("HTTP 502") });
+    assert.equal(result.code, 2);
+    assert.equal(result.message, "gh failed: HTTP 502");
+  });
+}
+
 test("a failed timeline or check-suites read exits 2", async () => {
   const timeline = await run({ statuses: RABBIT_DONE, timeline: new Error("HTTP 502") });
   assert.equal(timeline.code, 2);
@@ -401,12 +536,20 @@ test("--no-copilot waits for CodeRabbit only and reads no timeline", async () =>
   assert.equal(done.code, 0);
 });
 
-for (const description of ["Review rate limited", "Review paused"]) {
+for (const description of ["Review rate limited", "Review paused", "Rate limit exceeded", "Review limit reached"]) {
   test(`a CodeRabbit success status "${description}" is not a review of the head`, async () => {
     const result = await run({ statuses: [rabbitStatus(description)] }, { skipCopilot: true, tries: 2 });
     assert.equal(result.code, 1);
   });
 }
+
+test("a CodeRabbit success status that mentions skipped files ends the wait", async () => {
+  const result = await run(
+    { statuses: [rabbitStatus("Review completed. Files skipped from review: 1")] },
+    { skipCopilot: true }
+  );
+  assert.equal(result.code, 0, result.message);
+});
 
 test("a CodeRabbit review completed after a rate limit ends the wait, in any order", async () => {
   const result = await run(
@@ -414,6 +557,14 @@ test("a CodeRabbit review completed after a rate limit ends the wait, in any ord
     { skipCopilot: true }
   );
   assert.equal(result.code, 0);
+});
+
+test("a clean CodeRabbit check run with a rate-limited status ends the wait", async () => {
+  const result = await run(
+    { statuses: [rabbitStatus("Review rate limited")], "check-runs": [rabbitRun()] },
+    { skipCopilot: true }
+  );
+  assert.equal(result.code, 0, result.message);
 });
 
 test("a CodeRabbit rate-limit comment does not end the wait", async () => {
