@@ -427,7 +427,24 @@ test("a review and comments with no user are skipped", async () => {
 test("a clean CodeRabbit review with only a check run ends the wait", async () => {
   const skippedFiles = { title: "Finished", summary: "Result: Success - Review completed. Files skipped from review: 1" };
   const noTitle = { title: null, summary: "Result: Success - Review completed" };
-  for (const runOfHead of [rabbitRun(), rabbitRun({ output: skippedFiles }), rabbitRun({ output: noTitle })]) {
+  // A whole summary as CodeRabbit sent it, with its run id and step table.
+  const full = {
+    title: "Finished",
+    summary: [
+      "Result: Success - Review completed",
+      "Run ID: `d71b15b7-55e9-4532-9639-587a756f303a`",
+      "",
+      "| Step | Status | Time |",
+      "| --- | --- | --- |",
+      "| Prepare review scope | Completed | 6s 850ms |",
+      "| Prepare repository workspace | Completed | 2ms |",
+      "| Run analysis checks | Completed | 1m 31s 433ms |",
+      "| Generate review feedback | Completed | 1m 23s 712ms |",
+      "| Publish review results | Completed | 2s 196ms |",
+      "| Time taken | | 3m 4s 195ms |"
+    ].join("\n")
+  };
+  for (const runOfHead of [rabbitRun(), rabbitRun({ output: skippedFiles }), rabbitRun({ output: noTitle }), rabbitRun({ output: full })]) {
     const alone = await run({ "check-runs": [runOfHead] }, { skipCopilot: true });
     assert.equal(alone.code, 0, alone.message);
     assert.ok(alone.calls.includes(`repos/tmathura/copilot-plugin-cc/commits/${SHA}/check-runs`), alone.calls.join(" "));
@@ -450,6 +467,7 @@ for (const [name, runOfHead] of [
   // Only the summary start of a real clean review counts.
   ["a skipped review", rabbitRun({ output: { title: "Review skipped", summary: "Result: Success - Draft pull request" } })],
   ["the clean words only in the title", rabbitRun({ output: { title: CLEAN, summary: "" } })],
+  ["the clean words after other text", rabbitRun({ output: { title: "Finished", summary: `Skipped. ${CLEAN}` } })],
   ["other words around 'review completed'", rabbitRun({ output: { title: "Finished", summary: "Result: Success - No review completed" } })],
   ["no output", rabbitRun({ output: undefined })],
   ["a null output", rabbitRun({ output: null })],
