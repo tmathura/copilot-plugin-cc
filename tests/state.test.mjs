@@ -869,6 +869,51 @@ test("a timeout while the reclaim chain is free says that the holder has ended",
   assert.equal(fs.existsSync(`${lockFile}.reclaim`), false);
 });
 
+test("a timeout after a dead reclaim level and a free next level says that the holder has ended", (t) => {
+  const workspace = makeTempDir();
+  const lockFile = `${resolveStateFile(workspace)}.lock`;
+  const pid = deadPid();
+  writeLock(lockFile, { pid, token: "dead-owner" });
+  writeLock(`${lockFile}.reclaim`, { pid, token: TOKEN_1 });
+  const rmSync = fs.rmSync;
+  t.mock.method(fs, "rmSync", (file, options) => (file === lockFile ? undefined : rmSync(file, options)));
+
+  assert.throws(
+    () => updateState(workspace, () => {}, { lockTimeoutMs: 200 }),
+    new RegExp(`Process ${pid} has ended; retry\\.`)
+  );
+  assert.equal(fs.existsSync(`${lockFile}.reclaim.${TOKEN_1}`), false);
+});
+
+test("a reclaim level released and taken again while the timeout message reads it names its new owner", (t) => {
+  const workspace = makeTempDir();
+  const lockFile = `${resolveStateFile(workspace)}.lock`;
+  const reclaimFile = `${lockFile}.reclaim`;
+  const pid = deadPid();
+  writeLock(lockFile, { pid, token: "dead-owner" });
+  writeLock(reclaimFile, { pid: process.pid, token: TOKEN_LIVE });
+  const existsSync = fs.existsSync;
+  const readFileSync = fs.readFileSync;
+  let describing = false;
+  let handedOver = false;
+  // Only the timeout message checks whether a reclaim level exists.
+  t.mock.method(fs, "existsSync", (file) => {
+    describing ||= file === reclaimFile;
+    return existsSync(file);
+  });
+  t.mock.method(fs, "readFileSync", (file, options) => {
+    if (describing && file === reclaimFile && !handedOver) {
+      // The first read meets the moment between the old owner's release and the new owner's link.
+      handedOver = true;
+      throw Object.assign(new Error("ENOENT: no such file"), { code: "ENOENT" });
+    }
+    return readFileSync(file, options);
+  });
+
+  assert.throws(() => updateState(workspace, () => {}, { lockTimeoutMs: 200 }), freeingBy(process.pid, pid));
+  assert.equal(handedOver, true);
+});
+
 test("a reclaim level released while the timeout message reads it counts as free", (t) => {
   const workspace = makeTempDir();
   const lockFile = `${resolveStateFile(workspace)}.lock`;

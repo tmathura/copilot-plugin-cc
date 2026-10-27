@@ -311,13 +311,13 @@ function describeLockBlocker(lockFile, options) {
   const seen = new Set();
   let reclaimFile = `${lockFile}.reclaim`;
   while (fs.existsSync(reclaimFile)) {
-    const owner = readLockOwner(reclaimFile);
+    // A live reclaimer may release this level, and another take it, while it is read: read it twice.
+    const owner = readLockOwner(reclaimFile) ?? readLockOwner(reclaimFile);
     if (owner && isAlive(owner.pid)) {
       return `Process ${owner.pid} is freeing the lock of ended process ${holder.pid}; retry when it finishes.`;
     }
-    const next = nextReclaimLevel(lockFile, owner, seen, isAlive);
+    const next = nextReclaimLevel(lockFile, owner, seen, () => false);
     if (!next) {
-      // A live reclaimer may have released this level since the existsSync check of the loop.
       if (!fs.existsSync(reclaimFile)) {
         break;
       }

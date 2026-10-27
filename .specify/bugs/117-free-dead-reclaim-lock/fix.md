@@ -15,7 +15,7 @@ removes a dead level, so only one process reclaims the main lock at a time.
 
 | File | Change | Notes |
 |------|--------|-------|
-| `plugins/copilot/scripts/lib/state.mjs` | modified | `nextReclaimLevel` gives the next level after a dead one (stops at an unreadable, live, non-UUID or repeated token); `reclaimDeadLock` walks the chain, reads every passed level again after it links one and backs off if one changed, then re-checks and frees the main lock as before; `describeLockBlocker` names the level that blocks |
+| `plugins/copilot/scripts/lib/state.mjs` | modified | `nextReclaimLevel` gives the next level after a dead one (stops at an unreadable, live, non-UUID or repeated token); `reclaimDeadLock` walks the chain, reads every passed level again after it links one and backs off if one changed, then re-checks and frees the main lock as before; `describeLockBlocker` names the live process that frees the lock, or the unreadable level that blocks |
 | `tests/state.test.mjs` | modified tests | the dead-reclaimer test now expects the recovery; tests for a chain of dead levels, live first and later levels, a non-UUID token, a token loop, an unreadable later level, a reclaimer that read the first level before another reclaim finished, stale reads (a level taken or released), and an unexpected link error |
 | `docs/operations.md` | modified | names the reclaim files that a killed process can leave, and that they are not a stuck lock |
 | `plugins/copilot/CHANGELOG.md` | modified | `### 1.0.20` entry |
@@ -51,12 +51,14 @@ if (passed.some(([file, token]) => readLockOwner(file)?.token !== token)) {
 - "a reclaimer whose read of a passed level is stale backs off when the level was taken by a live reclaimer" and "... was released" — both fail with the re-read taken out.
 - "a timeout while the reclaim chain is free says that the holder has ended".
 - "a reclaim level released while the timeout message reads it counts as free".
+- "a reclaim level released and taken again while the timeout message reads it names its new owner".
+- "a timeout after a dead reclaim level and a free next level says that the holder has ended".
 - "an unexpected error on the link of a later reclaim level comes out, and no temp file stays".
 - Unchanged and passing: the unreadable-reclaim test, "a reclaimer that saw a dead owner does not remove the lock that a live process took since", and the link-order test with no reclaim file.
 
 ## Local Verification
 
-- Commands run: `npm ci --include=dev`, `npm run build` → pass; `npm test` → 434 tests, 410 pass, 24 skipped, 0 fail (after review round 2: 435 tests, 411 pass); `npm run check-version` → 1.0.20; `claude plugin validate .` → pass.
+- Commands run: `npm ci --include=dev`, `npm run build` → pass; `npm test` → 434 tests, 410 pass, 24 skipped, 0 fail (after review round 3: 437 tests, 413 pass); `npm run check-version` → 1.0.20; `claude plugin validate .` → pass.
 - With the re-read of passed levels taken out for one run, both stale-read tests fail.
 
 ## Deviations from Assessment
@@ -74,6 +76,10 @@ if (passed.some(([file, token]) => readLockOwner(file)?.token !== token)) {
   a lock that a running process held). A free chain gives "Process M has ended; retry." (no claim
   that another process is at work). Tests updated, and one added for a level released while the
   message reads it. The `CHANGELOG.md` entry names the new messages.
+- 2026-10-27, review round 3 (`code-review`): `describeLockBlocker` reads a level twice before it calls
+  it unreadable, so a level released and taken again during the read names its new live owner, not
+  the delete advice; it checks liveness once per level. Tests added for that case and for a walk past
+  a dead level to a free next level.
 
 ## Follow-ups
 
