@@ -656,18 +656,327 @@ test("a reclaimer that saw a dead owner does not remove the lock that a live pro
   fs.rmSync(lockFile, { force: true });
 });
 
-test("a reclaim lock whose owner is dead gives a clear error that names it", () => {
+// Reclaim levels after the first are named by the token of the dead owner of the level before.
+const TOKEN_1 = "11111111-1111-4111-8111-111111111111";
+const TOKEN_2 = "22222222-2222-4222-8222-222222222222";
+const TOKEN_3 = "33333333-3333-4333-8333-333333333333";
+const TOKEN_LIVE = "99999999-9999-4999-8999-999999999999";
+
+function tempOwnerFiles(lockFile) {
+  return fs.readdirSync(path.dirname(lockFile)).filter((name) => name.endsWith(".tmp"));
+}
+
+function blockedBy(file) {
+  return new RegExp(`but ${escapeRegExp(file)} blocks freeing its lock`);
+}
+
+function freeingBy(reclaimerPid, holderPid = "\\d+") {
+  return new RegExp(`Process ${reclaimerPid} is freeing the lock of ended process ${holderPid}; retry when it finishes\\.`);
+}
+
+test("a reclaim lock whose owner is dead is passed by the next level, and the update is written", (t) => {
   const workspace = makeTempDir();
   const lockFile = `${resolveStateFile(workspace)}.lock`;
   const pid = deadPid();
   writeLock(lockFile, { pid, token: "dead-owner" });
-  writeLock(`${lockFile}.reclaim`, { pid, token: "dead-reclaimer" });
+  writeLock(`${lockFile}.reclaim`, { pid, token: TOKEN_1 });
+  const links = t.mock.method(fs, "linkSync");
+
+  updateState(workspace, (state) => {
+    state.config.stopReviewGate = true;
+  });
+
+  assert.deepEqual(
+    links.mock.calls.map((call) => path.basename(call.arguments[1])),
+    ["state.json.lock", "state.json.lock.reclaim", `state.json.lock.reclaim.${TOKEN_1}`, "state.json.lock"]
+  );
+  assert.equal(loadState(workspace).config.stopReviewGate, true);
+  assert.equal(fs.existsSync(lockFile), false);
+  assert.equal(fs.existsSync(`${lockFile}.reclaim.${TOKEN_1}`), false);
+  // The dead level stays as the signpost that every reclaimer follows.
+  assert.equal(JSON.parse(fs.readFileSync(`${lockFile}.reclaim`, "utf8")).token, TOKEN_1);
+  assert.deepEqual(tempOwnerFiles(lockFile), []);
+});
+
+test("a chain of dead reclaim levels is walked to its end, and again for a later dead lock", () => {
+  const workspace = makeTempDir();
+  const lockFile = `${resolveStateFile(workspace)}.lock`;
+  const pid = deadPid();
+  writeLock(`${lockFile}.reclaim`, { pid, token: TOKEN_1 });
+  writeLock(`${lockFile}.reclaim.${TOKEN_1}`, { pid, token: TOKEN_2 });
+  writeLock(`${lockFile}.reclaim.${TOKEN_2}`, { pid, token: TOKEN_3 });
+
+  for (const run of [1, 2]) {
+    writeLock(lockFile, { pid, token: `dead-owner-${run}` });
+    updateState(workspace, (state) => {
+      state.config.stopReviewGate = run === 1;
+    });
+    assert.equal(loadState(workspace).config.stopReviewGate, run === 1);
+    assert.equal(fs.existsSync(lockFile), false);
+    assert.equal(fs.existsSync(`${lockFile}.reclaim.${TOKEN_3}`), false);
+  }
+  assert.deepEqual(tempOwnerFiles(lockFile), []);
+});
+
+test("a live owner on a later reclaim level makes the update wait, and the timeout names its owner", () => {
+  const workspace = makeTempDir();
+  const lockFile = `${resolveStateFile(workspace)}.lock`;
+  const pid = deadPid();
+  const nextLevel = `${lockFile}.reclaim.${TOKEN_1}`;
+  writeLock(lockFile, { pid, token: "dead-owner" });
+  writeLock(`${lockFile}.reclaim`, { pid, token: TOKEN_1 });
+  writeLock(nextLevel, { pid: process.pid, token: TOKEN_LIVE });
+
+  assert.throws(() => updateState(workspace, () => {}, { lockTimeoutMs: 200 }), freeingBy(process.pid, pid));
+  assert.equal(fs.existsSync(lockFile), true);
+  assert.equal(JSON.parse(fs.readFileSync(`${lockFile}.reclaim`, "utf8")).token, TOKEN_1);
+  assert.equal(JSON.parse(fs.readFileSync(nextLevel, "utf8")).token, TOKEN_LIVE);
+});
+
+test("a live owner on the first reclaim level makes the update wait, and the timeout names its owner", () => {
+  const workspace = makeTempDir();
+  const lockFile = `${resolveStateFile(workspace)}.lock`;
+  writeLock(lockFile, { pid: deadPid(), token: "dead-owner" });
+  writeLock(`${lockFile}.reclaim`, { pid: process.pid, token: TOKEN_LIVE });
+
+  assert.throws(() => updateState(workspace, () => {}, { lockTimeoutMs: 200 }), freeingBy(process.pid));
+  assert.equal(fs.existsSync(lockFile), true);
+  assert.equal(JSON.parse(fs.readFileSync(`${lockFile}.reclaim`, "utf8")).token, TOKEN_LIVE);
+});
+
+for (const [name, levels, blocking] of [
+  ["a token that is not a UUID", [["", "dead-reclaimer"]], ""],
+  ["a token loop", [["", TOKEN_1], [`.${TOKEN_1}`, TOKEN_1]], `.${TOKEN_1}`]
+]) {
+  test(`a dead reclaim level with ${name} stops the walk, and the timeout names it`, () => {
+    const workspace = makeTempDir();
+    const lockFile = `${resolveStateFile(workspace)}.lock`;
+    const pid = deadPid();
+    writeLock(lockFile, { pid, token: "dead-owner" });
+    for (const [suffix, token] of levels) {
+      writeLock(`${lockFile}.reclaim${suffix}`, { pid, token });
+    }
+
+    assert.throws(() => updateState(workspace, () => {}, { lockTimeoutMs: 200 }), blockedBy(`${lockFile}.reclaim${blocking}`));
+    assert.equal(fs.existsSync(lockFile), true);
+  });
+}
+
+test("an unreadable reclaim level after a dead one stops the walk, and the timeout names it", () => {
+  const workspace = makeTempDir();
+  const lockFile = `${resolveStateFile(workspace)}.lock`;
+  const pid = deadPid();
+  writeLock(lockFile, { pid, token: "dead-owner" });
+  writeLock(`${lockFile}.reclaim`, { pid, token: TOKEN_1 });
+  fs.writeFileSync(`${lockFile}.reclaim.${TOKEN_1}`, '{"pid":', "utf8");
 
   assert.throws(
     () => updateState(workspace, () => {}, { lockTimeoutMs: 200 }),
-    new RegExp(`${escapeRegExp(`${lockFile}.reclaim`)} belongs to process ${pid}, which is no longer running\\. Delete`)
+    new RegExp(`${escapeRegExp(`${lockFile}.reclaim.${TOKEN_1}`)} blocks freeing its lock; .*delete`)
   );
   assert.equal(fs.existsSync(lockFile), true);
+});
+
+test("a reclaimer that read the first level before another reclaim finished removes no live lock", () => {
+  const workspace = makeTempDir();
+  const lockFile = `${resolveStateFile(workspace)}.lock`;
+  const deadOwnerPid = 999999;
+  const deadReclaimerPid = 999998;
+  writeLock(lockFile, { pid: deadOwnerPid, token: "dead-owner" });
+  writeLock(`${lockFile}.reclaim`, { pid: deadReclaimerPid, token: TOKEN_1 });
+  let otherReclaimDone = false;
+
+  assert.throws(
+    () =>
+      updateState(workspace, () => {}, {
+        lockTimeoutMs: 200,
+        isPidAliveImpl(pid) {
+          if (pid === deadReclaimerPid && !otherReclaimDone) {
+            // While this reclaimer checks the first level, another one frees the dead lock and a live process takes it.
+            fs.rmSync(lockFile);
+            writeLock(lockFile, { pid: process.pid, token: "live-holder" });
+            otherReclaimDone = true;
+          }
+          return pid === process.pid;
+        }
+      }),
+    /Timed out after 200 ms waiting for the state lock/
+  );
+
+  assert.equal(JSON.parse(fs.readFileSync(lockFile, "utf8")).token, "live-holder");
+  assert.equal(JSON.parse(fs.readFileSync(`${lockFile}.reclaim`, "utf8")).token, TOKEN_1);
+  assert.equal(fs.existsSync(`${lockFile}.reclaim.${TOKEN_1}`), false);
+  fs.rmSync(lockFile, { force: true });
+});
+
+for (const [name, change, settles] of [
+  ["taken by a live reclaimer", (file) => writeLock(file, { pid: process.pid, token: TOKEN_LIVE }), false],
+  ["released", (file) => fs.rmSync(file), true]
+]) {
+  test(`a reclaimer whose read of a passed level is stale backs off when the level was ${name}`, (t) => {
+    const workspace = makeTempDir();
+    const lockFile = `${resolveStateFile(workspace)}.lock`;
+    const deadOwnerPid = 999999;
+    const staleReclaimerPid = 999998;
+    writeLock(lockFile, { pid: deadOwnerPid, token: "dead-owner" });
+    writeLock(`${lockFile}.reclaim`, { pid: staleReclaimerPid, token: TOKEN_1 });
+    let changed = false;
+    const removals = t.mock.method(fs, "rmSync");
+    const options = {
+      lockTimeoutMs: 200,
+      isPidAliveImpl(pid) {
+        if (pid === staleReclaimerPid && !changed) {
+          // The first level's owner was alive when it was read; it released the level and ended since.
+          change(`${lockFile}.reclaim`);
+          changed = true;
+        }
+        return pid === process.pid;
+      }
+    };
+    const removedMainLockBeforeBackOff = () => {
+      const removed = (file) => removals.mock.calls.findIndex((call) => call.arguments[0] === file);
+      const mainLock = removed(lockFile);
+      return mainLock !== -1 && mainLock < removed(`${lockFile}.reclaim.${TOKEN_1}`);
+    };
+
+    if (settles) {
+      // With the first level free again, the next try takes it and frees the dead lock.
+      updateState(workspace, () => {}, options);
+      assert.equal(fs.existsSync(lockFile), false);
+    } else {
+      assert.throws(() => updateState(workspace, () => {}, options), freeingBy(process.pid, deadOwnerPid));
+      assert.equal(JSON.parse(fs.readFileSync(lockFile, "utf8")).token, "dead-owner");
+      assert.equal(JSON.parse(fs.readFileSync(`${lockFile}.reclaim`, "utf8")).token, TOKEN_LIVE);
+    }
+    assert.equal(removedMainLockBeforeBackOff(), false);
+    assert.equal(fs.existsSync(`${lockFile}.reclaim.${TOKEN_1}`), false);
+  });
+}
+
+test("a timeout while the reclaim chain is free says that the holder has ended", (t) => {
+  const workspace = makeTempDir();
+  const lockFile = `${resolveStateFile(workspace)}.lock`;
+  const pid = deadPid();
+  writeLock(lockFile, { pid, token: "dead-owner" });
+  const rmSync = fs.rmSync;
+  // The dead lock stays, as if another process kept winning the race to free it.
+  t.mock.method(fs, "rmSync", (file, options) => (file === lockFile ? undefined : rmSync(file, options)));
+
+  assert.throws(
+    () => updateState(workspace, () => {}, { lockTimeoutMs: 200 }),
+    new RegExp(`Process ${pid} has ended; retry\\.`)
+  );
+  assert.equal(fs.existsSync(`${lockFile}.reclaim`), false);
+});
+
+test("a timeout after a dead reclaim level and a free next level says that the holder has ended", (t) => {
+  const workspace = makeTempDir();
+  const lockFile = `${resolveStateFile(workspace)}.lock`;
+  const pid = deadPid();
+  writeLock(lockFile, { pid, token: "dead-owner" });
+  writeLock(`${lockFile}.reclaim`, { pid, token: TOKEN_1 });
+  const rmSync = fs.rmSync;
+  t.mock.method(fs, "rmSync", (file, options) => (file === lockFile ? undefined : rmSync(file, options)));
+
+  assert.throws(
+    () => updateState(workspace, () => {}, { lockTimeoutMs: 200 }),
+    new RegExp(`Process ${pid} has ended; retry\\.`)
+  );
+  assert.equal(fs.existsSync(`${lockFile}.reclaim.${TOKEN_1}`), false);
+});
+
+test("a reclaim level released and taken again while the timeout message reads it names its new owner", (t) => {
+  const workspace = makeTempDir();
+  const lockFile = `${resolveStateFile(workspace)}.lock`;
+  const reclaimFile = `${lockFile}.reclaim`;
+  const pid = deadPid();
+  writeLock(lockFile, { pid, token: "dead-owner" });
+  writeLock(reclaimFile, { pid: 4242, token: TOKEN_1 });
+  const existsSync = fs.existsSync;
+  const readFileSync = fs.readFileSync;
+  const linkSync = fs.linkSync;
+  const calls = [];
+  let step = "before";
+  t.mock.method(fs, "linkSync", (source, target) => {
+    calls.push("link");
+    return linkSync(source, target);
+  });
+  t.mock.method(fs, "existsSync", (file) => {
+    if (file === reclaimFile) {
+      calls.push("exists");
+      if (step === "released") {
+        // The new owner links the level before the next check.
+        writeLock(reclaimFile, { pid: process.pid, token: TOKEN_LIVE });
+        step = "taken";
+      } else if (step === "before") {
+        step = "reading";
+      }
+    }
+    return existsSync(file);
+  });
+  t.mock.method(fs, "readFileSync", (file, options) => {
+    if (file === reclaimFile && step === "reading") {
+      // The old owner releases the level while it is read.
+      fs.rmSync(reclaimFile);
+      step = "released";
+      throw Object.assign(new Error("ENOENT: no such file"), { code: "ENOENT" });
+    }
+    return readFileSync(file, options);
+  });
+
+  assert.throws(
+    () => updateState(workspace, () => {}, { lockTimeoutMs: 200, isPidAliveImpl: (owner) => owner === process.pid || owner === 4242 }),
+    freeingBy(process.pid, pid)
+  );
+  assert.equal(step, "taken");
+  // Only the timeout message checks whether a reclaim level exists, after the last link attempt.
+  assert.ok(calls.indexOf("exists") > calls.lastIndexOf("link"), calls.join(" "));
+});
+
+test("a reclaim level released while the timeout message reads it counts as free", (t) => {
+  const workspace = makeTempDir();
+  const lockFile = `${resolveStateFile(workspace)}.lock`;
+  const reclaimFile = `${lockFile}.reclaim`;
+  const pid = deadPid();
+  writeLock(lockFile, { pid, token: "dead-owner" });
+  // A live reclaimer holds the first level, so this process waits until its timeout.
+  writeLock(reclaimFile, { pid: process.pid, token: TOKEN_LIVE });
+  const existsSync = fs.existsSync;
+  let released = false;
+  t.mock.method(fs, "existsSync", (file) => {
+    if (file === reclaimFile && !released) {
+      // The live reclaimer releases its level right after the message saw it.
+      released = true;
+      fs.rmSync(reclaimFile);
+      return true;
+    }
+    return existsSync(file);
+  });
+
+  assert.throws(
+    () => updateState(workspace, () => {}, { lockTimeoutMs: 200 }),
+    new RegExp(`Process ${pid} has ended; retry\\.`)
+  );
+  assert.equal(released, true);
+});
+
+test("an unexpected error on the link of a later reclaim level comes out, and no temp file stays", (t) => {
+  const workspace = makeTempDir();
+  const lockFile = `${resolveStateFile(workspace)}.lock`;
+  const pid = deadPid();
+  writeLock(lockFile, { pid, token: "dead-owner" });
+  writeLock(`${lockFile}.reclaim`, { pid, token: TOKEN_1 });
+  const linkSync = fs.linkSync;
+  t.mock.method(fs, "linkSync", (source, target) => {
+    if (target === `${lockFile}.reclaim.${TOKEN_1}`) {
+      throw Object.assign(new Error("EACCES: permission denied"), { code: "EACCES" });
+    }
+    return linkSync(source, target);
+  });
+
+  assert.throws(() => updateState(workspace, () => {}), { code: "EACCES" });
+  assert.equal(fs.existsSync(lockFile), true);
+  assert.deepEqual(tempOwnerFiles(lockFile), []);
 });
 
 test("an unreadable reclaim lock beside a dead lock gives an error that names it", () => {
