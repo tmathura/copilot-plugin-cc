@@ -43,19 +43,20 @@ if (passed.some(([file, token]) => readLockOwner(file)?.token !== token)) {
 
 - `tests/state.test.mjs` "a reclaim lock whose owner is dead is passed by the next level, and the update is written" — the bug; the link order is `lock`, `reclaim`, `reclaim.<token>`, `lock`, and the dead first level stays.
 - "a chain of dead reclaim levels is walked to its end, and again for a later dead lock".
-- "a live owner on a later reclaim level makes the update wait, and the timeout names that level".
-- "a live owner on the first reclaim level makes the update wait, and the timeout names it".
+- "a live owner on a later reclaim level makes the update wait, and the timeout names its owner".
+- "a live owner on the first reclaim level makes the update wait, and the timeout names its owner".
 - "a dead reclaim level with a token that is not a UUID stops the walk" and "... with a token loop ...".
 - "an unreadable reclaim level after a dead one stops the walk, and the timeout names it".
 - "a reclaimer that read the first level before another reclaim finished removes no live lock".
 - "a reclaimer whose read of a passed level is stale backs off when the level was taken by a live reclaimer" and "... was released" — both fail with the re-read taken out.
-- "a timeout while the reclaim chain is free says that the ended holder's lock is being freed".
+- "a timeout while the reclaim chain is free says that the holder has ended".
+- "a reclaim level released while the timeout message reads it counts as free".
 - "an unexpected error on the link of a later reclaim level comes out, and no temp file stays".
 - Unchanged and passing: the unreadable-reclaim test, "a reclaimer that saw a dead owner does not remove the lock that a live process took since", and the link-order test with no reclaim file.
 
 ## Local Verification
 
-- Commands run: `npm ci --include=dev`, `npm run build` → pass; `npm test` → 434 tests, 410 pass, 24 skipped, 0 fail (after review round 1); `npm run check-version` → 1.0.20; `claude plugin validate .` → pass.
+- Commands run: `npm ci --include=dev`, `npm run build` → pass; `npm test` → 434 tests, 410 pass, 24 skipped, 0 fail (after review round 2: 435 tests, 411 pass); `npm run check-version` → 1.0.20; `claude plugin validate .` → pass.
 - With the re-read of passed levels taken out for one run, both stale-read tests fail.
 
 ## Deviations from Assessment
@@ -67,6 +68,12 @@ if (passed.some(([file, token]) => readLockOwner(file)?.token !== token)) {
   (the assessment kept today's "Process N holds the lock" there, which is wrong for a dead holder).
   `describeLockBlocker` treats a level that was released during its walk as free, and
   `nextReclaimLevel` runs the UUID and loop checks before the liveness check. Test added.
+- 2026-10-27, review round 2 (`code-review`): a level held by a live reclaimer now gives "Process N
+  is freeing the lock of ended process M; retry when it finishes." in place of the advice to delete
+  it (on `main` that advice also appeared for a live first level, and it could lead a user to delete
+  a lock that a running process held). A free chain gives "Process M has ended; retry." (no claim
+  that another process is at work). Tests updated, and one added for a level released while the
+  message reads it. The `CHANGELOG.md` entry names the new messages.
 
 ## Follow-ups
 

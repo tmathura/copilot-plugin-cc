@@ -308,22 +308,26 @@ function describeLockBlocker(lockFile, options) {
   if (isAlive(holder.pid)) {
     return `Process ${holder.pid} holds the lock; retry when it finishes.`;
   }
-  // A damaged reclaim file, or one that an older version left without its owner, names no process to
-  // check, so no one can free it.
   const seen = new Set();
   let reclaimFile = `${lockFile}.reclaim`;
   while (fs.existsSync(reclaimFile)) {
-    const next = nextReclaimLevel(lockFile, readLockOwner(reclaimFile), seen, isAlive);
+    const owner = readLockOwner(reclaimFile);
+    if (owner && isAlive(owner.pid)) {
+      return `Process ${owner.pid} is freeing the lock of ended process ${holder.pid}; retry when it finishes.`;
+    }
+    const next = nextReclaimLevel(lockFile, owner, seen, isAlive);
     if (!next) {
-      // A live reclaimer may have released this level since the check above.
+      // A live reclaimer may have released this level since the existsSync check of the loop.
       if (!fs.existsSync(reclaimFile)) {
         break;
       }
+      // A damaged reclaim file, or one that an older version left without its owner, names no process
+      // to check, so no one can free it.
       return `Process ${holder.pid} has ended, but ${reclaimFile} blocks freeing its lock; if no Copilot companion is running, delete ${reclaimFile} and retry.`;
     }
     reclaimFile = next;
   }
-  return `Process ${holder.pid} has ended, and another process is freeing its lock; retry.`;
+  return `Process ${holder.pid} has ended; retry.`;
 }
 
 function acquireStateLock(cwd, options) {

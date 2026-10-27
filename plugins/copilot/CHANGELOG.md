@@ -8,6 +8,10 @@
   later change of the state. Before, each `/copilot:*` command, the SessionEnd hook and a job's last
   write failed with "... .reclaim belongs to process N, which is no longer running. Delete ... and
   retry" until the file was deleted by hand. The plugin now goes past such a file.
+- When a change of the state times out because the lock's holder has ended, the message now says
+  which process is freeing that lock ("Process N is freeing the lock of ended process M; retry when
+  it finishes"), or "Process M has ended; retry". Before, it could say "Process M holds the lock",
+  or advise deleting a file that a running process held.
 
 ### 1.0.19
 
