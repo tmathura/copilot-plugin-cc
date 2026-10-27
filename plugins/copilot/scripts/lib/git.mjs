@@ -1,9 +1,11 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): every git call writes no index and starts no
-// fsmonitor hook or textconv program; non-ASCII file names are not quoted; untracked symlinks are not
-// read; the diff is inline up to the byte limit whatever the file count; above it the self-collect
-// guidance points Copilot at one patch file per changed file, which writeReviewPatches writes; the
-// review sections remove only trailing new lines, so Git Status keeps the leading space of its first line;
-// the default branch from origin/HEAD is origin/<name> when there is no local branch of that name.
+// fsmonitor hook or textconv program; non-ASCII file names are not quoted; untracked symlinks, and
+// untracked files whose real path is outside the repository or in a .git folder (behind a folder
+// link or a junction), are not read; the diff is inline up to the byte limit whatever the file
+// count; above it the self-collect guidance points Copilot at one patch file per changed file, which
+// writeReviewPatches writes; the review sections remove only trailing new lines, so Git Status keeps
+// the leading space of its first line; the default branch from origin/HEAD is origin/<name> when
+// there is no local branch of that name.
 import fs from "node:fs";
 import path from "node:path";
 
@@ -231,18 +233,37 @@ function formatSection(title, body) {
   return [`## ${title}`, "", body.trim() ? body.replace(/\n+$/, "") : "(none)", ""].join("\n");
 }
 
+// Outside the root, or in a .git folder (the repo's or a nested clone's), whose config can hold a
+// token. Comparing whole path parts, not a prefix, keeps an in-repo name such as "..notes.txt"
+// inside. A case-insensitive file system (Windows, macOS) uses a folder stored as ".GIT" as the
+// .git folder, and realpath keeps the stored case.
+function isOutsideWorkTree(root, file) {
+  const relative = path.relative(root, file);
+  const parts = relative.split(path.sep);
+  return (
+    relative === "" ||
+    parts[0] === ".." ||
+    parts.some((part) => part.toLowerCase() === ".git") ||
+    path.isAbsolute(relative)
+  );
+}
+
 function formatUntrackedFile(cwd, relativePath) {
   const absolutePath = path.join(cwd, relativePath);
   let stat;
-  let isSymlink;
+  let isLink;
   try {
     stat = fs.statSync(absolutePath);
-    isSymlink = fs.lstatSync(absolutePath).isSymbolicLink();
+    // A folder link or a Windows junction above the file leaves the leaf a plain file, and Git for
+    // Windows lists the files behind a junction.
+    isLink =
+      fs.lstatSync(absolutePath).isSymbolicLink() ||
+      isOutsideWorkTree(fs.realpathSync.native(cwd), fs.realpathSync.native(absolutePath));
   } catch {
     return `### ${relativePath}\n(skipped: broken symlink or unreadable file)`;
   }
   // A link can point outside the repository, for example at a key file.
-  if (isSymlink) {
+  if (isLink) {
     return `### ${relativePath}\n(skipped: symlink)`;
   }
   if (stat.isDirectory()) {

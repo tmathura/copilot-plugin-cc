@@ -529,6 +529,149 @@ test("collectReviewContext never reads the target of an untracked symlink", () =
   }
 });
 
+// A junction needs no extra rights on Windows; elsewhere git lists a folder link as one entry.
+const FOLDER_LINK = process.platform === "win32" ? "junction" : "dir";
+
+// The inline context, the lightweight context and the untracked.md patch file, joined.
+function untrackedOutputs(cwd) {
+  const target = resolveReviewTarget(cwd, {});
+  const lightweight = collectReviewContext(cwd, target, { maxInlineFiles: 0 });
+  const dir = makeTempDir();
+  writeReviewPatches(lightweight, dir);
+  return [
+    collectReviewContext(cwd, target).content,
+    lightweight.content,
+    fs.readFileSync(path.join(dir, "untracked.md"), "utf8")
+  ];
+}
+
+test("an untracked file behind a folder link or junction that leads outside the repo or into .git is not read", () => {
+  const base = makeTempDir();
+  const cwd = path.join(base, "repo");
+  const outside = path.join(base, "outside");
+  // A sibling whose name starts with the repo's name is still outside it.
+  const sibling = path.join(base, "repo2");
+  for (const dir of [cwd, outside, sibling, path.join(cwd, "sub"), path.join(cwd, "inner")]) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(path.join(outside, "key.txt"), "SECRET_OUTSIDE_MARKER\n");
+  fs.writeFileSync(path.join(sibling, "key.txt"), "SECRET_SIBLING_MARKER\n");
+  initGitRepo(cwd);
+  // The repo's .git/config can hold a token, as in a remote URL.
+  run("git", ["config", "review.marker", "SECRET_GIT_MARKER"], { cwd });
+  fs.writeFileSync(path.join(cwd, "app.js"), "console.log('v1');\n");
+  run("git", ["add", "app.js"], { cwd });
+  run("git", ["commit", "-m", "init"], { cwd });
+  fs.writeFileSync(path.join(cwd, "sub", "plain.txt"), "PLAIN_INSIDE\n");
+  fs.writeFileSync(path.join(cwd, "..notes.txt"), "DOTS_INSIDE\n");
+  // Names that only start with ".git" are not the .git folder.
+  fs.mkdirSync(path.join(cwd, ".github"));
+  fs.writeFileSync(path.join(cwd, ".github", "ci.yml"), "GITHUB_INSIDE\n");
+  fs.writeFileSync(path.join(cwd, ".gitattributes"), "GITATTRIBUTES_INSIDE\n");
+  fs.writeFileSync(path.join(cwd, "inner", "ok.txt"), "INNER_INSIDE\n");
+  fs.symlinkSync(outside, path.join(cwd, "linkdir"), FOLDER_LINK);
+  fs.symlinkSync(outside, path.join(cwd, "sub", "linkdir"), FOLDER_LINK);
+  fs.symlinkSync(sibling, path.join(cwd, "siblink"), FOLDER_LINK);
+  fs.symlinkSync(path.join(cwd, "inner"), path.join(cwd, "innerlink"), FOLDER_LINK);
+  fs.symlinkSync(path.join(cwd, ".git"), path.join(cwd, "gitlink"), FOLDER_LINK);
+
+  for (const output of untrackedOutputs(cwd)) {
+    assert.doesNotMatch(output, /SECRET_OUTSIDE_MARKER|SECRET_SIBLING_MARKER|SECRET_GIT_MARKER/);
+    assert.match(output, /PLAIN_INSIDE/);
+    assert.match(output, /DOTS_INSIDE/);
+    assert.match(output, /GITHUB_INSIDE/);
+    assert.match(output, /GITATTRIBUTES_INSIDE/);
+    assert.match(output, /INNER_INSIDE/);
+    if (process.platform === "win32") {
+      // Git for Windows lists the files behind a junction; one that stays inside is read.
+      assert.match(output, /### linkdir\/key\.txt\n\(skipped: symlink\)/);
+      assert.match(output, /### sub\/linkdir\/key\.txt\n\(skipped: symlink\)/);
+      assert.match(output, /### siblink\/key\.txt\n\(skipped: symlink\)/);
+      assert.match(output, /### gitlink\/config\n\(skipped: symlink\)/);
+      assert.match(output, /### innerlink\/ok\.txt\n```\nINNER_INSIDE\n```/);
+    } else {
+      assert.match(output, /### linkdir\n\(skipped: symlink\)/);
+      assert.match(output, /### sub\/linkdir\n\(skipped: symlink\)/);
+      assert.match(output, /### siblink\n\(skipped: symlink\)/);
+      assert.match(output, /### gitlink\n\(skipped: symlink\)/);
+      assert.match(output, /### innerlink\n\(skipped: symlink\)/);
+    }
+  }
+});
+
+// Each mock matches one path and passes every other path to the real function.
+function mockRealpath(t, match, answer) {
+  const native = fs.realpathSync.native;
+  t.mock.method(fs.realpathSync, "native", (filePath, ...rest) =>
+    path.resolve(String(filePath)) === path.resolve(match) ? answer() : native(filePath, ...rest)
+  );
+}
+
+// The paths match git's root, which the code uses: a temp folder can differ from it (/var is
+// /private/var on macOS).
+function makeRepoWithUntrackedFile() {
+  const cwd = makeTempDir();
+  initGitRepo(cwd);
+  fs.writeFileSync(path.join(cwd, "app.js"), "console.log('v1');\n");
+  run("git", ["add", "app.js"], { cwd });
+  run("git", ["commit", "-m", "init"], { cwd });
+  fs.writeFileSync(path.join(cwd, "plain.txt"), "SECRET_MOCKED_MARKER\n");
+  const root = git(cwd, "rev-parse", "--show-toplevel").trim();
+  return { cwd, root, file: path.join(root, "plain.txt") };
+}
+
+test("an untracked file whose real path is outside the repo is skipped as a symlink", (t) => {
+  const { cwd, file } = makeRepoWithUntrackedFile();
+  mockRealpath(t, file, () => path.join(makeTempDir(), "plain.txt"));
+
+  for (const output of untrackedOutputs(cwd)) {
+    assert.match(output, /### plain\.txt\n\(skipped: symlink\)/);
+    assert.doesNotMatch(output, /SECRET_MOCKED_MARKER/);
+  }
+});
+
+test("an untracked file whose real path is in a .git folder, in any case, is skipped as a symlink", (t) => {
+  for (const folder of [".git", ".GIT", path.join("vendor", "lib", ".git")]) {
+    const { cwd, root, file } = makeRepoWithUntrackedFile();
+    mockRealpath(t, file, () => path.join(fs.realpathSync.native(root), folder, "config"));
+
+    for (const output of untrackedOutputs(cwd)) {
+      assert.match(output, /### plain\.txt\n\(skipped: symlink\)/, folder);
+      assert.doesNotMatch(output, /SECRET_MOCKED_MARKER/);
+    }
+    t.mock.restoreAll();
+  }
+});
+
+test(
+  "an untracked file whose real path is on another drive is skipped as a symlink",
+  { skip: process.platform !== "win32" && "only Windows has drive letters" },
+  (t) => {
+    const { cwd, file } = makeRepoWithUntrackedFile();
+    const otherDrive = path.parse(fs.realpathSync.native(cwd)).root.startsWith("Z") ? "Y:\\" : "Z:\\";
+    mockRealpath(t, file, () => `${otherDrive}elsewhere\\plain.txt`);
+
+    for (const output of untrackedOutputs(cwd)) {
+      assert.match(output, /### plain\.txt\n\(skipped: symlink\)/);
+      assert.doesNotMatch(output, /SECRET_MOCKED_MARKER/);
+    }
+  }
+);
+
+for (const which of ["the file", "the repo root"]) {
+  test(`an untracked file whose real path cannot be read for ${which} is skipped as unreadable`, (t) => {
+    const { cwd, root, file } = makeRepoWithUntrackedFile();
+    mockRealpath(t, which === "the file" ? file : root, () => {
+      throw Object.assign(new Error("no such file"), { code: "ENOENT" });
+    });
+
+    for (const output of untrackedOutputs(cwd)) {
+      assert.match(output, /### plain\.txt\n\(skipped: broken symlink or unreadable file\)/);
+      assert.doesNotMatch(output, /SECRET_MOCKED_MARKER/);
+    }
+  });
+}
+
 test("collectReviewContext skips an untracked file that disappears while it is checked", (t) => {
   const cwd = makeTempDir();
   initGitRepo(cwd);

@@ -291,8 +291,10 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
 - A branch review in a clone whose `origin/HEAD` names a branch with no local copy, such as one
   made with `git clone -b <other branch>`, compares against `origin/<name>`. Codex uses the name
   from `origin/HEAD` as a local branch, so `git merge-base` fails. The reason is correctness.
-- A review does not read the target of an untracked symlink. The link can point outside the repo,
-  for example at a key file. Codex puts the target's text in the prompt.
+- A review reads no untracked file whose real path is outside the repo or in a `.git` folder: not
+  the target of an untracked symlink, and not a file behind a folder link or, on Windows, a
+  directory junction. The link can point outside the repo, for example at a key file, or at
+  `.git/config`, which can hold a token. Codex puts the target's text in the prompt.
 - A review reads an untracked file whose name has non-ASCII letters, a tab or a newline. It shows a
   non-ASCII name as it is (`core.quotePath=false`) in the status, the file lists and the patches.
   Codex shows git's quoted form, such as `"caf\303\251.js"`, and skips such an untracked file as
