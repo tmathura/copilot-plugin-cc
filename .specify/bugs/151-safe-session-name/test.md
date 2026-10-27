@@ -10,7 +10,7 @@
 
 The bug reproduces with main's companion and the real Copilot CLI 1.0.95, and does not with the
 fixed one: the same quoted read-only task completes. The full suite passes with no regression. The
-checks ran again after review rounds 1 and 2.
+checks ran again after review rounds 1, 2 and 3.
 
 ## Checks Performed
 

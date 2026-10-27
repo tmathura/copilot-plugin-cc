@@ -63,8 +63,9 @@ These pass on the old code too:
 
 - Commands run: `npm run build` (pass), `npm test` (508 tests: 466 pass, 42 skipped, 0 fail),
   `npm run check-version` (1.0.24), `claude plugin validate .` (pass).
-- Before the fix, the three tests listed as failing on the old code failed: the runtime ones with
+- Before the fix, the four tests listed as failing on the old code failed: the runtime ones with
   the fake CLI's "Session name must not contain double quotes.", the unit one with the U+0000 kept.
+  The one-string test, added in review round 2, was run on main's `copilot.mjs` and failed there.
 
 ## Deviations from Assessment
 
