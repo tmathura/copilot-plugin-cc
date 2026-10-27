@@ -28,8 +28,13 @@ of the repo root. A file behind a directory junction (or any folder link) that l
 ```js
 function isOutsideWorkTree(root, file) {
   const relative = path.relative(root, file);
-  const [first] = relative.split(path.sep);
-  return relative === "" || first === ".." || first === ".git" || path.isAbsolute(relative);
+  const parts = relative.split(path.sep);
+  return (
+    relative === "" ||
+    parts[0] === ".." ||
+    parts.some((part) => part.toLowerCase() === ".git") ||
+    path.isAbsolute(relative)
+  );
 }
 // in formatUntrackedFile, inside the existing try:
 isLink =
