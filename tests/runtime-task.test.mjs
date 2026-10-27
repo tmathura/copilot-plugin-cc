@@ -149,6 +149,18 @@ test("a task whose prompt holds double quotes runs, and only its session name lo
   }
 });
 
+// An apostrophe opens a quoted span in the one-string split, so the double quotes reach the name.
+test("a one-string task prompt that keeps its double quotes through the split runs", () => {
+  const { companion, runs } = setUpTasks();
+
+  const result = companion(["task", 'Don\'t add "x" here']);
+
+  assert.equal(result.status, 0, result.stderr);
+  const [taskRun] = runs();
+  assert.ok(taskRun.args.includes("--name=Copilot Companion Task: Dont add x here"), taskRun.args.join(" "));
+  assert.equal(taskRun.prompt, 'Dont add "x" here');
+});
+
 test("a background task whose prompt holds double quotes completes", () => {
   const { companion, runs } = setUpTasks();
 

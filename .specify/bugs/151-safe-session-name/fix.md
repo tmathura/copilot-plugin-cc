@@ -41,6 +41,9 @@ These fail on the old code:
   name loses them": the release run's prompt, read-only and `--write`, exit 0; the `--name` is
   `Copilot Companion Task: Add the comment line // Checked by the release run. a...`; Copilot gets
   the prompt with its quotes.
+- `tests/runtime-task.test.mjs`, "a one-string task prompt that keeps its double quotes through the
+  split runs": `task 'Don'\''t add "x" here'` as one argument, exit 0; the `--name` is
+  `Copilot Companion Task: Dont add x here`.
 - `tests/runtime-task.test.mjs`, "a background task whose prompt holds double quotes completes": job
   status `completed`, the result is the answer with no refusal, and the prompt keeps its quotes.
 - `tests/copilot.test.mjs`, "a task's session name holds no character that Copilot CLI refuses, and
@@ -58,7 +61,7 @@ These pass on the old code too:
 
 ## Local Verification
 
-- Commands run: `npm run build` (pass), `npm test` (507 tests: 465 pass, 42 skipped, 0 fail),
+- Commands run: `npm run build` (pass), `npm test` (508 tests: 466 pass, 42 skipped, 0 fail),
   `npm run check-version` (1.0.24), `claude plugin validate .` (pass).
 - Before the fix, the three tests listed as failing on the old code failed: the runtime ones with
   the fake CLI's "Session name must not contain double quotes.", the unit one with the U+0000 kept.
@@ -66,17 +69,21 @@ These pass on the old code too:
 ## Deviations from Assessment
 
 - 2026-10-27: the foreground read-only test passes `--fresh` with the prompt. With one argument
-  after `task`, the companion splits it again like a shell line (`normalizeArgv`, open issue #111),
-  which drops every `"` before the prompt and the name are built. That is main's behaviour and #111's
-  scope. So a prompt given as one string never reached `--name` with its quotes; the failure hits a
-  prompt that comes with an option, as in the release run (`--background --write --json`), and
-  would hit every prompt once #111 is fixed.
+  after `task`, the companion splits it again like a shell line (`normalizeArgv`, open issue #111).
+  The split drops a `"` that opens or closes a quoted span, so the release run's prompt given as
+  one string reaches Copilot without its quotes. That is main's behaviour and #111's scope; the
+  test checks the prompt that Copilot receives, so it takes the many-argument path.
 - 2026-10-27, review round 1: for the same reason, the assessment's Reproduction (`task 'Say
-  "hi".'`, one argument) does not show the bug on main, and its Symptom ("A `/copilot:rescue` or
-  `task` whose prompt holds a double quote ... fails") says too much: only a prompt that comes with
-  an option keeps its quotes until the name is built. `test.md` reproduces it with `task --fresh`.
+  "hi".'`, one argument) does not show the bug on main: its quotes go in the split. `test.md`
+  reproduces it with `task --fresh`.
+- 2026-10-27, review round 2: the two entries above first said that a one-string prompt never
+  reached the name with its quotes, and that the assessment's Symptom said too much. That was
+  wrong, and they are corrected. A one-string prompt can reach the name with its quotes: an apostrophe opens a single-quoted span that keeps a `"`
+  (`Don't add "x" here` splits to `Dont add "x" here`), and so does `\"`. So the assessment's
+  Symptom holds for the bare `/copilot:rescue` form too. A new runtime test runs such a one-string
+  prompt.
 
 ## Follow-ups
 
-- #111 keeps the quotes of a one-string prompt; this fix keeps such a prompt's session name valid
+- #111 keeps every quote of a one-string prompt; this fix keeps such a prompt's session name valid
   then.

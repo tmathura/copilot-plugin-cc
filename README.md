@@ -295,8 +295,8 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
   inside the data folder that Claude Code gives the plugin ([Folders](docs/configuration.md#folders)
   gives which folders, and what stays as it is). The job files hold your prompts and Copilot's answers. Codex makes them with the default
   mode, so other users on a shared host may read them, depending on that data folder.
-- A task's Copilot session name, made from the start of its prompt, has a space in place of each
-  double quote and ASCII control character. Copilot CLI refuses a name that holds one, so the task
+- A task's Copilot session name, made from the start of its prompt, leaves out each double quote
+  and ASCII control character. Copilot CLI refuses a name that holds one, so the task
   would fail before it starts. Codex takes any name. The prompt itself is unchanged. The reason is
   correctness.
 - A review reads no untracked file whose real path is outside the repo or in a `.git` folder: not
