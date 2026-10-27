@@ -41,6 +41,8 @@ export const NOT_LOGGED_IN_STDERR = [
 //   reject-flags        rejects its arguments and exits 1 before it reads the prompt
 // Every run records its arguments, environment, prompt, pid and the files of each --add-dir folder
 // (base64, so the bytes stay exact). Each child that a run starts is recorded with the run's pid.
+// After the record, like Copilot CLI 1.0.95, a run exits 1 for a --name that is empty, longer than
+// 100 characters, or holds a double quote or an ASCII control character.
 // FAKE_COPILOT_ANSWER replaces the final answer text. FAKE_COPILOT_EARLIER gives the first turn's
 // message, which comes with the view tool call. FAKE_COPILOT_CRLF ends each event line with CRLF.
 export function installFakeCopilot(binDir, behavior = "ok") {
@@ -116,6 +118,28 @@ function runForever() {
   setInterval(() => {}, 1000);
 }
 
+// Copilot CLI 1.0.95 refuses these --name values before it starts.
+function sessionNameRefusal() {
+  const flag = args.find((arg) => arg.startsWith("--name="));
+  if (flag === undefined) {
+    return null;
+  }
+  const name = flag.slice("--name=".length);
+  if (!name) {
+    return "Session name cannot be empty.";
+  }
+  if (name.length > 100) {
+    return "Session name must be 100 characters or less.";
+  }
+  if (name.includes('"')) {
+    return "Session name must not contain double quotes.";
+  }
+  if (/[\\u0000-\\u001f\\u007f]/.test(name)) {
+    return "Session name must not contain control characters.";
+  }
+  return null;
+}
+
 function sessionId() {
   const flag = args.find((arg) => arg.startsWith("--session-id=") || arg.startsWith("--resume="));
   return flag ? flag.slice(flag.indexOf("=") + 1) : "fake-session";
@@ -150,6 +174,11 @@ process.stdin.on("data", (chunk) => {
 process.stdin.on("end", () => {
   const record = { args, cwd: process.cwd(), env: process.env, prompt, pid: process.pid, addDirFiles: readAddDirFiles() };
   fs.appendFileSync(RECORD_PATH, JSON.stringify(record) + "\\n");
+  const refusal = sessionNameRefusal();
+  if (refusal) {
+    process.stderr.write(refusal + "\\n");
+    process.exit(1);
+  }
 
   switch (BEHAVIOR) {
     case "not-logged-in":

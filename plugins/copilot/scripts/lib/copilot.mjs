@@ -2,7 +2,8 @@
 // prompt mode. This module alone builds Copilot arguments and decides permissions. It has no broker,
 // no session transfer and no thread list, so the latest task comes from the plugin's job state, never
 // a review gate job; the login check is one tiny read-only prompt, and a caller can start Copilot
-// inside its own locked step.
+// inside its own locked step; a task's session name has a space in place of each character that
+// Copilot CLI refuses.
 /**
  * @typedef {import("./prompt-mode-protocol").PromptModeEvent} PromptModeEvent
  * @typedef {import("./prompt-mode-protocol").ResultEvent} ResultEvent
@@ -86,8 +87,9 @@ function shorten(text, limit = 72) {
   return `${normalized.slice(0, limit - 3)}...`;
 }
 
+// Copilot CLI refuses a --name that holds a double quote or an ASCII control character.
 function buildTaskThreadName(prompt) {
-  const excerpt = shorten(prompt, 56);
+  const excerpt = shorten(String(prompt ?? "").replace(/["\u0000-\u001f\u007f]/g, " "), 56);
   return excerpt ? `${TASK_THREAD_PREFIX}: ${excerpt}` : TASK_THREAD_PREFIX;
 }
 
