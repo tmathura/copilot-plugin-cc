@@ -15,7 +15,7 @@
     "build": "tsc -p tsconfig.prompt-mode.json"
   },
   "devDependencies": {
-    "@types/node": "^25.9.9",
+    "@types/node": "^26.6.5",
     "typescript": "^6.0.3"
   }
 }
