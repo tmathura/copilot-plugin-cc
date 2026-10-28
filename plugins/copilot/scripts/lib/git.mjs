@@ -1,9 +1,10 @@
 // Changed from upstream codex-plugin-cc (Apache-2.0): every git call writes no index and starts no
 // fsmonitor hook or textconv program; non-ASCII file names are not quoted; untracked symlinks, and
 // untracked files whose real path is outside the repository or in a .git folder (behind a folder
-// link or a junction), are not read; the diff is inline up to the byte limit whatever the file
-// count; above it the self-collect guidance points Copilot at one patch file per changed file, which
-// writeReviewPatches writes; the review sections remove only trailing new lines, so Git Status keeps
+// link or a junction), are not read; the untracked files that Git for Windows lists behind a
+// junction become the junction itself, and their Git Status lines are dropped; the diff is inline
+// up to the byte limit whatever the file count; above it the self-collect guidance points Copilot
+// at one patch file per changed file, which writeReviewPatches writes; the review sections remove only trailing new lines, so Git Status keeps
 // the leading space of its first line; the default branch from origin/HEAD is origin/<name> when
 // there is no local branch of that name.
 import fs from "node:fs";
@@ -159,14 +160,107 @@ export function getWorkingTreeState(cwd) {
   const unstaged = listUnstagedFiles(cwd);
   // -z gives the real names: without it git quotes a name with a tab, a newline, a quote or a
   // backslash, and the file cannot be read.
-  const untracked = gitChecked(cwd, ["ls-files", "-z", "--others", "--exclude-standard"]).stdout.split("\0").filter(Boolean);
+  const listed = gitChecked(cwd, ["ls-files", "-z", "--others", "--exclude-standard"]).stdout.split("\0").filter(Boolean);
+  const { untracked, linkFolders } = collapseLinkFolders(cwd, listed);
 
   return {
     staged,
     unstaged,
     untracked,
+    linkFolders,
     isDirty: staged.length > 0 || unstaged.length > 0 || untracked.length > 0
   };
+}
+
+// Git for Windows walks into a junction as if it were a folder, so it lists the files behind it;
+// elsewhere git lists a folder link as one entry. A folder that cannot be checked may be a link, so
+// it is treated as one.
+function collapseLinkFolders(cwd, listed) {
+  const checked = new Map();
+  const isLinkFolder = (folder) => {
+    if (!checked.has(folder)) {
+      let link;
+      try {
+        link = fs.lstatSync(path.join(cwd, folder)).isSymbolicLink();
+      } catch {
+        link = true;
+      }
+      checked.set(folder, link);
+    }
+    return checked.get(folder);
+  };
+  const untracked = [];
+  const linkFolders = new Set();
+  for (const file of listed) {
+    // A "nested/" entry (a nested repo, or on Windows a junction to one) ends in an empty part, so
+    // "nested" is checked.
+    const parts = file.split("/").slice(0, -1);
+    let folder = "";
+    let link = null;
+    for (const part of parts) {
+      folder = folder ? `${folder}/${part}` : part;
+      if (isLinkFolder(folder)) {
+        link = folder;
+        break;
+      }
+    }
+    if (!link) {
+      untracked.push(file);
+    } else if (!linkFolders.has(link)) {
+      linkFolders.add(link);
+      untracked.push(link);
+    }
+  }
+  return { untracked, linkFolders: [...linkFolders] };
+}
+
+const GIT_ESCAPES = { a: "\x07", b: "\b", t: "\t", n: "\n", v: "\v", f: "\f", r: "\r" };
+
+// Git quotes a name with a space, a quote, a backslash or a control character. Reading the quotes
+// back, not predicting them, holds whichever names a git version quotes; a broken line must not throw.
+export function unquoteGitPath(text) {
+  if (!text.startsWith('"')) {
+    return text;
+  }
+  const chars = [...text.slice(1)];
+  const bytes = [];
+  for (let index = 0; index < chars.length; index += 1) {
+    const char = chars[index];
+    if (char === '"') {
+      break;
+    }
+    if (char !== "\\" || index + 1 === chars.length) {
+      bytes.push(...Buffer.from(char));
+      continue;
+    }
+    index += 1;
+    const octal = chars.slice(index, index + 3).join("");
+    if (/^[0-7]{3}$/.test(octal)) {
+      bytes.push(parseInt(octal, 8) & 0xff);
+      index += 2;
+    } else {
+      bytes.push(...Buffer.from(GIT_ESCAPES[chars[index]] ?? chars[index]));
+    }
+  }
+  return Buffer.from(bytes).toString("utf8");
+}
+
+// Git Status walks into a junction too. Matching the folder, not the listed names, also drops a file
+// that appears behind the link between the two git calls. A tracked line keeps its name and diff.
+export function dropLinkedStatusLines(status, linkFolders) {
+  if (linkFolders.length === 0) {
+    return status;
+  }
+  return status
+    .split("\n")
+    .filter((line) => {
+      if (!line.startsWith("?? ")) {
+        return true;
+      }
+      const name = unquoteGitPath(line.slice(3));
+      return !linkFolders.some((folder) => name.startsWith(`${folder}/`));
+    })
+    .join("\n");
 }
 
 export function resolveReviewTarget(cwd, options = {}) {
@@ -288,7 +382,11 @@ function formatUntrackedFile(cwd, relativePath) {
 
 function collectWorkingTreeContext(cwd, state, options = {}) {
   const includeDiff = options.includeDiff !== false;
-  const status = gitChecked(cwd, ["status", "--short", "--untracked-files=all"]).stdout;
+  // A colour code before "??" would hide a line from the link filter.
+  const status = dropLinkedStatusLines(
+    gitChecked(cwd, ["-c", "color.status=false", "status", "--short", "--untracked-files=all"]).stdout,
+    state.linkFolders
+  );
   const changedFiles = listUniqueFiles(state.staged, state.unstaged, state.untracked);
 
   let parts;

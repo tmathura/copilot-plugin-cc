@@ -2,6 +2,15 @@
 
 ## Copilot plugin
 
+### 1.0.25
+
+- On Windows, a review no longer names the untracked files behind a directory junction. Git for
+  Windows lists every file behind a junction, so their names reached Git Status and the file lists,
+  and a junction to a git-ignored folder in the repo, such as `secrets/`, put that folder's text in
+  the prompt. The junction is now shown once as skipped in the untracked files, as a folder link
+  is on macOS and Linux; on Windows it has no Git Status line. Git still walks into a junction, so
+  a junction to a big folder can make a review slow.
+
 ### 1.0.24
 
 - A Copilot task whose prompt holds a double quote now runs. Before, it failed at once with

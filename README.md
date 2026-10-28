@@ -303,6 +303,14 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
   the target of an untracked symlink, and not a file behind a folder link or, on Windows, a
   directory junction. The link can point outside the repo, for example at a key file, or at
   `.git/config`, which can hold a token. Codex puts the target's text in the prompt.
+- An untracked folder link or junction is shown once, as skipped, with no name or text of the files
+  behind it, also when it points at a git-ignored folder in the repo. Git for Windows lists the
+  files behind a junction; the review drops them, and their Git Status lines too. A tracked file
+  reached through a junction keeps its name and diff. Codex shows the names and reads the files
+  that git lists. The reason is safety. Two limits stay: git still walks into a junction, so a
+  junction to a big folder can make a review slow; and Copilot's own `view` tool can open a file
+  through a folder link or junction in the repo (seen on Windows with a junction), which the plugin
+  cannot stop.
 - A review reads an untracked file whose name has non-ASCII letters, a tab or a newline. It shows a
   non-ASCII name as it is (`core.quotePath=false`) in the status, the file lists and the patches.
   Codex shows git's quoted form, such as `"caf\303\251.js"`, and skips such an untracked file as
