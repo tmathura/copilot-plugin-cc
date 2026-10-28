@@ -7,7 +7,14 @@ import path from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { collectReviewContext, getWorkingTreeState, resolveReviewTarget, writeReviewPatches } from "../plugins/copilot/scripts/lib/git.mjs";
+import {
+  collectReviewContext,
+  dropLinkedStatusLines,
+  getWorkingTreeState,
+  resolveReviewTarget,
+  unquoteGitPath,
+  writeReviewPatches
+} from "../plugins/copilot/scripts/lib/git.mjs";
 import { DIFF_ARGS, countLines, git, gitBytes, initGitRepo, makeTempDir, run } from "./helpers.mjs";
 
 function sha256File(filePath) {
@@ -582,19 +589,10 @@ test("an untracked file behind a folder link or junction that leads outside the 
     assert.match(output, /GITHUB_INSIDE/);
     assert.match(output, /GITATTRIBUTES_INSIDE/);
     assert.match(output, /INNER_INSIDE/);
-    if (process.platform === "win32") {
-      // Git for Windows lists the files behind a junction; one that stays inside is read.
-      assert.match(output, /### linkdir\/key\.txt\n\(skipped: symlink\)/);
-      assert.match(output, /### sub\/linkdir\/key\.txt\n\(skipped: symlink\)/);
-      assert.match(output, /### siblink\/key\.txt\n\(skipped: symlink\)/);
-      assert.match(output, /### gitlink\/config\n\(skipped: symlink\)/);
-      assert.match(output, /### innerlink\/ok\.txt\n```\nINNER_INSIDE\n```/);
-    } else {
-      assert.match(output, /### linkdir\n\(skipped: symlink\)/);
-      assert.match(output, /### sub\/linkdir\n\(skipped: symlink\)/);
-      assert.match(output, /### siblink\n\(skipped: symlink\)/);
-      assert.match(output, /### gitlink\n\(skipped: symlink\)/);
-      assert.match(output, /### innerlink\n\(skipped: symlink\)/);
+    // Git for Windows lists the files behind a junction; each becomes the junction itself.
+    for (const link of ["linkdir", "sub/linkdir", "siblink", "gitlink", "innerlink"]) {
+      assert.match(output, new RegExp(`### ${link}\\n\\(skipped: symlink\\)`), link);
+      assert.doesNotMatch(output, new RegExp(`(### |\\?\\? )${link}/`), link);
     }
   }
 });
@@ -924,3 +922,214 @@ test("writeReviewPatches throws when a patch file exists already", () => {
 
   assert.throws(() => writeReviewPatches(context, dir), { code: "EEXIST" });
 });
+
+// A repo whose root is spelled as git prints it, which the code uses (/private/var on macOS).
+function makeLinkRepo() {
+  const base = makeTempDir();
+  const repo = path.join(base, "repo");
+  fs.mkdirSync(repo);
+  initGitRepo(repo);
+  fs.writeFileSync(path.join(repo, "app.js"), "console.log('v1');\n");
+  run("git", ["add", "app.js"], { cwd: repo });
+  run("git", ["commit", "-m", "init"], { cwd: repo });
+  const root = git(repo, "rev-parse", "--show-toplevel").trim();
+  return { base, root };
+}
+
+function untrackedNamesInStatus(content) {
+  const status = content.split("## Git Status\n\n")[1].split("\n## ")[0];
+  return status.split("\n").filter((line) => line.startsWith("?? "));
+}
+
+test("a junction or folder link to a git-ignored folder in the repo leaks no name or text", () => {
+  const { root } = makeLinkRepo();
+  fs.writeFileSync(path.join(root, ".gitignore"), "secrets/\n");
+  run("git", ["add", ".gitignore"], { cwd: root });
+  run("git", ["commit", "-m", "ignore"], { cwd: root });
+  fs.mkdirSync(path.join(root, "secrets"));
+  fs.writeFileSync(path.join(root, "secrets", "key.txt"), "SECRET_IGNORED_MARKER\n");
+  fs.symlinkSync(path.join(root, "secrets"), path.join(root, "seclink"), FOLDER_LINK);
+
+  for (const output of untrackedOutputs(root)) {
+    assert.doesNotMatch(output, /SECRET_IGNORED_MARKER|seclink\/|secrets\//);
+    assert.match(output, /### seclink\n\(skipped: symlink\)/);
+  }
+});
+
+test("each untracked path behind a link becomes the link once, in the state, Git Status and the count", () => {
+  const { base, root } = makeLinkRepo();
+  const outside = path.join(base, "outside");
+  fs.mkdirSync(path.join(outside, "sub"), { recursive: true });
+  for (const file of ["a.txt", "b.txt", path.join("sub", "c.txt")]) {
+    fs.writeFileSync(path.join(outside, file), "OUTSIDE\n");
+  }
+  // A folder behind a link that holds another link.
+  const deep = path.join(base, "deep");
+  fs.mkdirSync(deep);
+  fs.symlinkSync(outside, path.join(deep, "inner"), FOLDER_LINK);
+  fs.writeFileSync(path.join(root, "plain.txt"), "PLAIN_INSIDE\n");
+  fs.mkdirSync(path.join(root, "newdir"));
+  fs.writeFileSync(path.join(root, "newdir", "f.txt"), "NEWDIR_INSIDE\n");
+  fs.writeFileSync(path.join(root, "app.js"), "console.log('v2');\n");
+  const links = ["link dir", "multi", "outer", "lïnk"];
+  fs.symlinkSync(outside, path.join(root, "multi"), FOLDER_LINK);
+  fs.symlinkSync(outside, path.join(root, "link dir"), FOLDER_LINK);
+  fs.symlinkSync(outside, path.join(root, "lïnk"), FOLDER_LINK);
+  fs.symlinkSync(deep, path.join(root, "outer"), FOLDER_LINK);
+
+  const state = getWorkingTreeState(root);
+  assert.deepEqual([...state.untracked].sort(), [...links, "newdir/f.txt", "plain.txt"].sort());
+  // Git for Windows walks into a junction; elsewhere git lists the folder link as one entry.
+  assert.deepEqual([...state.linkFolders].sort(), process.platform === "win32" ? [...links].sort() : []);
+
+  const context = collectReviewContext(root, resolveReviewTarget(root, {}));
+  assert.match(context.content, /## Git Status\n\n M app\.js\n/);
+  for (const line of untrackedNamesInStatus(context.content)) {
+    assert.doesNotMatch(line, /(multi|link dir|outer|lïnk)\//, line);
+  }
+  assert.match(context.content, /PLAIN_INSIDE/);
+  assert.match(context.content, /NEWDIR_INSIDE/);
+  assert.doesNotMatch(context.content, /OUTSIDE\n/);
+  assert.equal(context.summary, "Reviewing 0 staged, 1 unstaged, and 6 untracked file(s).");
+});
+
+test("a nested repo stays one entry, and a link to a nested repo becomes the link", () => {
+  const { base, root } = makeLinkRepo();
+  fs.mkdirSync(path.join(root, "nested"));
+  initGitRepo(path.join(root, "nested"));
+  fs.writeFileSync(path.join(root, "nested", "n.txt"), "NESTED\n");
+  const other = path.join(base, "other");
+  fs.mkdirSync(other);
+  initGitRepo(other);
+  fs.writeFileSync(path.join(other, "o.txt"), "OTHER\n");
+  fs.symlinkSync(other, path.join(root, "linkrepo"), FOLDER_LINK);
+
+  const { untracked } = getWorkingTreeState(root);
+  assert.ok(untracked.includes("nested/"), untracked.join(", "));
+  assert.ok(untracked.includes("linkrepo"), untracked.join(", "));
+  assert.ok(!untracked.some((file) => file.startsWith("linkrepo/")), untracked.join(", "));
+});
+
+test("a folder that cannot be checked counts as a link, and no name or text behind it is shown", (t) => {
+  const { root } = makeLinkRepo();
+  const inner = path.join(root, "outer", "inner");
+  fs.mkdirSync(inner, { recursive: true });
+  fs.writeFileSync(path.join(inner, "secret.txt"), "SECRET_UNCHECKED_MARKER\n");
+  const quoted = process.platform === "win32" ? [] : ["a\tb.txt", 'q"x.txt'];
+  for (const name of quoted) {
+    fs.writeFileSync(path.join(inner, name), "SECRET_UNCHECKED_MARKER\n");
+  }
+  fs.writeFileSync(path.join(root, "outer", "ok.txt"), "OK_INSIDE\n");
+  const native = fs.lstatSync;
+  let hits = 0;
+  t.mock.method(fs, "lstatSync", (file, ...rest) => {
+    if (path.resolve(String(file)) === path.resolve(inner)) {
+      hits += 1;
+      throw Object.assign(new Error("EACCES: mocked"), { code: "EACCES" });
+    }
+    return native(file, ...rest);
+  });
+
+  const state = getWorkingTreeState(root);
+  assert.ok(hits > 0);
+  assert.deepEqual([...state.untracked].sort(), ["outer/inner", "outer/ok.txt"]);
+  for (const output of untrackedOutputs(root)) {
+    assert.match(output, /### outer\/inner\n\(skipped: broken symlink or unreadable file\)/);
+    assert.doesNotMatch(output, /SECRET_UNCHECKED_MARKER|outer\/inner\/|"outer\/inner\//);
+    assert.match(output, /OK_INSIDE/);
+  }
+});
+
+test("a folder on many untracked paths is checked once", (t) => {
+  const { root } = makeLinkRepo();
+  const folder = path.join(root, "plainfolder");
+  fs.mkdirSync(folder);
+  for (const name of ["a.txt", "b.txt", "c.txt"]) {
+    fs.writeFileSync(path.join(folder, name), "x\n");
+  }
+  const native = fs.lstatSync;
+  let hits = 0;
+  t.mock.method(fs, "lstatSync", (file, ...rest) => {
+    if (path.resolve(String(file)) === path.resolve(folder)) {
+      hits += 1;
+    }
+    return native(file, ...rest);
+  });
+
+  getWorkingTreeState(root);
+  assert.equal(hits, 1);
+});
+
+test("unquoteGitPath reads back each untracked name that git status prints", () => {
+  const { root } = makeLinkRepo();
+  const names = ["a b.txt", "café.txt"];
+  if (process.platform !== "win32") {
+    names.push("t\tab.txt", "new\nline.txt", 'q"uote.txt', "back\\slash.txt", "c\u0001.txt", "d\u007f.txt");
+  }
+  for (const name of names) {
+    fs.writeFileSync(path.join(root, name), "x\n");
+  }
+  const listed = git(root, "ls-files", "-z", "--others", "--exclude-standard").split("\0").filter(Boolean);
+  const status = git(root, "-c", "core.quotePath=false", "status", "--short", "--untracked-files=all");
+  const read = status
+    .split("\n")
+    .filter((line) => line.startsWith("?? "))
+    .map((line) => unquoteGitPath(line.slice(3)));
+  assert.deepEqual(read.sort(), listed.sort());
+  assert.deepEqual(listed.sort(), [...names].sort());
+});
+
+test("unquoteGitPath reads git's escapes and never throws on a broken name", () => {
+  assert.equal(unquoteGitPath('"a\\tb"'), "a\tb");
+  assert.equal(unquoteGitPath('"caf\\303\\251"'), "café");
+  assert.equal(unquoteGitPath('"a\\qb"'), "aqb");
+  assert.equal(unquoteGitPath('"linkdir/x'), "linkdir/x");
+  assert.equal(unquoteGitPath('"linkdir/\\377x"'), "linkdir/�x");
+  assert.equal(unquoteGitPath("plain name.txt"), "plain name.txt");
+});
+
+test("dropLinkedStatusLines drops only the untracked lines under a link folder", () => {
+  const status = [
+    " M app.js",
+    "?? linkdir/old.txt",
+    // A file that the untracked listing never saw.
+    "?? linkdir/new.txt",
+    '?? "link dir/a b.txt"',
+    '?? "linkdir/x',
+    '?? "linkdir/\\qy"',
+    '?? "other/\\qy"',
+    "?? linkdir2.txt",
+    "?? other/x.txt",
+    ""
+  ].join("\n");
+
+  assert.equal(
+    dropLinkedStatusLines(status, ["linkdir", "link dir"]),
+    [" M app.js", '?? "other/\\qy"', "?? linkdir2.txt", "?? other/x.txt", ""].join("\n")
+  );
+  assert.equal(dropLinkedStatusLines(status, []), status);
+});
+
+test(
+  "a tracked change under a junction stays in Git Status, and the untracked file beside it is gone",
+  { skip: process.platform !== "win32" && "only Git for Windows walks into a folder link" },
+  () => {
+    const { base, root } = makeLinkRepo();
+    fs.mkdirSync(path.join(root, "tracked"));
+    fs.writeFileSync(path.join(root, "tracked", "file.txt"), "v1\n");
+    run("git", ["add", "tracked/file.txt"], { cwd: root });
+    run("git", ["commit", "-m", "tracked"], { cwd: root });
+    const copy = path.join(base, "copy");
+    fs.cpSync(path.join(root, "tracked"), copy, { recursive: true });
+    fs.writeFileSync(path.join(copy, "file.txt"), "v2\n");
+    fs.writeFileSync(path.join(copy, "new.txt"), "SECRET_NEW_MARKER\n");
+    fs.rmSync(path.join(root, "tracked"), { recursive: true });
+    fs.symlinkSync(copy, path.join(root, "tracked"), "junction");
+
+    const context = collectReviewContext(root, resolveReviewTarget(root, {}));
+    assert.match(context.content, /## Git Status\n\n M tracked\/file\.txt\n/);
+    assert.doesNotMatch(context.content, /tracked\/new\.txt|SECRET_NEW_MARKER/);
+    assert.match(context.content, /### tracked\n\(skipped: symlink\)/);
+    assert.match(context.content, /\+v2/);
+  }
+);

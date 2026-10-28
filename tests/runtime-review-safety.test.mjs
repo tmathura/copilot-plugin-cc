@@ -248,12 +248,12 @@ test("a review sends Copilot no file behind a folder link or junction that leads
   makeRepo(repo);
   // A junction needs no extra rights on Windows; elsewhere git lists the folder link itself.
   fs.symlinkSync(outside, path.join(repo, "linkdir"), process.platform === "win32" ? "junction" : "dir");
-  const note = process.platform === "win32" ? "### linkdir/key.txt\n(skipped: symlink)" : "### linkdir\n(skipped: symlink)";
+  const note = "### linkdir\n(skipped: symlink)";
 
   const inline = runReview("review", repo, { env: { FAKE_COPILOT_ANSWER: REVIEW_JSON } });
   assert.equal(inline.result.status, 0, inline.result.stderr);
   assert.ok(inline.runs[0].prompt.includes(note), inline.runs[0].prompt);
-  assert.doesNotMatch(inline.runs[0].prompt, /SECRET_OUTSIDE_MARKER/);
+  assert.doesNotMatch(inline.runs[0].prompt, /SECRET_OUTSIDE_MARKER|linkdir\/key\.txt/);
 
   // More than the inline limit, so the untracked files go to untracked.md.
   writeFile(repo, "big.txt", `${Array.from({ length: 15000 }, (_, index) => `line ${index} ${"x".repeat(90)}`).join("\n")}\n`);
@@ -263,7 +263,7 @@ test("a review sends Copilot no file behind a folder link or junction that leads
   const patches = patchesOf(above.runs[0]);
   assert.ok(patches["untracked.md"].toString("utf8").includes(note));
   for (const text of [above.runs[0].prompt, ...Object.values(patches).map((data) => data.toString("utf8"))]) {
-    assert.doesNotMatch(text, /SECRET_OUTSIDE_MARKER/);
+    assert.doesNotMatch(text, /SECRET_OUTSIDE_MARKER|linkdir\/key\.txt/);
   }
 });
 
