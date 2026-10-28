@@ -592,6 +592,7 @@ test("an untracked file behind a folder link or junction that leads outside the 
     // Git for Windows lists the files behind a junction; each becomes the junction itself.
     for (const link of ["linkdir", "sub/linkdir", "siblink", "gitlink", "innerlink"]) {
       assert.match(output, new RegExp(`### ${link}\\n\\(skipped: symlink\\)`), link);
+      assert.doesNotMatch(output, new RegExp(`(### |\\?\\? )${link}/`), link);
     }
     assert.doesNotMatch(output, /linkdir\/key\.txt|siblink\/key\.txt|gitlink\/config|innerlink\/ok\.txt/);
   }
@@ -1039,6 +1040,26 @@ test("a folder that cannot be checked counts as a link, and no name or text behi
     assert.doesNotMatch(output, /SECRET_UNCHECKED_MARKER|outer\/inner\/|"outer\/inner\//);
     assert.match(output, /OK_INSIDE/);
   }
+});
+
+test("forced status colours do not let a name behind a link into Git Status", (t) => {
+  const { root } = makeLinkRepo();
+  run("git", ["config", "color.status", "always"], { cwd: root });
+  run("git", ["config", "color.ui", "always"], { cwd: root });
+  const inner = path.join(root, "outer", "inner");
+  fs.mkdirSync(inner, { recursive: true });
+  fs.writeFileSync(path.join(inner, "secret.txt"), "x\n");
+  const native = fs.lstatSync;
+  t.mock.method(fs, "lstatSync", (file, ...rest) => {
+    if (path.resolve(String(file)) === path.resolve(inner)) {
+      throw Object.assign(new Error("EACCES: mocked"), { code: "EACCES" });
+    }
+    return native(file, ...rest);
+  });
+
+  const context = collectReviewContext(root, resolveReviewTarget(root, {}));
+  assert.doesNotMatch(context.content, /outer\/inner\/secret\.txt/);
+  assert.doesNotMatch(context.content.split("## Staged Diff")[0], /\u001b\[/);
 });
 
 test("a folder on many untracked paths is checked once", (t) => {

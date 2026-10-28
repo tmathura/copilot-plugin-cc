@@ -48,16 +48,21 @@ These fail on the old code:
 
 - "an untracked file behind a folder link or junction that leads outside the repo or into .git is
   not read" (updated; Windows): one `### <link> (skipped: symlink)` for each of `linkdir`,
-  `sub/linkdir`, `siblink`, `gitlink`, `innerlink`, and no `<link>/` name or `??` line.
+  `sub/linkdir`, `siblink`, `gitlink`, `innerlink`; no `### <link>/` header or `?? <link>/` line,
+  and the names `linkdir/key.txt`, `siblink/key.txt`, `gitlink/config` and `innerlink/ok.txt`
+  nowhere in the output, also not in the self-collect Changed Files list.
 - "a junction or folder link to a git-ignored folder in the repo leaks no name or text" (Windows).
-- "each untracked path behind a link becomes the link once, in the state, Git Status and the
-  count" (Windows): links with three files and a subfolder, a link in a folder behind a link, links
+- "each untracked path behind a link becomes the link once, with no Git Status line behind it"
+  (Windows): links with three files and a subfolder, a link in a folder behind a link, links
   named with a space and with `ï`; ` M app.js` stays the first Git Status line; the summary counts 6.
 - "a nested repo stays one entry, and a link to a nested repo becomes the link" (Windows).
 - "a folder that cannot be checked counts as a link, and no name or text behind it is shown" (every
   system): `fs.lstatSync` throws for `outer/inner`, which shows as `(skipped: broken symlink or
   unreadable file)`; on macOS and Linux also with a tab and a `"` in the names behind it.
 - "a folder on many untracked paths is checked once" (every system).
+- "forced status colours do not let a name behind a link into Git Status" (every system): with
+  `color.status=always` and `color.ui=always`, git put a colour code before `??`, and the filter
+  kept the line; the Git Status call now passes `-c color.status=false`.
 - "a tracked change under a junction stays in Git Status, and the untracked file beside it is gone"
   (Windows only).
 - "a review sends Copilot no file behind a folder link or junction that leads outside the repo"
@@ -73,7 +78,7 @@ This one guards the read-back against git itself:
 ## Local Verification
 
 - Commands run: `npm ci --include=dev` (0 vulnerabilities), `npm run build` (pass), `npm test`
-  (517 tests: 475 pass, 42 skipped, 0 fail), `npm run check-version` (1.0.25),
+  (518 tests: 476 pass, 42 skipped, 0 fail), `npm run check-version` (1.0.25),
   `claude plugin validate .` (pass), on Windows.
 - Manual checks: the reproduction script on main's code showed `?? linkdir/key.txt`,
   `?? seclink/key.txt` and the ignored file's text (assessment, Report).
@@ -92,6 +97,9 @@ This one guards the read-back against git itself:
   the parent path step by step and stops at the first link. A link made between the `ls-files` and
   the `status` call is not dropped from Git Status for that review (its text stays guarded by
   `formatUntrackedFile`); the next review collapses it.
+- 2026-10-28, review round 2: the Git Status call passes `-c color.status=false`, which the
+  assessment did not plan: a forced colour setting put a code before `??` and hid lines from the
+  filter (Codex). Colour in the diffs is #61's scope.
 
 ## Follow-ups
 

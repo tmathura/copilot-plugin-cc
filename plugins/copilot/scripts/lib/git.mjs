@@ -3,8 +3,8 @@
 // untracked files whose real path is outside the repository or in a .git folder (behind a folder
 // link or a junction), are not read; the untracked files that Git for Windows lists behind a
 // junction become the junction itself, and their Git Status lines are dropped; the diff is inline
-// up to the byte limit whatever the file count; above it the self-collect guidance points Copilot at one patch file per changed file, which
-// writeReviewPatches writes; the review sections remove only trailing new lines, so Git Status keeps
+// up to the byte limit whatever the file count; above it the self-collect guidance points Copilot
+// at one patch file per changed file, which writeReviewPatches writes; the review sections remove only trailing new lines, so Git Status keeps
 // the leading space of its first line; the default branch from origin/HEAD is origin/<name> when
 // there is no local branch of that name.
 import fs from "node:fs";
@@ -192,7 +192,7 @@ function collapseLinkFolders(cwd, listed) {
   const untracked = [];
   const linkFolders = new Set();
   for (const file of listed) {
-    // The last part is the file; a "nested/" entry ends in an empty part, so "nested" is checked.
+    // A "nested/" entry (a nested repo, or a link to one) ends in an empty part, so "nested" is checked.
     const parts = file.split("/").slice(0, -1);
     let folder = "";
     let link = null;
@@ -381,8 +381,9 @@ function formatUntrackedFile(cwd, relativePath) {
 
 function collectWorkingTreeContext(cwd, state, options = {}) {
   const includeDiff = options.includeDiff !== false;
+  // A colour code before "??" would hide a line from the link filter.
   const status = dropLinkedStatusLines(
-    gitChecked(cwd, ["status", "--short", "--untracked-files=all"]).stdout,
+    gitChecked(cwd, ["-c", "color.status=false", "status", "--short", "--untracked-files=all"]).stdout,
     state.linkFolders
   );
   const changedFiles = listUniqueFiles(state.staged, state.unstaged, state.untracked);

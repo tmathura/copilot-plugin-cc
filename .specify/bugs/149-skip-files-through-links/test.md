@@ -10,7 +10,7 @@
 
 The reproduction no longer shows the bug on Windows: a review of a repo with a junction to an
 outside folder and a junction to a git-ignored folder names neither link's files and reads no text
-behind them. The full suite passes with no regression; the checks ran again after review round 1.
+behind them. The full suite passes with no regression; the checks ran again after review rounds 1 and 2.
 Copilot's `view` tool reaching through a link is not changed; it is the README limit the issue
 allows.
 
@@ -21,7 +21,7 @@ allows.
 | Reproduction (pre-fix) | `collectReviewContext` on a repo with `linkdir` (a junction outside) and `seclink` (a junction to the ignored `secrets/`), main's `git.mjs` | fail (as expected) | `?? linkdir/key.txt`, `?? seclink/key.txt`, both `###` headers, and the ignored file's text |
 | Reproduction (post-fix) | The same with this branch's `git.mjs` | pass | ` M app.js`, `### linkdir` and `### seclink` as skipped; no name or text behind them |
 | New / updated tests | `node --test tests/git.test.mjs tests/runtime-review-safety.test.mjs` | pass | The tests listed in `fix.md` as failing on the old code failed on main's code on Windows and pass now |
-| Regression suite | `npm test` | pass | 517 tests: 475 pass, 42 skipped, 0 fail |
+| Regression suite | `npm test` | pass | 518 tests: 476 pass, 42 skipped, 0 fail |
 | Lint / type-check | `npm run build` | pass | `tsc` type check |
 | Version and plugin | `npm run check-version`, `claude plugin validate .` | pass | 1.0.25; validation passed |
 
