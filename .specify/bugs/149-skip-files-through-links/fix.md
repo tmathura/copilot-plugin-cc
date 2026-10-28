@@ -85,6 +85,13 @@ This one guards the read-back against git itself:
 - 2026-10-28: the README keeps the #110 bullet as it is and adds a new bullet next to it for the
   link folder, the Git Status lines and the two limits, instead of rewording the #110 bullet: the
   #110 bullet is still true, and one bullet per difference is easier to read.
+- 2026-10-28, review round 1: the mocked-folder test builds its path from the root that
+  `git rev-parse --show-toplevel` prints, as `makeRepoWithUntrackedFile` does, not from
+  `fs.realpathSync.native(root)`: that is the root `collectReviewContext` passes on, so the mock
+  matches the path the code checks, and the test asserts the mock fired. The folder check builds
+  the parent path step by step and stops at the first link. A link made between the `ls-files` and
+  the `status` call is not dropped from Git Status for that review (its text stays guarded by
+  `formatUntrackedFile`); the next review collapses it.
 
 ## Follow-ups
 

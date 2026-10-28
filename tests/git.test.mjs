@@ -592,8 +592,8 @@ test("an untracked file behind a folder link or junction that leads outside the 
     // Git for Windows lists the files behind a junction; each becomes the junction itself.
     for (const link of ["linkdir", "sub/linkdir", "siblink", "gitlink", "innerlink"]) {
       assert.match(output, new RegExp(`### ${link}\\n\\(skipped: symlink\\)`), link);
-      assert.doesNotMatch(output, new RegExp(`(### |\\?\\? )${link}/`), link);
     }
+    assert.doesNotMatch(output, /linkdir\/key\.txt|siblink\/key\.txt|gitlink\/config|innerlink\/ok\.txt/);
   }
 });
 
@@ -956,7 +956,7 @@ test("a junction or folder link to a git-ignored folder in the repo leaks no nam
   }
 });
 
-test("each untracked path behind a link becomes the link once, in the state, Git Status and the count", () => {
+test("each untracked path behind a link becomes the link once, with no Git Status line behind it", () => {
   const { base, root } = makeLinkRepo();
   const outside = path.join(base, "outside");
   fs.mkdirSync(path.join(outside, "sub"), { recursive: true });
@@ -1033,6 +1033,7 @@ test("a folder that cannot be checked counts as a link, and no name or text behi
   const state = getWorkingTreeState(root);
   assert.ok(hits > 0);
   assert.deepEqual([...state.untracked].sort(), ["outer/inner", "outer/ok.txt"]);
+  assert.deepEqual(state.linkFolders, ["outer/inner"]);
   for (const output of untrackedOutputs(root)) {
     assert.match(output, /### outer\/inner\n\(skipped: broken symlink or unreadable file\)/);
     assert.doesNotMatch(output, /SECRET_UNCHECKED_MARKER|outer\/inner\/|"outer\/inner\//);

@@ -10,8 +10,9 @@
 
 The reproduction no longer shows the bug on Windows: a review of a repo with a junction to an
 outside folder and a junction to a git-ignored folder names neither link's files and reads no text
-behind them. The full suite passes with no regression. Copilot's `view` tool reaching through a
-link is not changed; it is the README limit the issue allows.
+behind them. The full suite passes with no regression; the checks ran again after review round 1.
+Copilot's `view` tool reaching through a link is not changed; it is the README limit the issue
+allows.
 
 ## Checks Performed
 

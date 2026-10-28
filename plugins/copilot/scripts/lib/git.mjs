@@ -2,8 +2,8 @@
 // fsmonitor hook or textconv program; non-ASCII file names are not quoted; untracked symlinks, and
 // untracked files whose real path is outside the repository or in a .git folder (behind a folder
 // link or a junction), are not read; the untracked files that Git for Windows lists behind a
-// junction become the junction itself, and their Git Status lines are dropped; the diff is inline up to the byte limit whatever the file
-// count; above it the self-collect guidance points Copilot at one patch file per changed file, which
+// junction become the junction itself, and their Git Status lines are dropped; the diff is inline
+// up to the byte limit whatever the file count; above it the self-collect guidance points Copilot at one patch file per changed file, which
 // writeReviewPatches writes; the review sections remove only trailing new lines, so Git Status keeps
 // the leading space of its first line; the default branch from origin/HEAD is origin/<name> when
 // there is no local branch of that name.
@@ -172,9 +172,9 @@ export function getWorkingTreeState(cwd) {
   };
 }
 
-// Git for Windows walks into a junction as if it were a folder, so it lists the files behind it.
-// Each such path becomes the link folder itself, once, as git lists a folder link elsewhere. A
-// folder that cannot be checked counts as a link. A "nested/" entry checks "nested" too.
+// Git for Windows walks into a junction as if it were a folder, so it lists the files behind it;
+// elsewhere git lists a folder link as one entry. A folder that cannot be checked may be a link, so
+// it is treated as one.
 function collapseLinkFolders(cwd, listed) {
   const checked = new Map();
   const isLinkFolder = (folder) => {
@@ -190,23 +190,33 @@ function collapseLinkFolders(cwd, listed) {
     return checked.get(folder);
   };
   const untracked = [];
-  const linkFolders = [];
+  const linkFolders = new Set();
   for (const file of listed) {
+    // The last part is the file; a "nested/" entry ends in an empty part, so "nested" is checked.
     const parts = file.split("/").slice(0, -1);
-    const link = parts.map((_, index) => parts.slice(0, index + 1).join("/")).find(isLinkFolder);
+    let folder = "";
+    let link = null;
+    for (const part of parts) {
+      folder = folder ? `${folder}/${part}` : part;
+      if (isLinkFolder(folder)) {
+        link = folder;
+        break;
+      }
+    }
     if (!link) {
       untracked.push(file);
-    } else if (!linkFolders.includes(link)) {
-      linkFolders.push(link);
+    } else if (!linkFolders.has(link)) {
+      linkFolders.add(link);
       untracked.push(link);
     }
   }
-  return { untracked, linkFolders };
+  return { untracked, linkFolders: [...linkFolders] };
 }
 
 const GIT_ESCAPES = { a: "\x07", b: "\b", t: "\t", n: "\n", v: "\v", f: "\f", r: "\r" };
 
-// Reads back a name that git put in double quotes; it never throws, so a broken line is still read.
+// Git quotes a name with a space, a quote, a backslash or a control character. Reading the quotes
+// back, not predicting them, holds whichever names a git version quotes; a broken line must not throw.
 export function unquoteGitPath(text) {
   if (!text.startsWith('"')) {
     return text;
@@ -234,7 +244,8 @@ export function unquoteGitPath(text) {
   return Buffer.from(bytes).toString("utf8");
 }
 
-// Git Status lists the files behind a junction too; tracked lines stay as they are.
+// Git Status walks into a junction too. Matching the folder, not the listed names, also drops a file
+// that appears behind the link between the two git calls. A tracked line keeps its name and diff.
 export function dropLinkedStatusLines(status, linkFolders) {
   if (linkFolders.length === 0) {
     return status;
@@ -372,7 +383,7 @@ function collectWorkingTreeContext(cwd, state, options = {}) {
   const includeDiff = options.includeDiff !== false;
   const status = dropLinkedStatusLines(
     gitChecked(cwd, ["status", "--short", "--untracked-files=all"]).stdout,
-    state.linkFolders ?? []
+    state.linkFolders
   );
   const changedFiles = listUniqueFiles(state.staged, state.unstaged, state.untracked);
 
