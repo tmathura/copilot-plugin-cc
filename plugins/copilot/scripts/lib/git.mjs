@@ -192,7 +192,8 @@ function collapseLinkFolders(cwd, listed) {
   const untracked = [];
   const linkFolders = new Set();
   for (const file of listed) {
-    // A "nested/" entry (a nested repo, or a link to one) ends in an empty part, so "nested" is checked.
+    // A "nested/" entry (a nested repo, or on Windows a junction to one) ends in an empty part, so
+    // "nested" is checked.
     const parts = file.split("/").slice(0, -1);
     let folder = "";
     let link = null;
