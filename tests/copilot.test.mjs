@@ -50,8 +50,27 @@ function setUp(behavior = "ok", extraEnv = {}) {
   fs.mkdirSync(binDir);
   fs.mkdirSync(workDir);
   const { recordPath } = installFakeCopilot(binDir, behavior);
-  const env = buildEnv(binDir, { CLAUDE_PLUGIN_DATA: dataDir, ...extraEnv });
-  return { binDir, workDir, dataDir, env, runs: () => readFakeCopilotRuns(recordPath) };
+  // The user's own Copilot folder, empty, so no test reads the accounts of the machine.
+  const userHome = path.join(root, "user copilot");
+  const env = buildEnv(binDir, { CLAUDE_PLUGIN_DATA: dataDir, COPILOT_HOME: userHome, ...extraEnv });
+  return { binDir, workDir, dataDir, userHome, env, runs: () => readFakeCopilotRuns(recordPath) };
+}
+
+const CONFIG_HEADER = "// User settings belong in settings.json.\n// This file is managed automatically.\n";
+const ACCOUNT = { host: "https://github.com", login: "octo" };
+
+function writeCopilotConfig(dir, text) {
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, "config.json"), text);
+}
+
+function pluginConfigFile(dataDir) {
+  return path.join(dataDir, "copilot-home", "config.json");
+}
+
+function readPluginConfig(dataDir) {
+  const lines = fs.readFileSync(pluginConfigFile(dataDir), "utf8").split("\n");
+  return JSON.parse(lines.filter((line) => !line.startsWith("//")).join("\n"));
 }
 
 test("the read-only profile builds exactly the read-only arguments", () => {
@@ -201,6 +220,122 @@ test("a write run passes shell characters in its arguments unchanged, so no shel
   assert.deepEqual(run.args, buildCopilotArgs({ write: true, sessionId: result.threadId, model }));
   assert.ok(run.args.includes("--deny-tool=shell(git push)"));
   assert.equal(run.env.COPILOT_ALLOW_ALL, undefined);
+});
+
+test("a read-only run copies only the host and login of the logged-in accounts into the plugin's Copilot folder", async () => {
+  const { workDir, dataDir, userHome, env } = setUp("ok");
+  const other = { host: "https://ghe.example", login: "other" };
+  writeCopilotConfig(
+    userHome,
+    `${CONFIG_HEADER}${JSON.stringify(
+      {
+        lastLoggedInUser: { ...ACCOUNT, token: "gho_secret" },
+        loggedInUsers: [{ ...ACCOUNT, token: "gho_secret", name: "Octo" }, { host: "https://github.com" }, "octo", null, other],
+        copilotTokens: { "https://github.com:octo": "gho_secret" },
+        banner: "see https://github.com // not a comment"
+      },
+      null,
+      2
+    )}\n`
+  );
+  writeCopilotConfig(
+    path.join(dataDir, "copilot-home"),
+    `${CONFIG_HEADER}${JSON.stringify({ firstLaunchAt: "2026-11-09", loggedInUsers: [{ host: "old", login: "stale" }] }, null, 2)}\n`
+  );
+
+  const result = await runPromptModeTurn(workDir, { prompt: "Review this.", env });
+
+  assert.equal(result.status, 0);
+  const text = fs.readFileSync(pluginConfigFile(dataDir), "utf8");
+  assert.ok(text.startsWith(CONFIG_HEADER));
+  assert.doesNotMatch(text, /gho_secret|copilotTokens|banner/);
+  assert.deepEqual(readPluginConfig(dataDir), { firstLaunchAt: "2026-11-09", lastLoggedInUser: ACCOUNT, loggedInUsers: [ACCOUNT, other] });
+  assert.deepEqual(fs.readdirSync(path.join(dataDir, "copilot-home")), ["config.json"]);
+  if (process.platform !== "win32") {
+    assert.equal(fs.statSync(pluginConfigFile(dataDir)).mode & 0o777, 0o600);
+  }
+});
+
+test("the plugin's Copilot folder follows an account switch, and loses the accounts when the user's config has none", async () => {
+  const { workDir, dataDir, userHome, env } = setUp("ok");
+  const pluginHome = path.join(dataDir, "copilot-home");
+  const switched = { host: "https://github.com", login: "switched" };
+  writeCopilotConfig(userHome, JSON.stringify({ lastLoggedInUser: ACCOUNT, loggedInUsers: [ACCOUNT] }));
+  writeCopilotConfig(pluginHome, JSON.stringify({ firstLaunchAt: "2026-11-09" }));
+  await runPromptModeTurn(workDir, { prompt: "x", env });
+  writeCopilotConfig(userHome, JSON.stringify({ lastLoggedInUser: switched, loggedInUsers: [switched] }));
+
+  await runPromptModeTurn(workDir, { prompt: "x", env });
+
+  assert.deepEqual(readPluginConfig(dataDir), { firstLaunchAt: "2026-11-09", lastLoggedInUser: switched, loggedInUsers: [switched] });
+
+  const logouts = {
+    "no such keys": () => writeCopilotConfig(userHome, `${CONFIG_HEADER}{ "firstLaunchAt": "2026-01-01" }\n`),
+    "a missing file": () => fs.rmSync(userHome, { recursive: true, force: true }),
+    "a folder in its place": () => fs.mkdirSync(path.join(userHome, "config.json"), { recursive: true }),
+    "a broken file": () => writeCopilotConfig(userHome, "{ not json"),
+    "a root that is not an object": () => writeCopilotConfig(userHome, JSON.stringify([ACCOUNT])),
+    "a loggedInUsers that is not a list": () => writeCopilotConfig(userHome, JSON.stringify({ loggedInUsers: ACCOUNT }))
+  };
+  for (const [name, logout] of Object.entries(logouts)) {
+    fs.rmSync(userHome, { recursive: true, force: true });
+    writeCopilotConfig(pluginHome, JSON.stringify({ firstLaunchAt: "2026-11-09", lastLoggedInUser: ACCOUNT, loggedInUsers: [ACCOUNT] }));
+    logout();
+
+    const result = await runPromptModeTurn(workDir, { prompt: "x", env });
+
+    assert.equal(result.status, 0, name);
+    assert.deepEqual(readPluginConfig(dataDir), { firstLaunchAt: "2026-11-09" }, name);
+  }
+});
+
+test("the plugin's Copilot config is written only when its accounts change", async () => {
+  const nothing = setUp("ok");
+  await runPromptModeTurn(nothing.workDir, { prompt: "x", env: nothing.env });
+  assert.equal(fs.existsSync(pluginConfigFile(nothing.dataDir)), false);
+
+  const { workDir, dataDir, userHome, env } = setUp("ok");
+  writeCopilotConfig(userHome, JSON.stringify({ lastLoggedInUser: ACCOUNT, loggedInUsers: [ACCOUNT] }));
+  await runPromptModeTurn(workDir, { prompt: "x", env });
+  assert.equal(fs.readFileSync(pluginConfigFile(dataDir), "utf8"), `${JSON.stringify({ lastLoggedInUser: ACCOUNT, loggedInUsers: [ACCOUNT] }, null, 2)}\n`);
+
+  // Copilot formats the file in its own way; the same accounts in it must not cause a rewrite.
+  const own = `${CONFIG_HEADER}{"loggedInUsers":[${JSON.stringify(ACCOUNT)}],"firstLaunchAt":"x","lastLoggedInUser":${JSON.stringify(ACCOUNT)}}`;
+  fs.writeFileSync(pluginConfigFile(dataDir), own);
+  await runPromptModeTurn(workDir, { prompt: "x", env });
+  assert.equal(fs.readFileSync(pluginConfigFile(dataDir), "utf8"), own);
+
+  fs.writeFileSync(pluginConfigFile(dataDir), "{ broken");
+  await runPromptModeTurn(workDir, { prompt: "x", env });
+  assert.deepEqual(readPluginConfig(dataDir), { lastLoggedInUser: ACCOUNT, loggedInUsers: [ACCOUNT] });
+});
+
+test("a write run does not touch the plugin's Copilot config", async () => {
+  const { workDir, dataDir, userHome, env } = setUp("ok");
+  writeCopilotConfig(userHome, JSON.stringify({ lastLoggedInUser: ACCOUNT, loggedInUsers: [ACCOUNT] }));
+  const before = `${CONFIG_HEADER}{ "firstLaunchAt": "2026-11-09" }\n`;
+  writeCopilotConfig(path.join(dataDir, "copilot-home"), before);
+
+  const result = await runPromptModeTurn(workDir, { prompt: "Fix it.", write: true, env });
+
+  assert.equal(result.status, 0);
+  assert.equal(fs.readFileSync(pluginConfigFile(dataDir), "utf8"), before);
+});
+
+test("a plugin Copilot config that cannot be written stops a read-only run before Copilot starts", async () => {
+  const { workDir, dataDir, userHome, env, runs } = setUp("ok");
+  writeCopilotConfig(userHome, JSON.stringify({ lastLoggedInUser: ACCOUNT, loggedInUsers: [ACCOUNT] }));
+  // A folder that is not empty cannot be replaced by a rename on any platform.
+  fs.mkdirSync(path.join(pluginConfigFile(dataDir), "inside"), { recursive: true });
+
+  await assert.rejects(runPromptModeTurn(workDir, { prompt: "x", env }));
+  const auth = await getCopilotAuthStatus(".", { env });
+
+  assert.equal(auth.loggedIn, false);
+  assert.equal(auth.requiresGithubAuth, null);
+  assert.notEqual(auth.detail, "not logged in");
+  assert.deepEqual(runs(), []);
+  assert.deepEqual(fs.readdirSync(path.join(dataDir, "copilot-home")), ["config.json"]);
 });
 
 test("a read-only run stops when Copilot starts a tool it does not allow", async () => {

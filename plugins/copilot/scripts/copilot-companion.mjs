@@ -228,7 +228,7 @@ async function buildSetupReport(cwd, actionsTaken = []) {
     nextSteps.push("Run `!copilot login`.");
     nextSteps.push("If browser login is blocked, retry with `!copilot login --device-code`.");
     nextSteps.push(
-      "On a system without a credential store, `copilot login` saves the token in a file that the plugin cannot read. Set `COPILOT_GITHUB_TOKEN` to a fine-grained token with the \"Copilot Requests\" permission instead."
+      "If `copilot login` asked to store the token in a plaintext config file (no system keychain), the plugin cannot read that token. Then set `COPILOT_GITHUB_TOKEN` to a fine-grained token with the \"Copilot Requests\" permission instead."
     );
   }
   if (!config.stopReviewGate) {

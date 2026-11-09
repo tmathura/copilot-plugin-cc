@@ -62,8 +62,9 @@ stopped.
 - Finished jobs are removed by the plugin, as above. You do not need to delete them.
 - Copilot keeps a session for every review and every task. Reviews and read-only tasks keep their
   sessions in the plugin's own Copilot folder (`copilot-home`). When no job runs, you can delete
-  that whole folder. It holds no login: Copilot reads the login from the credential store, the
-  GitHub CLI or a token variable.
+  that whole folder. It holds no token: only the names of your logged-in accounts, which the
+  plugin copies from your own Copilot folder again at the next run. Copilot reads the token from
+  the credential store, the GitHub CLI or a token variable.
 - Tasks with `--write` keep their sessions in your own Copilot folder (`~/.copilot`), with your
   other Copilot sessions.
 
