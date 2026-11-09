@@ -27,8 +27,14 @@ The Copilot CLI needs Node.js 22 or later. A WinGet install also works: the plug
 
 Copilot finds a login in one of these places:
 
-- A login from `copilot login` (or `/login` in an interactive session). It is kept in the system
-  credential store.
+- A login from `copilot login` (or `/login` in an interactive session). The token is kept in the
+  system credential store. Copilot also writes the names of the logged-in accounts (`host` and
+  `login`) in `config.json` in your own Copilot folder (`~/.copilot`, or `$COPILOT_HOME`), and some
+  Copilot versions find the token only through these names. So before each review, read-only task
+  and login check, the plugin copies these names into its own Copilot folder (see "Permission
+  profiles"). It copies only the `host` and `login` of each account, never a token or another
+  field. When your file has no names, the plugin removes them from its copy, so a logout or an
+  account switch counts at the next run.
 - The GitHub CLI login from `gh auth login`.
 - A token variable. Copilot reads `COPILOT_GITHUB_TOKEN`, then `GH_TOKEN`, then `GITHUB_TOKEN`. Use a
   fine-grained token with the "Copilot Requests" permission. Classic `ghp_` tokens do not work.
@@ -44,10 +50,13 @@ use `!copilot login --device-code`.
 
 ### Systems without a credential store
 
-When `copilot login` finds no credential store, it saves the token in a file in your own Copilot
+When `copilot login` finds no credential store, it asks "System keychain unavailable. Store token
+in plaintext config file? (y/N)". On yes, it saves the token in `config.json` in your own Copilot
 folder (`~/.copilot`). Reviews and read-only tasks run with the plugin's own Copilot folder (see
-"Permission profiles"), so they cannot read that file. On such a system, set `COPILOT_GITHUB_TOKEN`
-in the environment that starts Claude Code instead.
+"Permission profiles"), and the plugin never copies a token there, so they cannot use that login.
+If `copilot login` asked you this, set `COPILOT_GITHUB_TOKEN` in the environment that starts Claude
+Code instead. The plugin cannot see where Copilot kept the token, so setup gives this step with
+every "not logged in".
 
 ### Your own model provider (BYOK)
 
@@ -71,6 +80,9 @@ environment.
 
 - The plugin's own Copilot folder has no trusted folders, hooks, saved approvals or MCP servers of
   yours. So the hooks and MCP servers of the repo under review do not start.
+- From your own Copilot folder, the plugin copies only the names of the logged-in accounts into
+  its `config.json` (see "Log in"), and keeps the other keys that Copilot wrote there. On macOS and
+  Linux that file is readable only by you. A write run does not change it.
 - If Copilot starts any other tool in a read-only run, the plugin stops the run and reports the tool.
 - The plugin never passes `--allow-all-tools`, `--allow-all`, `--yolo` or `--allow-all-paths`.
 

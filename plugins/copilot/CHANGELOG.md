@@ -2,6 +2,17 @@
 
 ## Copilot plugin
 
+### 1.0.26
+
+- Setup, reviews and read-only tasks now find a `copilot login` whose token is in the system
+  credential store on systems where Copilot finds it only through the account names in its own
+  `config.json`, such as Linux with GNOME Keyring and Copilot CLI 1.0.105. Before, setup said
+  "not logged in". Before each such run, the plugin copies the `host` and `login` of each
+  logged-in account from your own Copilot folder into its own one, never a token, and removes them
+  there after a logout.
+- When Copilot is not logged in, the setup step about `COPILOT_GITHUB_TOKEN` now says when it
+  applies: when `copilot login` asked to store the token in a plaintext config file.
+
 ### 1.0.25
 
 - On Windows, a review no longer names the untracked files behind a directory junction. Git for

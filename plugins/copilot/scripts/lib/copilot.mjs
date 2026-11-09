@@ -3,7 +3,8 @@
 // no session transfer and no thread list, so the latest task comes from the plugin's job state, never
 // a review gate job; the login check is one tiny read-only prompt, and a caller can start Copilot
 // inside its own locked step; a task's session name has a space in place of each character that
-// Copilot CLI refuses.
+// Copilot CLI refuses; a read-only run first copies the logged-in account names, never a token, into
+// the plugin's Copilot folder.
 /**
  * @typedef {import("./prompt-mode-protocol").PromptModeEvent} PromptModeEvent
  * @typedef {import("./prompt-mode-protocol").ResultEvent} ResultEvent
@@ -25,13 +26,15 @@
  */
 import crypto from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
+import { isDeepStrictEqual } from "node:util";
 
 import { readJsonFile } from "./fs.mjs";
 import { CopilotPromptModeClient, runShortCommand } from "./prompt-mode.mjs";
 import { resolveLauncher } from "./process.mjs";
-import { ensurePluginDataDir, hasPendingStop, listJobs, resolvePluginDataDir } from "./state.mjs";
+import { ensurePluginDataDir, hasPendingStop, listJobs, resolvePluginDataDir, writeFileAtomic } from "./state.mjs";
 
 const TASK_THREAD_PREFIX = "Copilot Companion Task";
 const DEFAULT_CONTINUE_PROMPT =
@@ -179,6 +182,64 @@ export function buildCopilotEnv(options = {}) {
     ...withoutEnvVars(env, [...SCRUBBED_ENV_VARS, "COPILOT_HOME"]),
     COPILOT_HOME: resolveCopilotHome(env)
   };
+}
+
+// Copilot starts its config.json with whole-line comments, so the file is not plain JSON. Returns
+// null for a file that cannot be read, and a null config for one that is not a JSON object.
+function readCopilotConfig(file) {
+  let lines;
+  try {
+    lines = fs.readFileSync(file, "utf8").split(/\r?\n/);
+  } catch {
+    return null;
+  }
+  const isComment = (line) => line.trimStart().startsWith("//");
+  const headerEnd = lines.findIndex((line) => !isComment(line));
+  const header = lines.slice(0, headerEnd < 0 ? lines.length : headerEnd);
+  try {
+    const value = JSON.parse(lines.filter((line) => !isComment(line)).join("\n"));
+    return { header, config: value && typeof value === "object" && !Array.isArray(value) ? value : null };
+  } catch {
+    return { header, config: null };
+  }
+}
+
+// Field by field, so that no token or other field can come along.
+function pickAccount(entry) {
+  return typeof entry?.host === "string" && typeof entry?.login === "string"
+    ? { host: entry.host, login: entry.login }
+    : null;
+}
+
+function pickLoggedInAccounts(config) {
+  const accounts = {};
+  const last = pickAccount(config?.lastLoggedInUser);
+  if (last) {
+    accounts.lastLoggedInUser = last;
+  }
+  const users = Array.isArray(config?.loggedInUsers) ? config.loggedInUsers.map(pickAccount).filter(Boolean) : [];
+  if (users.length > 0) {
+    accounts.loggedInUsers = users;
+  }
+  return accounts;
+}
+
+// Copilot finds a login in the system credential store through the account names in its own
+// config.json. The plugin's folder gets those names from the user's folder, and loses them on a logout.
+function copyLoggedInAccounts(copilotHome, env) {
+  const userHome = env.COPILOT_HOME || path.join(os.homedir(), ".copilot");
+  const accounts = pickLoggedInAccounts(readCopilotConfig(path.join(userHome, "config.json"))?.config);
+  const file = path.join(copilotHome, "config.json");
+  const current = readCopilotConfig(file);
+  const { lastLoggedInUser, loggedInUsers, ...rest } = current?.config ?? {};
+  const copied = Object.fromEntries(
+    Object.entries({ lastLoggedInUser, loggedInUsers }).filter(([, value]) => value !== undefined)
+  );
+  if (isDeepStrictEqual(copied, accounts)) {
+    return;
+  }
+  const text = [...(current?.header ?? []), JSON.stringify({ ...rest, ...accounts }, null, 2)].join("\n");
+  writeFileAtomic(file, `${text}\n`);
 }
 
 export function buildCopilotArgs(options = {}) {
@@ -438,6 +499,7 @@ async function runCopilotTurn(cwd, options = {}) {
   if (!write) {
     ensurePluginDataDir(options.env);
     fs.mkdirSync(env.COPILOT_HOME, { recursive: true, mode: 0o700 });
+    copyLoggedInAccounts(env.COPILOT_HOME, options.env ?? process.env);
   }
   const args = buildCopilotArgs({
     write,

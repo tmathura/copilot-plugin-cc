@@ -92,7 +92,27 @@ test("setup without a login names copilot login and the token variable", () => {
   assert.equal(payload.ready, false);
   assert.equal(payload.auth.detail, "not logged in");
   assert.ok(payload.nextSteps.includes("Run `!copilot login`."));
-  assert.ok(payload.nextSteps.some((step) => step.includes("`COPILOT_GITHUB_TOKEN`")));
+  // Worded as a case the user can check, because the plugin cannot see where Copilot keeps the token.
+  assert.ok(
+    payload.nextSteps.some((step) => step.startsWith("If `copilot login` asked to store the token in a plaintext config file") && step.includes("`COPILOT_GITHUB_TOKEN`"))
+  );
+});
+
+test("the login check copies the accounts from ~/.copilot when COPILOT_HOME is not set", () => {
+  const home = makeTempDir();
+  const dataDir = makeTempDir();
+  fs.mkdirSync(path.join(home, ".copilot"));
+  const account = { host: "https://github.com", login: "octo" };
+  fs.writeFileSync(
+    path.join(home, ".copilot", "config.json"),
+    `// This file is managed automatically.\n${JSON.stringify({ lastLoggedInUser: account, loggedInUsers: [account] })}\n`
+  );
+
+  const payload = parsePayload(runSetup("ok", { env: { HOME: home, USERPROFILE: home, CLAUDE_PLUGIN_DATA: dataDir } }).result);
+
+  assert.equal(payload.ready, true);
+  const copied = JSON.parse(fs.readFileSync(path.join(dataDir, "copilot-home", "config.json"), "utf8"));
+  assert.deepEqual(copied, { lastLoggedInUser: account, loggedInUsers: [account] });
 });
 
 test("setup gives no login steps when the check fails for another reason", () => {

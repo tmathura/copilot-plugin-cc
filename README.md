@@ -372,13 +372,16 @@ environment that starts Claude Code. See [docs/configuration.md](docs/configurat
 - Setup reads your own model provider (BYOK) from the `COPILOT_PROVIDER_*` variables. Codex reads
   its provider from its config file.
 - When Copilot is not logged in, setup also suggests `!copilot login --device-code` for a blocked
-  browser flow, and `COPILOT_GITHUB_TOKEN` for a system without a credential store.
+  browser flow, and `COPILOT_GITHUB_TOKEN` when `copilot login` stored the token in a plaintext
+  config file.
 - Setup checks the login with one small read-only prompt, which counts toward your Copilot usage. Copilot
   has no other way to report a login. Codex reads the account from its app server.
 - Reviews and read-only tasks run with the plugin's own Copilot folder (`COPILOT_HOME`) and only
   Copilot's read tools. So the repo's hooks and MCP servers, and your own saved approvals, do not
   apply. The plugin also removes `COPILOT_ALLOW_ALL` from Copilot's environment. A read-only run
-  that starts any other tool is stopped.
+  that starts any other tool is stopped. Before each such run, the plugin copies the names of your
+  logged-in accounts (`host` and `login`, never a token) into that folder, because some Copilot
+  versions find a login in the credential store only through these names.
 - A helper command, such as `git`, that is stopped by a signal counts as failed. Codex counts it as
   a success (exit code 0).
 - When the companion is stopped with `SIGTERM` or `SIGINT`, it first stops its Copilot process and

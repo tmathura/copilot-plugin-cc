@@ -441,15 +441,19 @@ function readTextFile(filePath, lockFile, deadline) {
 }
 
 // A reader must never see half a file, and a failed write must keep the old one.
-function writeJsonAtomic(filePath, value, deadline) {
+export function writeFileAtomic(filePath, text, deadline) {
   const tempFile = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
   try {
-    fs.writeFileSync(tempFile, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+    fs.writeFileSync(tempFile, text, { encoding: "utf8", mode: 0o600 });
     retryOnWindows(() => fs.renameSync(tempFile, filePath), isBusyFileError, deadline);
   } catch (error) {
     fs.rmSync(tempFile, { force: true });
     throw error;
   }
+}
+
+function writeJsonAtomic(filePath, value, deadline) {
+  writeFileAtomic(filePath, `${JSON.stringify(value, null, 2)}\n`, deadline);
 }
 
 function writeStateFile(cwd, state, deadline) {
