@@ -256,6 +256,16 @@ test("a read-only run copies only the host and login of the logged-in accounts i
   }
 });
 
+test("on Windows the user's Copilot folder is found under any letter case of COPILOT_HOME", { skip: process.platform !== "win32" && "names keep their case outside Windows" }, async () => {
+  const { workDir, dataDir, userHome, env } = setUp("ok");
+  const { COPILOT_HOME: _, ...rest } = env;
+  writeCopilotConfig(userHome, JSON.stringify({ lastLoggedInUser: ACCOUNT }));
+
+  await runPromptModeTurn(workDir, { prompt: "x", env: { ...rest, Copilot_Home: userHome } });
+
+  assert.deepEqual(readPluginConfig(dataDir), { lastLoggedInUser: ACCOUNT });
+});
+
 test("the plugin's Copilot folder follows an account switch, and loses the accounts when the user's config has none", async () => {
   const { workDir, dataDir, userHome, env } = setUp("ok");
   const pluginHome = path.join(dataDir, "copilot-home");

@@ -82,7 +82,7 @@ environment.
   yours. So the hooks and MCP servers of the repo under review do not start.
 - From your own Copilot folder, the plugin copies only the names of the logged-in accounts into
   its `config.json` (see "Log in"), and keeps the other keys that Copilot wrote there. On macOS and
-  Linux that file is readable only by you. A write run does not change it.
+  Linux the plugin writes that file readable only by you. A write run does not change it.
 - If Copilot starts any other tool in a read-only run, the plugin stops the run and reports the tool.
 - The plugin never passes `--allow-all-tools`, `--allow-all`, `--yolo` or `--allow-all-paths`.
 
