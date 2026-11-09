@@ -227,8 +227,7 @@ function pickLoggedInAccounts(config) {
 // Copilot finds a login in the system credential store through the account names in its own
 // config.json. The plugin's folder gets those names from the user's folder, and loses them on a logout.
 function copyLoggedInAccounts(copilotHome, env) {
-  const homeKey = Object.keys(env).find((key) => (process.platform === "win32" ? key.toUpperCase() : key) === "COPILOT_HOME");
-  const userHome = (homeKey && env[homeKey]) || path.join(os.homedir(), ".copilot");
+  const userHome = env.COPILOT_HOME || path.join(os.homedir(), ".copilot");
   const accounts = pickLoggedInAccounts(readCopilotConfig(path.join(userHome, "config.json"))?.config);
   const file = path.join(copilotHome, "config.json");
   const current = readCopilotConfig(file);

@@ -47,22 +47,22 @@ copy, both compare equal (`{}`), so nothing is written.
 - `tests/copilot.test.mjs` "the plugin's Copilot folder follows an account switch, and loses the accounts when the user's config has none" — a switch over two runs; no keys, a missing file, a folder in its place, a broken file, a root that is not an object, and a `loggedInUsers` that is not a list.
 - `tests/copilot.test.mjs` "the plugin's Copilot config is written only when its accounts change" — nothing written with nothing to copy; a new file holds only the accounts; the same accounts in Copilot's own formatting cause no rewrite; a broken plugin file is replaced.
 - `tests/copilot.test.mjs` "a write run does not touch the plugin's Copilot config".
-- `tests/copilot.test.mjs` "on Windows the user's Copilot folder is found under any letter case of COPILOT_HOME" (added in review round 1; skipped outside Windows).
 - `tests/copilot.test.mjs` "a plugin Copilot config that cannot be written stops a read-only run before Copilot starts" — no Copilot run, no temp file left, and the login check reports the error with no login steps.
 - `tests/runtime-setup.test.mjs` "the login check copies the accounts from ~/.copilot when COPILOT_HOME is not set" — a setup run with `HOME` and `USERPROFILE` set to a temp folder.
 - `tests/runtime-setup.test.mjs` "setup without a login names copilot login and the token variable" — the step is worded as a condition.
 
 ## Local Verification
 
-- Commands run: `npm run build` → passed; `node --test tests/copilot.test.mjs tests/runtime-setup.test.mjs` → 44 passed, 2 skipped (POSIX-only, on Windows). After review round 1: `npm test` → 525 tests, 483 passed, 0 failed, 42 skipped.
+- Commands run: `npm run build` → passed; `node --test tests/copilot.test.mjs tests/runtime-setup.test.mjs` → 44 passed, 2 skipped (POSIX-only, on Windows). After review round 2: `npm test` → 524 tests, 482 passed, 0 failed, 42 skipped.
 - Manual checks: none. The Linux keyring case needs the reporter's system.
 
 ## Deviations from Assessment
 
-- 2026-11-09, review round 1: on Windows, the caller's `COPILOT_HOME` is found under any letter
-  case of its name, as `buildCopilotEnv` already treats it, because Windows treats environment
-  names without case. Outside Windows the name must match exactly. Test: "on Windows the user's
-  Copilot folder is found under any letter case of COPILOT_HOME" in `tests/copilot.test.mjs`.
+- 2026-11-09, review round 1: on Windows, the caller's `COPILOT_HOME` was found under any letter
+  case of its name, with a Windows-only test. Rejected in review round 2 and taken out: every
+  real caller passes the companion's own `process.env` (the review gate starts the companion as a
+  child process), and on Windows `process.env` already ignores letter case. So the lookup reads
+  `env.COPILOT_HOME`, as the assessment says.
 - 2026-11-09, review round 1: `docs/configuration.md` now says the plugin writes its
   `config.json` readable only by you, not that the file always is: Copilot may write it with its
   own mode.
