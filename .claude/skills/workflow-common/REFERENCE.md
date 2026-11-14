@@ -698,6 +698,8 @@ Before a run, read every record:
    `fail` or `unsure` row, a missing step, a table that cannot be read, or no such comment is no
    proof: the release waits for the owner. If a `gh` call fails, run it once more. If it fails
    again, stop and report it, as for `gh release view` above: write no record and no `hold:` line.
+   That stop is for Setup. When "Record" makes this check for a record it reads, a `gh` call that
+   fails twice has the result that "Record" gives instead.
 
    When the table is the proof, write no record, change no record and add no `hold:` line.
 2. Write the record. The three paths are the release worktree `$WT_ROOT/release-X.Y.Z`, the
