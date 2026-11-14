@@ -619,7 +619,14 @@ A record is finished when it has no `hold:` line (the owner removes it), its cle
 - its result is `failed` and it names a fix ticket. When the failed version was itself a release
   fix ("Result"), it also needs the line `checked by owner`;
 - it has the line `checked by owner`. The owner adds it when nothing more is to be done, for
-  example for a version the owner decides not to publish.
+  example for a version the owner decides not to publish;
+- it has no paths, its result is `waits`, and the "A release exists" case of Setup step 1 finds
+  nothing to run for its version, because the run table is the proof ("Table as proof" there).
+  Use the PR and the merge commit that the record names; a record that does not name them is
+  not finished. Check this each time you read the record, and leave the record as it is. If a
+  `gh` call fails twice (`gh release view`: for another reason than "release not found"), the
+  record counts as not finished for this read. Report the query error as the cause, not a task
+  for the owner.
 
 A record with no paths (no run happened: "Where", or a release found by Setup step 1) has the
 cleanup state `closed` from the start and needs no table.
@@ -653,12 +660,15 @@ Before a run, read every record:
      the run early). A query error is no fault in the release, so write no record and no `hold:`
      line: the next run asks again.
    - A release exists: there is nothing to run when it is not a draft, its tag points to the merge
-     commit, and the record for vX.Y.Z is finished ("Record") with the result `published` or the
-     line `checked by owner`. A finished `failed` record without `checked by owner` does not
-     count: a failed version gets no release. Versions up to 1.0.12 (by version order) were
-     released before release-run records existed: for them only the record is not needed; the
-     release must still be no draft with its tag on the merge commit. In every other case, the
-     release waits for the owner.
+     commit, and one of these is true:
+     - the record for vX.Y.Z is finished ("Record") with the result `published` or the line
+       `checked by owner`. A finished `failed` record without `checked by owner` does not count:
+       a failed version gets no release;
+     - the run table on the PR is the proof ("Table as proof", below);
+     - the version is 1.0.12 or lower (by version order). Those versions were released before
+       release-run records existed, so they need no record.
+
+     In every other case, the release waits for the owner.
    - No release exists: claim the version by creating the record, in a way that fails when it
      exists: `mkdir -p "$WT_ROOT"`, then `(set -o noclobber; : > "$WT_ROOT/release-run-X.Y.Z.md")`. Only one run can claim a
      version. If the create fails, touch no path and no record, and report it to the owner: the
@@ -666,13 +676,32 @@ Before a run, read every record:
      made.
 
    When a release exists and waits for the owner, report it, and keep the hold for later runs:
-   - no record: create one with the `noclobber` command above, with the result `waits` and no
-     paths;
+   - no record: create one with the `noclobber` command above. It names the PR and the merge
+     commit, and has the result `waits` and no paths;
    - a finished record: append the line `hold: <what is wrong>` to it;
    - a record that is not finished: it already blocks later runs, so only report it.
 
    The owner clears the hold by completing the record by hand until it is finished, for example
-   with `checked by owner`.
+   with `checked by owner`. "Record" also says when a record with no paths is finished with no
+   change by the owner.
+
+   **Table as proof.** The record is not in git, so a checkout that did not do the run has no
+   record of it. The run table on the merged PR is then the proof that the run passed. This
+   applies only when no run happened in this checkout: it has no record for vX.Y.Z, or it has one
+   with no paths, the result `waits` and no `hold:` line. A record of a run that happened here
+   keeps its meaning.
+
+   Find the comment with the query in "Table" (the owner's login, the whole first line
+   `Release run vX.Y.Z`; the newest one, if there are several). Read its body with
+   `gh api repos/tmathura/copilot-plugin-cc/issues/comments/<id> --jq .body`. The table is the
+   proof when it has one row for each step in "Steps", and the result of each row is `pass`. A
+   `fail` or `unsure` row, a missing step, a table that cannot be read, or no such comment is no
+   proof: the release waits for the owner. If a `gh` call fails, run it once more. If it fails
+   again, stop and report it, as for `gh release view` above: write no record and no `hold:` line.
+   That stop is for Setup. When "Record" makes this check for a record it reads, a `gh` call that
+   fails twice has the result that "Record" gives instead.
+
+   When the table is the proof, write no record, change no record and add no `hold:` line.
 2. Write the record. The three paths are the release worktree `$WT_ROOT/release-X.Y.Z`, the
    throwaway repo `$WT_ROOT/release-repo-X.Y.Z` and the data folder `$WT_ROOT/release-data-X.Y.Z`.
    Check that none of them exists; any folder that exists, also an empty one, did not come from
