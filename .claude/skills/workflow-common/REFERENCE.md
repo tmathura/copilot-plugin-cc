@@ -624,7 +624,9 @@ A record is finished when it has no `hold:` line (the owner removes it), its cle
   nothing to run for its version, because the run table is the proof ("Table as proof" there).
   Use the PR and the merge commit that the record names; a record that does not name them is
   not finished. Check this each time you read the record, and leave the record as it is. If a
-  `gh` call fails twice, stop and report the query error, as "Table as proof" says.
+  `gh` call fails twice (`gh release view`: for another reason than "release not found"), the
+  record counts as not finished for this read. Report the query error as the cause, not a task
+  for the owner.
 
 A record with no paths (no run happened: "Where", or a release found by Setup step 1) has the
 cleanup state `closed` from the start and needs no table.
@@ -674,8 +676,8 @@ Before a run, read every record:
      made.
 
    When a release exists and waits for the owner, report it, and keep the hold for later runs:
-   - no record: create one with the `noclobber` command above, with the result `waits` and no
-     paths;
+   - no record: create one with the `noclobber` command above. It names the PR and the merge
+     commit, and has the result `waits` and no paths;
    - a finished record: append the line `hold: <what is wrong>` to it;
    - a record that is not finished: it already blocks later runs, so only report it.
 
