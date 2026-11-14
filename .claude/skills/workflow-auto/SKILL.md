@@ -84,8 +84,8 @@ or a `gh` query error) is not lost:
 3. Run `gh release view vX.Y.Z`. "Release not found" means no release (the branches below). Any
    other failure: try once more, then stop and report it.
    - A release exists: apply the "A release exists" case of Setup step 1 in REFERENCE.md, with
-     this commit as the merge commit and the PR from point 2 as its PR. When it says the release waits for the owner, keep the hold
-     as it says, report it, and stop the run.
+     this commit as the merge commit and the PR from point 2 as its PR. When it says the release
+     waits for the owner, keep the hold as it says, report it, and stop the run.
    - No release and no record: when the commit date (`git log -1 --format=%cI <sha>`) is more
      than 2 hours old, do the release run for this commit and PR before the queue (the "Publish
      the release" row below applies, also its `--ask-merge` question before publishing). A newer one

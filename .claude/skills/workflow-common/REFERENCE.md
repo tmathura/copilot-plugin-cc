@@ -620,9 +620,11 @@ A record is finished when it has no `hold:` line (the owner removes it), its cle
   fix ("Result"), it also needs the line `checked by owner`;
 - it has the line `checked by owner`. The owner adds it when nothing more is to be done, for
   example for a version the owner decides not to publish;
-- it has no paths, its result is `waits`, and the release of its version needs no run because
-  the run table on its PR is the proof (Setup step 1, "Table as proof"). The record names the PR
-  and the merge commit. Check this each time you read the record, and leave the record as it is.
+- it has no paths, its result is `waits`, and the "A release exists" case of Setup step 1 finds
+  nothing to run for its version, because the run table is the proof ("Table as proof" there).
+  The record names the PR and the merge commit. Leave the record as it is. A proof that held
+  once in this session holds for the session. If the check cannot be made (a `gh` call fails
+  twice), the record is not finished.
 
 A record with no paths (no run happened: "Where", or a release found by Setup step 1) has the
 cleanup state `closed` from the start and needs no table.
@@ -678,7 +680,8 @@ Before a run, read every record:
    - a record that is not finished: it already blocks later runs, so only report it.
 
    The owner clears the hold by completing the record by hand until it is finished, for example
-   with `checked by owner`.
+   with `checked by owner`. A record with no paths and no `hold:` line is also finished once the
+   run table on the PR is the proof ("Table as proof", below).
 
    **Table as proof.** The record is not in git, so a checkout that did not do the run has no
    record of it. The run table on the merged PR is then the proof that the run passed. This
