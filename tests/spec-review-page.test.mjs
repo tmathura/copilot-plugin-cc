@@ -318,6 +318,40 @@ test("a relative spec path through a linked parent folder (a committed specs lin
   assert.ok(!fs.existsSync(path.join(outside, "105-x", "review.html")));
 });
 
+function repoWithSpecifySpec() {
+  const repo = makeTempDir("spec-review-page-test-");
+  const spec = path.join(".specify", "specs", "105-x");
+  fs.mkdirSync(path.join(repo, spec), { recursive: true });
+  fs.writeFileSync(path.join(repo, spec, "spec.md"), SPEC_MD);
+  return { repo, spec };
+}
+
+test("a spec folder under .specify/specs builds, and the page is written there", { skip }, () => {
+  const { repo, spec } = repoWithSpecifySpec();
+  const result = buildFrom(repo, spec, GOOD);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /missing anchors: 0/);
+  const page = fs.readFileSync(path.join(repo, spec, "review.html"), "utf8");
+  assert.ok(page.includes('<span id="spec-md-L3">Café — the first claim.</span>'));
+});
+
+test("a spec path through a linked .specify/specs folder is refused", { skip }, (t) => {
+  const { repo, spec } = repoWithSpecifySpec();
+  const outside = makeTempDir("spec-review-page-test-");
+  const parent = path.join(repo, ".specify", "specs");
+  fs.renameSync(parent, path.join(outside, "specs"));
+  try {
+    fs.symlinkSync(path.join(outside, "specs"), parent, "junction");
+  } catch {
+    t.skip("this system cannot make a folder link");
+    return;
+  }
+  const result = buildFrom(repo, spec, GOOD);
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /\.specify[\\/]specs is a link/);
+  assert.ok(!fs.existsSync(path.join(outside, "specs", "105-x", "review.html")));
+});
+
 test("a relative spec path with '..' and no link builds", { skip }, () => {
   const ctx = makeSpec({ "spec.md": SPEC_MD });
   const sub = path.join(ctx.dir, "sub");

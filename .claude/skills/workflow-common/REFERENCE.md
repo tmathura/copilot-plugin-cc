@@ -69,7 +69,7 @@ WT_ROOT="$MAIN/.claude/worktrees"                                               
 | Branch | `<type>/<n>-<slug>`, lowercase. The type is `bugfix` if the issue has the `bug` label, otherwise `feature`. | `feature/12-copilot-review-polling` |
 | Slug | 3 to 5 words from the issue title, kebab-case, ASCII only | `copilot-review-polling` |
 | Worktree folder | `$WT_ROOT/<type>-<n>-<slug>` | `.claude/worktrees/feature-12-copilot-review-polling` |
-| Planning folder | `specs/NNN-<name>/` or `.specify/bugs/NNN-<slug>/`. `NNN` is the issue number padded to 3 digits ("Folder names" in the repo's `docs/development.md`). | `.specify/bugs/016-quoted-untracked-file-names/` |
+| Planning folder | `.specify/specs/NNN-<name>/` or `.specify/bugs/NNN-<slug>/`. `NNN` is the issue number padded to 3 digits ("Folder names" in the repo's `docs/development.md`). | `.specify/bugs/016-quoted-untracked-file-names/` |
 | Commit subject | `[#<n>] Imperative description`, 72 characters at most, no full stop at the end | `[#12] Poll for the Copilot review` |
 | Commit trailer | a blank line, then the `Co-Authored-By:` line that Claude Code gives for this session. Leave it out if there is none. Do not write a model name from memory. | |
 | PR title | the commit subject format, for the whole change | `[#12] Poll for the Copilot review` |
@@ -109,7 +109,7 @@ When the repo gets tooling, add the commands here. Do not guess them in the step
 - Use Spec Kit only if `$MAIN/.specify/` exists and `command -v specify` finds the CLI.
 - The order is `/speckit-specify`, then `/speckit-clarify` if the spec has open questions, then
   `/speckit-plan`, `/speckit-tasks` and `/speckit-analyze`.
-- Specs go in `specs/NNN-<name>/` (see "Naming"). `.specify/feature.json` points to the current spec. It is per
+- Specs go in `.specify/specs/NNN-<name>/` (see "Naming"). `.specify/feature.json` points to the current spec. It is per
   checkout and gitignored.
 - Spec Kit does not create branches. `workflow-branch` does.
 - `/speckit-specify`, `/speckit-plan` and `/speckit-tasks` rewrite their files and lose earlier
@@ -131,17 +131,17 @@ the file test in "Is this ticket a release?" below.
 - A plugin change never uses plan mode. For it, the planning-mode question chooses only between
   bug triage and the spec flow.
 - Give the issue its type label ("Tickets" in the repo's `docs/development.md`) before the branch is made.
-- **Folder line:** the issue body ends with `Spec: specs/NNN-<name>/` or
+- **Folder line:** the issue body ends with `Spec: .specify/specs/NNN-<name>/` or
   `Bug notes: .specify/bugs/NNN-<slug>/`. When you plan in Step 1, `workflow-ticket` adds it.
   When you plan in the worktree for an issue that already exists, add it yourself: append it to the
   body from `gh issue view <n> -R tmathura/copilot-plugin-cc --json body --jq .body` in a scratchpad
   file, then `gh issue edit <n> -R tmathura/copilot-plugin-cc --body-file <file>`.
-- On resume, plugin work with no `.specify/bugs/NNN-<slug>/` or `specs/NNN-<name>/` in the branch: stop
+- On resume, plugin work with no `.specify/bugs/NNN-<slug>/` or `.specify/specs/NNN-<name>/` in the branch: stop
   and ask. A plan-mode ticket that grows into plugin files: stop and ask.
-- **Spec flow:** pass the folder: `/speckit-specify SPECIFY_FEATURE_DIRECTORY=specs/NNN-<name>
-  <description>` when the issue exists, or `specs/<name>` in Step 1, before the issue exists
+- **Spec flow:** pass the folder: `/speckit-specify SPECIFY_FEATURE_DIRECTORY=.specify/specs/NNN-<name>
+  <description>` when the issue exists, or `.specify/specs/<name>` in Step 1, before the issue exists
   (`workflow-ticket` adds the number). In Step 1, first check that no untracked
-  `$MAIN/specs/<name>/` exists. Then run
+  `$MAIN/.specify/specs/<name>/` exists. Then run
   `/speckit-clarify` if needed, `/speckit-plan`, `/speckit-tasks` and `/speckit-analyze`. The plan
   for the review loop is `spec.md`, `plan.md` and `tasks.md`. In a worktree, check that
   `.specify/feature.json` exists after specify.
@@ -234,7 +234,7 @@ new evidence is checked again: the text it points at changed, it names a new cas
 asks for the change. If you cannot tell, check it again.
 
 **Spec review page.** It applies to the ticket's own planning folder, the one in the issue's `Spec:`
-or `Bug notes:` line (a spec folder `specs/NNN-<name>/`, or a bug folder `.specify/bugs/NNN-<slug>/`),
+or `Bug notes:` line (a spec folder `.specify/specs/NNN-<name>/`, or a bug folder `.specify/bugs/NNN-<slug>/`),
 when a commit changed a Markdown file in it: in a review round, any commit of the round (a Codex
 and Copilot round inside a PR review loop round, step 4 there, is part of that round); otherwise
 the commit itself, such as the commit of `workflow-manual` Step 6 or of a spec sweep made outside a
@@ -566,7 +566,7 @@ Decide in Step 4, from the files the ticket changes:
 | The PR changes | Release? |
 | --- | --- |
 | Anything under `plugins/copilot/`, or `.claude-plugin/marketplace.json` | Yes. Claude Code updates an installed plugin by its version, so a shipped change with no new version can stay unseen by users. |
-| Only files outside those: `docs/`, `specs/`, `tests/`, `.github/`, `.specify/`, `.claude/`, `scripts/`, `package.json`, `package-lock.json`, `tsconfig.*.json`, `README.md`, `CLAUDE.md`, `UPSTREAM.md`, `NOTICE`, `.gitignore`, `.gitattributes` | No. These are not part of the installed plugin. |
+| Only files outside those: `docs/`, `tests/`, `.github/`, `.specify/`, `.claude/`, `scripts/`, `package.json`, `package-lock.json`, `tsconfig.*.json`, `README.md`, `CLAUDE.md`, `UPSTREAM.md`, `NOTICE`, `.gitignore`, `.gitattributes` | No. These are not part of the installed plugin. |
 
 For a release, pick the level by what users see (SemVer, as the constitution says):
 

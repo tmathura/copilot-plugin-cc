@@ -75,7 +75,7 @@ record with LF. This difference is part of the README entry.
 - `plugins/copilot/scripts/lib/prompt-mode.mjs`
 - `tests/fake-copilot-fixture.mjs` (an env switch that ends event lines with CRLF, added to the fake's list of passed variables next to `FAKE_COPILOT_ANSWER`; the separators already pass through `FAKE_COPILOT_ANSWER`)
 - `tests/prompt-mode.test.mjs` (the chunk, late-output and partial-line cases use small inline scripts, as its existing stop tests do, because the fake writes each event in one `write`)
-- No other doc: no doc names readline; `specs/005-copilot-plugin-port/call-site-map.md` maps `handleLine` and `handleChunk` to upstream and stays true (and is history)
+- No other doc: no doc names readline; `.specify/specs/005-copilot-plugin-port/call-site-map.md` maps `handleLine` and `handleChunk` to upstream and stays true (and is history)
 - `README.md` "Differences from the Codex plugin" (a correctness difference from upstream)
 - `plugins/copilot/CHANGELOG.md` and the version files (patch release)
 

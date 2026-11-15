@@ -149,7 +149,7 @@ def markdown_files(spec: pathlib.Path) -> tuple[list[pathlib.Path], str | None]:
     walk stops at the first link before it goes into one: a link can point outside the folder (such
     as at a .env), loop back into it, or show a folder twice."""
     # A link on the way to the folder leads elsewhere as much as one inside it, for example a
-    # committed specs/ link. Every part below the current folder (the repo root, where the
+    # committed .specify/specs link. Every part below the current folder (the repo root, where the
     # workflow runs) is checked, which also covers ".." through a link in a relative path. Folders
     # above it can be system links (macOS /var) and are not the repo's, so they are not checked;
     # ".." in an absolute path is refused, because the system resolves it through a link.

@@ -100,7 +100,7 @@ reclaim file exists.
 - `plugins/copilot/CHANGELOG.md` and the version files (patch release 1.0.20)
 - `docs/operations.md`: one sentence that names the reclaim files a killed process leaves, and that
   they are not a stuck lock (it gives no advice to delete a lock file today). The spec folder
-  `specs/005-copilot-plugin-port/` mentions the old error, but a merged spec folder is history
+  `.specify/specs/005-copilot-plugin-port/` mentions the old error, but a merged spec folder is history
   (constitution, Implementation-to-Spec Consistency).
 
 **Tests to add or update**:

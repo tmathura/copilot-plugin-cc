@@ -56,7 +56,7 @@ Step 9's readiness checks and `--match-head-commit` still apply.
   ask which planning mode to use, with the one the rule picks marked (Recommended): **Bug triage**
   / **Spec flow** if it touches the plugin, otherwise **Claude plan mode**. Plan once, in the
   worktree, with the issue text. With Spec Kit, the folder has the issue number from the start
-  (`slug=NNN-<slug>` or `SPECIFY_FEATURE_DIRECTORY=specs/NNN-<name>`), and you add its `Bug notes:` or
+  (`slug=NNN-<slug>` or `SPECIFY_FEATURE_DIRECTORY=.specify/specs/NNN-<name>`), and you add its `Bug notes:` or
   `Spec:` line to the issue (REFERENCE.md "Planning mode"). Run the blind plan, write the
   Constitution Check, and run the Codex and Copilot loop on the merged plan, as in Step 1, before the
   code.
@@ -123,7 +123,7 @@ Draft the ticket from the plan: its title, body and one type label, as "Tickets"
 `docs/development.md` says, with the `## Plan comparison` section. Pass the type label to
 `workflow-ticket` apart from the body, not as a line in it.
 
-With Spec Kit, also pass the planning folder (`specs/<name>/` or `.specify/bugs/<slug>/`, still
+With Spec Kit, also pass the planning folder (`.specify/specs/<name>/` or `.specify/bugs/<slug>/`, still
 without the issue number). `workflow-ticket` adds the number to the folder and the `Spec:` or
 `Bug notes:` line to the issue.
 

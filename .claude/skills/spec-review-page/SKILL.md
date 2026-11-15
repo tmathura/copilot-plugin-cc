@@ -1,6 +1,6 @@
 ---
 name: spec-review-page
-description: Build a one-page reading companion for a Spec Kit spec folder (specs/NNN-<name>/) or a bug triage folder (.specify/bugs/NNN-<slug>/) so a reviewer can judge it without reading every Markdown file. Writes review.html into the spec folder with the change in one screen, what moved since the last read, two or three mechanism diagrams, a few worked examples, what breaks for consumers, a short list of things to check, and the source files embedded with line-cited claims. Use when asked to make a spec easier to review, to build or refresh the review page, or after a spec has been updated and needs re-reviewing. Invoke with an optional spec directory, for example "/spec-review-page specs/NNN-<name>".
+description: Build a one-page reading companion for a Spec Kit spec folder (.specify/specs/NNN-<name>/) or a bug triage folder (.specify/bugs/NNN-<slug>/) so a reviewer can judge it without reading every Markdown file. Writes review.html into the spec folder with the change in one screen, what moved since the last read, two or three mechanism diagrams, a few worked examples, what breaks for consumers, a short list of things to check, and the source files embedded with line-cited claims. Use when asked to make a spec easier to review, to build or refresh the review page, or after a spec has been updated and needs re-reviewing. Invoke with an optional spec directory, for example "/spec-review-page .specify/specs/NNN-<name>".
 allowed-tools: Read, Glob, Grep, Bash, Write
 ---
 
@@ -10,7 +10,7 @@ One HTML page that lets a reviewer decide on a spec in about ten minutes. It con
 duplicate. Nothing on the page asks the reviewer for input.
 
 It works for both kinds of planning folder that the ticket workflow commits: a spec folder
-`specs/NNN-<name>/` (spec flow) and a bug folder `.specify/bugs/NNN-<slug>/` (bug triage, with
+`.specify/specs/NNN-<name>/` (spec flow) and a bug folder `.specify/bugs/NNN-<slug>/` (bug triage, with
 `assessment.md`, `fix.md` and `test.md`). "Spec folder" below means either.
 
 The page is a plain file, `review.html`, written into the spec folder next to the Markdown it
@@ -45,15 +45,15 @@ Rules that came from reviewer feedback. Do not relax them.
 
 1. If a spec directory was given, use it. Otherwise `git rev-parse --abbrev-ref HEAD`, take `<n>`
    from the branch `<type>/<n>-<slug>`, pad it to 3 digits (`printf '%03d' <n>`) and glob
-   `specs/NNN-*` and `.specify/bugs/NNN-*` (no trailing `/`). If nothing matches, or more than one
-   folder matches, ask for the path. The ticket number `<n>` for step 4 is the
+   `.specify/specs/NNN-*` and `.specify/bugs/NNN-*` (no trailing `/`). If nothing matches, or more
+   than one folder matches, ask for the path. The ticket number `<n>` for step 4 is the
    folder's `NNN` without its leading zeros, because the folder carries the issue number. A folder
-   with no number yet (`specs/<name>/`, before the issue exists) takes `<n>` from the branch; if
-   there is none, ask. Before you read any file in it, check that no folder on the way to it, nor
-   the folder, nor anything in it is a link. For `specs/NNN-<name>`:
-   `find specs "<spec dir>" -maxdepth 0 -type l` and `find "<spec dir>" -type l` both print
-   nothing; for `.specify/bugs/NNN-<slug>` the first command is
-   `find .specify .specify/bugs "<spec dir>" -maxdepth 0 -type l`; for a folder elsewhere, list
+   with no number yet (`.specify/specs/<name>/`, before the issue exists) takes `<n>` from the
+   branch; if there is none, ask. Before you read any file in it, check that no folder on the way
+   to it, nor the folder, nor anything in it is a link. For `.specify/specs/NNN-<name>`:
+   `find .specify .specify/specs "<spec dir>" -maxdepth 0 -type l` and
+   `find "<spec dir>" -type l` both print nothing; for `.specify/bugs/NNN-<slug>` the first
+   command is `find .specify .specify/bugs "<spec dir>" -maxdepth 0 -type l`; for a folder elsewhere, list
    every folder on its path in the first command. Write the
    paths without a trailing `/`, or `find` follows a linked folder and prints nothing. A link can point at a file outside
    the folder, such as a `.env`, and reading it would put its text in the page. If it prints
