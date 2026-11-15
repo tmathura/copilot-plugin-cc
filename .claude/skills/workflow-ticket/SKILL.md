@@ -70,11 +70,12 @@ which, and do not create the issue.
    - For a spec, also look for the root form of the path. Spec Kit's templates can write the path
      with no `.specify/` in front, as `specs/<name>` or `/specs/<name>`. An earlier run can have
      left it as `specs/NNN-<name>` or `/specs/NNN-<name>`. The root-form `grep` below prints each
-     line that holds one. Change only the text that this `grep` matches, one line at a time: the
-     path, with its leading `/` if it has one, becomes `.specify/specs/NNN-<name>`. The form
+     line that holds one. In each line it prints, change only the root-form path itself: from its
+     leading `/` (if it has one) to the end of the name, it becomes `.specify/specs/NNN-<name>`.
+     Leave the characters around it, and any other path in the line, as they are. The form
      counts only where a path starts: the character before it (before the leading `/`, if it has
-     one) is not a letter, a digit, `.`, `_`, `-` or `/`. It has the same limit on what follows
-     the name. So `.specify/specs/NNN-<name>`, `docs/specs/<name>` and `specs/<name>-two` are not
+     one) is not a letter, a digit, `.`, `_`, `-` or `/`. And the name is not followed by a
+     letter, a digit or `-`. So `.specify/specs/NNN-<name>`, `docs/specs/<name>` and `specs/<name>-two` are not
      this form, and a path that already has `.specify/` in front never gets a second one.
    - Check the result. If a check fails, fix the files and check again.
      - No old path is left. This prints nothing: `grep -rnE '\.specify/specs/<name>([^A-Za-z0-9-]|$)'
