@@ -62,14 +62,17 @@ which, and do not create the issue.
    - `mv "$MAIN/.specify/specs/<name>" "$MAIN/.specify/specs/NNN-<name>"` (or the same in `$MAIN/.specify/bugs/`).
    - With the file tools, change each place in its files that names the folder to the numbered
      name: every `.specify/specs/<name>` (or `.specify/bugs/<slug>`) that is not followed by a letter, a
-     digit or `-`, so that a longer name that starts the same is left alone; the `Slug` line in
+     digit or `-`, so that a longer name that starts the same is left alone; a spec path that
+     Spec Kit's templates wrote without `.specify/` in front (`specs/<name>`), which becomes
+     `.specify/specs/NNN-<name>`; the `Slug` line in
      `assessment.md`; and the
      `**Feature Branch**` line in `spec.md` and the `**Branch**` line in `plan.md`, if they hold the
      bare name. For a spec, write `{"feature_directory": ".specify/specs/NNN-<name>"}` to
      `$MAIN/.specify/feature.json`.
    - Check the result. If a check fails, fix the files and check again.
-     - No old path is left. This prints nothing: `grep -rnE '\.specify/specs/<name>([^A-Za-z0-9-]|$)'
-       "$MAIN/.specify/specs/NNN-<name>"` (for a bug: `'\.specify/bugs/<slug>([^A-Za-z0-9-]|$)'` in
+     - No old path is left. This prints nothing: `grep -rnE '(^|[^A-Za-z0-9-])specs/<name>([^A-Za-z0-9-]|$)'
+       "$MAIN/.specify/specs/NNN-<name>"` (it finds the path with and without `.specify/` in
+       front; for a bug: `'\.specify/bugs/<slug>([^A-Za-z0-9-]|$)'` in
        `"$MAIN/.specify/bugs/NNN-<slug>"`).
      - The new names are set. For a bug, `assessment.md` has the line `- **Slug**: NNN-<slug>`. For
        a spec, a `**Feature Branch**` or `**Branch**` line that held the bare name now holds

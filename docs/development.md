@@ -153,9 +153,9 @@ Things to know:
 - Specs live in `.specify/specs/NNN-<name>/`, where `NNN` is the issue number ("Folder names",
   below). Always pass the folder: `.specify/specs/NNN-<name>`, or `.specify/specs/<name>` while
   the issue does not exist yet. Without it, `/speckit-specify` still writes to `specs/` at the
-  repo root, because its text is a managed file that this repo does not edit. It also takes the
-  highest number in `specs/` plus one, which is not the issue number. In a worktree, check that
-  `.specify/feature.json` exists after it.
+  repo root, because its text is a managed file that this repo does not edit. It also numbers
+  the folder itself, from 001 when that folder is empty, which is not the issue number. In a
+  worktree, check that `.specify/feature.json` exists after it.
 - `.specify/feature.json` points to the current spec. Each checkout has its own copy, and git ignores
   it. A new or resumed worktree has none, so `/speckit-plan`, `/speckit-analyze` and
   `/speckit-implement` fail with "Feature directory not found". To fix it, write
