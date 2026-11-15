@@ -171,6 +171,6 @@ only the repo.
   becomes no limit. Tests use it to force the patch folder.
 - Untracked files keep one `untracked.md` file. Their text is also in the prompt in both modes, so
   splitting it gives Copilot nothing new.
-- The port spec `specs/005-copilot-plugin-port/` has merged, so it is history and is not updated
+- The port spec `.specify/specs/005-copilot-plugin-port/` has merged, so it is history and is not updated
   (constitution, "Implementation-to-Spec Consistency"). The issue asks for research §2 and the
   call-site map there to be updated. This spec and the README record the change instead.

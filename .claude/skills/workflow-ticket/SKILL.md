@@ -18,7 +18,7 @@ approved draft, or when the draft has no type label, more than one, or one that 
 `bug` or `enhancement`.
 
 It can also name a Spec Kit planning folder in the main checkout that has no issue number yet:
-`specs/<name>/` or `.specify/bugs/<slug>/`.
+`.specify/specs/<name>/` or `.specify/bugs/<slug>/`.
 
 To finish step 4 after it stopped (a resume), pass the existing issue (`#<n>`) and the planning
 folder by its name without the number, as first given, instead of a draft. Then skip steps 1 to 3,
@@ -59,27 +59,27 @@ which, and do not create the issue.
      `mv`, and do the rest.
    - Otherwise check that the folder is untracked (`git -C "$MAIN" ls-files <folder>` prints
      nothing) and that `NNN-<name>` (or `NNN-<slug>`) does not exist. If not, stop and report.
-   - `mv "$MAIN/specs/<name>" "$MAIN/specs/NNN-<name>"` (or the same in `$MAIN/.specify/bugs/`).
+   - `mv "$MAIN/.specify/specs/<name>" "$MAIN/.specify/specs/NNN-<name>"` (or the same in `$MAIN/.specify/bugs/`).
    - With the file tools, change each place in its files that names the folder to the numbered
-     name: every `specs/<name>` (or `.specify/bugs/<slug>`) that is not followed by a letter, a
+     name: every `.specify/specs/<name>` (or `.specify/bugs/<slug>`) that is not followed by a letter, a
      digit or `-`, so that a longer name that starts the same is left alone; the `Slug` line in
      `assessment.md`; and the
      `**Feature Branch**` line in `spec.md` and the `**Branch**` line in `plan.md`, if they hold the
-     bare name. For a spec, write `{"feature_directory": "specs/NNN-<name>"}` to
+     bare name. For a spec, write `{"feature_directory": ".specify/specs/NNN-<name>"}` to
      `$MAIN/.specify/feature.json`.
    - Check the result. If a check fails, fix the files and check again.
-     - No old path is left. This prints nothing: `grep -rnE 'specs/<name>([^A-Za-z0-9-]|$)'
-       "$MAIN/specs/NNN-<name>"` (for a bug: `'\.specify/bugs/<slug>([^A-Za-z0-9-]|$)'` in
+     - No old path is left. This prints nothing: `grep -rnE '\.specify/specs/<name>([^A-Za-z0-9-]|$)'
+       "$MAIN/.specify/specs/NNN-<name>"` (for a bug: `'\.specify/bugs/<slug>([^A-Za-z0-9-]|$)'` in
        `"$MAIN/.specify/bugs/NNN-<slug>"`).
      - The new names are set. For a bug, `assessment.md` has the line `- **Slug**: NNN-<slug>`. For
        a spec, a `**Feature Branch**` or `**Branch**` line that held the bare name now holds
-       `NNN-<name>`, and `$MAIN/.specify/feature.json` holds `specs/NNN-<name>`.
+       `NNN-<name>`, and `$MAIN/.specify/feature.json` holds `.specify/specs/NNN-<name>`.
    - Set the folder line in the issue. Read the current body
      (`gh issue view <n> -R tmathura/copilot-plugin-cc --json body --jq .body`) into
      `<scratchpad>/issue-body.md`. If the command fails or the body is empty, stop and report: never
-     edit the issue from a body you could not read. The expected line is `Spec: specs/NNN-<name>/`
+     edit the issue from a body you could not read. The expected line is `Spec: .specify/specs/NNN-<name>/`
      or `Bug notes: .specify/bugs/NNN-<slug>/`. A folder line is a line that starts with `Spec:`
-     or `Bug notes:` and holds a `specs/` or `.specify/bugs/` path; compare lines without a trailing
+     or `Bug notes:` and holds a `.specify/specs/` or `.specify/bugs/` path; compare lines without a trailing
      `\r` or spaces. Leave every other line alone. Count the folder lines first:
      - more than one: stop and report;
      - one, equal to the expected line and already the last non-blank line: nothing to change;

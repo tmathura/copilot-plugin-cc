@@ -5,7 +5,7 @@ description: "Tasks for #108: give Copilot reviews the whole diff of a large cha
 
 # Tasks: Give Copilot reviews the whole diff of a large change
 
-**Input**: Design documents from `specs/108-copilot-reviews-whole-diff/`
+**Input**: Design documents from `.specify/specs/108-copilot-reviews-whole-diff/`
 
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/review-input.md
 

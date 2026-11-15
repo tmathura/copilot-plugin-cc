@@ -109,7 +109,7 @@ different runs, so the test compares only what was read.
 
 ## §4 The port spec
 
-- **Decision**: do not edit `specs/005-copilot-plugin-port/`. Record the change here and in the
+- **Decision**: do not edit `.specify/specs/005-copilot-plugin-port/`. Record the change here and in the
   README section "Differences from the Codex plugin".
 - **Rationale**: the issue asks for research §2 and the call-site map in spec 005 to be updated, but
   spec 005 has merged, and the constitution ("Implementation-to-Spec Consistency") says a merged

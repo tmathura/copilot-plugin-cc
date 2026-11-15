@@ -146,8 +146,8 @@ Why: the owner follows upstream releases. An upstream change must land in the sa
 
 ### Implementation-to-Spec Consistency (non-negotiable)
 
-- Every session reads the feature's spec folder (`specs/NNN-<name>/`) first. While the feature is
-  being built, the folder MUST describe the feature as it is being built.
+- Every session reads the feature's spec folder (`.specify/specs/NNN-<name>/`) first. While the
+  feature is being built, the folder MUST describe the feature as it is being built.
 - When the work departs from any file in the spec folder, in scope, approach, a decision, a count or
   the shape of a test, those files MUST be updated in the same commit as the code, before the PR is
   pushed.
@@ -166,4 +166,4 @@ Why: the owner follows upstream releases. An upstream change must land in the sa
 Why: the agent trusts the spec folder at the start of each session. A decision changed in one file
 only leaves stale copies in the others, and reviews then find them one at a time.
 
-**Version**: 3.1.0 | **Ratified**: 2026-10-08 | **Last Amended**: 2026-10-20
+**Version**: 3.1.1 | **Ratified**: 2026-10-08 | **Last Amended**: 2026-11-15

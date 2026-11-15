@@ -24,8 +24,9 @@ scripts/bump-version.mjs          sets and checks the version in every manifest
 tests/                            node --test suites, helpers and the fake copilot CLI
 UPSTREAM.md                       last upstream commit checked, and the status of later changes
 docs/                             architecture, configuration, operations, conventions, workflow
-specs/005-copilot-plugin-port/    the port spec: transport decision, call-site map, plan, tasks
 .specify/                         Spec Kit: constitution, templates, scripts, the bug extension, bug notes
+.specify/specs/                   the spec folders; 005-copilot-plugin-port is the port spec:
+                                  transport decision, call-site map, plan, tasks
 .claude/skills/speckit-*          Spec Kit skills (managed, do not edit)
 .claude/skills/workflow-*         the ticket workflow skills (written for this repo, edit as normal)
 .claude/skills/spec-review-page   builds review.html, a one-page reading aid, in a spec or bug folder

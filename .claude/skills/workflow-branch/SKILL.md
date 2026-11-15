@@ -22,7 +22,7 @@ with the `MAIN=` and `WT_ROOT=` lines from REFERENCE.md, and run git as `git -C 
    If not, stop.
 2. **Check the main checkout.** It must be on `main`, and
    `git -C "$MAIN" status --porcelain --untracked-files=no` must be empty. If not, stop and report.
-   Untracked `specs/NNN-<name>/` and `.specify/bugs/NNN-<slug>/` from Spec Kit planning are expected.
+   Untracked `.specify/specs/NNN-<name>/` and `.specify/bugs/NNN-<slug>/` from Spec Kit planning are expected.
 3. **Fetch:** `git -C "$MAIN" fetch origin`.
 4. **Does the branch exist already?** Check `git -C "$MAIN" branch --list "<branch>"`,
    `git -C "$MAIN" ls-remote --heads origin "<branch>"` and `git -C "$MAIN" worktree list`. If it
@@ -44,7 +44,7 @@ with the `MAIN=` and `WT_ROOT=` lines from REFERENCE.md, and run git as `git -C 
    the first push.
 6. **Copy `.env`** if the main checkout has one and the worktree does not.
 7. **Move Spec Kit files** (only when this ticket's Spec Kit planning ran in the main checkout and
-   its files are still untracked there; skip this step when planning runs in the worktree). Move `specs/NNN-<name>/` and
+   its files are still untracked there; skip this step when planning runs in the worktree). Move `.specify/specs/NNN-<name>/` and
    `.specify/feature.json`, or `.specify/bugs/NNN-<slug>/`, from `$MAIN` to the same paths in the
    worktree. The path is the one in the issue body's `Spec:` or `Bug notes:` line, which
    `workflow-ticket` added. Move only an untracked folder (`git -C "$MAIN" ls-files <folder>`

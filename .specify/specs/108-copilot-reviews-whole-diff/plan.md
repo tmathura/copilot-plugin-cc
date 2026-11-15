@@ -2,7 +2,7 @@
 
 **Branch**: `feature/108-copilot-reviews-whole-diff` | **Date**: 2026-10-21 | **Spec**: [spec.md](spec.md)
 
-**Input**: Feature specification from `specs/108-copilot-reviews-whole-diff/spec.md`
+**Input**: Feature specification from `.specify/specs/108-copilot-reviews-whole-diff/spec.md`
 
 ## Summary
 
@@ -54,7 +54,7 @@ No principle is "not met". Re-check after Phase 1: unchanged.
 ### Documentation (this feature)
 
 ```text
-specs/108-copilot-reviews-whole-diff/
+.specify/specs/108-copilot-reviews-whole-diff/
 ├── plan.md
 ├── research.md
 ├── data-model.md
