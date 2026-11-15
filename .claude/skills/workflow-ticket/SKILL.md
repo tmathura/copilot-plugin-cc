@@ -68,7 +68,8 @@ which, and do not create the issue.
      bare name. For a spec, write `{"feature_directory": ".specify/specs/NNN-<name>"}` to
      `$MAIN/.specify/feature.json`.
    - For a spec, also look for the root form of the path. Spec Kit's templates can write the path
-     as `specs/<name>` or `/specs/<name>`, with no `.specify/` in front. Change it to
+     as `specs/<name>` or `/specs/<name>`, with no `.specify/` in front. An earlier run can have
+     left it as `specs/NNN-<name>`. Change each of these to
      `.specify/specs/NNN-<name>`, with no `/` in front. This form counts only where the path
      starts there: the text before it is not a letter, a digit, `.`, `_`, `-` or `/`. It has the
      same limit on what follows the name. So `.specify/specs/<name>`, `docs/specs/<name>` and

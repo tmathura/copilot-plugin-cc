@@ -182,8 +182,9 @@ digits, as Spec Kit pads its own numbers: `.specify/specs/NNN-<name>/` and `.spe
   number. As soon as the issue is created, add the number:
   1. Rename the folder to `NNN-<name>` or `NNN-<slug>`.
   2. In its files, replace the old folder path with the new one. For a spec, also change a path
-     that Spec Kit's templates wrote as `specs/<name>`, with no `.specify/` in front, to
-     `.specify/specs/NNN-<name>`. In `assessment.md`, also set the `Slug` line to `NNN-<slug>`.
+     that Spec Kit's templates wrote as `specs/<name>` or `/specs/<name>`, with no `.specify/` in
+     front, to `.specify/specs/NNN-<name>`, with no `/` in front. In `assessment.md`, also set
+     the `Slug` line to `NNN-<slug>`.
   3. For a spec, write the new path to `.specify/feature.json`.
 
   `workflow-ticket` does these steps.
