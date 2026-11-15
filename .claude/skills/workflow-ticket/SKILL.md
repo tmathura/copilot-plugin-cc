@@ -62,18 +62,23 @@ which, and do not create the issue.
    - `mv "$MAIN/.specify/specs/<name>" "$MAIN/.specify/specs/NNN-<name>"` (or the same in `$MAIN/.specify/bugs/`).
    - With the file tools, change each place in its files that names the folder to the numbered
      name: every `.specify/specs/<name>` (or `.specify/bugs/<slug>`) that is not followed by a letter, a
-     digit or `-`, so that a longer name that starts the same is left alone; a spec path that
-     Spec Kit's templates wrote without `.specify/` in front (`specs/<name>`), which becomes
-     `.specify/specs/NNN-<name>`; the `Slug` line in
+     digit or `-`, so that a longer name that starts the same is left alone; the `Slug` line in
      `assessment.md`; and the
      `**Feature Branch**` line in `spec.md` and the `**Branch**` line in `plan.md`, if they hold the
      bare name. For a spec, write `{"feature_directory": ".specify/specs/NNN-<name>"}` to
      `$MAIN/.specify/feature.json`.
+   - For a spec, also look for the root form of the path. Spec Kit's templates can write the path
+     as `specs/<name>` or `/specs/<name>`, with no `.specify/` in front. Change it to
+     `.specify/specs/NNN-<name>`, with no `/` in front. This form counts only where the path
+     starts there: the text before it is not a letter, a digit, `.`, `_`, `-` or `/`. It has the
+     same limit on what follows the name. So `.specify/specs/<name>`, `docs/specs/<name>` and
+     `specs/<name>-two` are not this form.
    - Check the result. If a check fails, fix the files and check again.
-     - No old path is left. This prints nothing: `grep -rnE '(^|[^A-Za-z0-9-])specs/<name>([^A-Za-z0-9-]|$)'
-       "$MAIN/.specify/specs/NNN-<name>"` (it finds the path with and without `.specify/` in
-       front; for a bug: `'\.specify/bugs/<slug>([^A-Za-z0-9-]|$)'` in
+     - No old path is left. This prints nothing: `grep -rnE '\.specify/specs/<name>([^A-Za-z0-9-]|$)'
+       "$MAIN/.specify/specs/NNN-<name>"` (for a bug: `'\.specify/bugs/<slug>([^A-Za-z0-9-]|$)'` in
        `"$MAIN/.specify/bugs/NNN-<slug>"`).
+     - For a spec, no root form is left. This prints nothing:
+       `grep -rnE '(^|[^A-Za-z0-9._/-])/?specs/(NNN-)?<name>([^A-Za-z0-9-]|$)' "$MAIN/.specify/specs/NNN-<name>"`.
      - The new names are set. For a bug, `assessment.md` has the line `- **Slug**: NNN-<slug>`. For
        a spec, a `**Feature Branch**` or `**Branch**` line that held the bare name now holds
        `NNN-<name>`, and `$MAIN/.specify/feature.json` holds `.specify/specs/NNN-<name>`.
@@ -93,7 +98,8 @@ which, and do not create the issue.
      Only when you changed the body, run `gh issue edit <n> -R tmathura/copilot-plugin-cc
      --body-file "<scratchpad>/issue-body.md"`. On every run, also when nothing changed, read the
      body again and check that it has exactly one folder line, the expected one, as its last
-     non-blank line, and no old unnumbered path (the same `grep -E` pattern as for the files).
+     non-blank line, and no old unnumbered path (the first `grep -E` pattern for the files, the
+     one with `\.specify/` in front).
      If the old path is still in other text of the body, stop and report it; do not edit that text.
    - Print the new folder path. Later steps use it.
    - If this step stops, the issue already exists. Fix the cause, then run this skill again with

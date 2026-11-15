@@ -154,8 +154,9 @@ Things to know:
   below). Always pass the folder: `.specify/specs/NNN-<name>`, or `.specify/specs/<name>` while
   the issue does not exist yet. Without it, `/speckit-specify` still writes to `specs/` at the
   repo root, because its text is a managed file that this repo does not edit. It also numbers
-  the folder itself, from 001 when that folder is empty, which is not the issue number. In a
-  worktree, check that `.specify/feature.json` exists after it.
+  the new folder itself: the highest number in the root `specs/` folder plus one, or 001 when
+  there is none. That is not the issue number. In a worktree, check that `.specify/feature.json`
+  exists after it.
 - `.specify/feature.json` points to the current spec. Each checkout has its own copy, and git ignores
   it. A new or resumed worktree has none, so `/speckit-plan`, `/speckit-analyze` and
   `/speckit-implement` fail with "Feature directory not found". To fix it, write
@@ -180,8 +181,9 @@ digits, as Spec Kit pads its own numbers: `.specify/specs/NNN-<name>/` and `.spe
 - When you plan before the issue exists (step 1 of the ticket workflow), use the name without the
   number. As soon as the issue is created, add the number:
   1. Rename the folder to `NNN-<name>` or `NNN-<slug>`.
-  2. In its files, replace the old folder path with the new one. In `assessment.md`, also set the
-     `Slug` line to `NNN-<slug>`.
+  2. In its files, replace the old folder path with the new one. For a spec, also change a path
+     that Spec Kit's templates wrote as `specs/<name>`, with no `.specify/` in front, to
+     `.specify/specs/NNN-<name>`. In `assessment.md`, also set the `Slug` line to `NNN-<slug>`.
   3. For a spec, write the new path to `.specify/feature.json`.
 
   `workflow-ticket` does these steps.
