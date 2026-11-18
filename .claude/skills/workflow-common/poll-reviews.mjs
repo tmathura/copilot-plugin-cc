@@ -6,7 +6,7 @@
 //   the PR timeline has no copilot_work_started event since the request. Ends the poll at once.
 // --no-copilot: wait for CodeRabbit only (after Copilot dropped a second request for this head).
 //
-// Reviewers (keep in step with the "Bot reviewers" table in REFERENCE.md):
+// Reviewers (keep in step with the "Bot reviewers" table in PR-REVIEW-LOOP.md):
 // - copilot: done when it has a review on the head SHA. Its request time is the later of its newest
 //   review_requested event and the head's first check suite (made at the push), because a dropped
 //   request leaves no event. Both are GitHub times; the 2-minute window uses only the local clock.

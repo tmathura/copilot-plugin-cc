@@ -6,8 +6,8 @@ argument-hint: "[issue number to resume or start from | new]"
 
 # workflow: manual
 
-First read the repo's `.claude/skills/workflow-common/REFERENCE.md`. Read it again after each summary of the conversation. It holds the repo facts, the names,
-the commands and the loop rules. This file does not repeat them.
+First read the repo's `.claude/skills/workflow-common/REFERENCE.md`, as its "Reading these files" says: once, and again after each summary of the conversation or change of checkout. It holds the repo facts, the names,
+the commands and the index of the files with the loop rules. This file does not repeat them.
 
 ## When to ask the user
 
@@ -59,7 +59,8 @@ Step 9's readiness checks and `--match-head-commit` still apply.
   (`slug=NNN-<slug>` or `SPECIFY_FEATURE_DIRECTORY=.specify/specs/NNN-<name>`), and you add its `Bug notes:` or
   `Spec:` line to the issue (REFERENCE.md "Planning mode"). Run the blind plan, write the
   Constitution Check, and run the Codex and Copilot loop on the merged plan, as in Step 1, before the
-  code.
+  code. Read `REVIEW-LOOP.md` before the blind plan. For an issue that touches the plugin, read
+  `BUG-TRIAGE.md` before the planning mode question: it says when bug triage may be offered.
 - **Empty or `new`:** start at Step 1. If no task was described, ask: **Describe and plan
   (Recommended)** / **Give an issue number** / **Abort**.
 
@@ -95,11 +96,11 @@ Track the steps of this run with the session's todo tool, or print a checklist i
 
 Ask which planning mode to use. Mark the mode that REFERENCE.md "Planning mode" picks as
 (Recommended), and give the reason in one line. For a change that touches the plugin, offer only the
-two Spec Kit modes.
+two Spec Kit modes, and read `BUG-TRIAGE.md` before you ask: it says when bug triage may be offered.
 
 Pull `main` in the main checkout (`git -C "$MAIN" pull --ff-only origin main`; if it fails, stop
-and report). Then start the blind plan (REFERENCE.md) with the task description, and plan in the
-chosen mode while it runs; REFERENCE.md says what you may write in the checkout before it ends.
+and report). Read `REVIEW-LOOP.md` before the blind plan. Then start the blind plan (REFERENCE.md)
+with the task description, and plan in the chosen mode while it runs; REFERENCE.md says what you may write in the checkout before it ends.
 Before you show the plan, write the comparison and merge what you take into the plan (Spec Kit files
 by hand). Show the comparison with the plan for approval.
 
@@ -108,13 +109,13 @@ by hand). Show the comparison with the plan for approval.
 - **Spec Kit spec flow**: offer it only when REFERENCE.md "Spec Kit" allows it. Run the skills in
   the main checkout, as REFERENCE.md "Planning mode" says. The spec files stay untracked;
   `workflow-branch` moves them into the worktree.
-- **Spec Kit bug triage**: offer it for a bug, when REFERENCE.md "Bug triage" allows it. Check the
-  slug, then run `/speckit-bug-assess "<symptom>" slug=<slug>` in the main checkout. Write
+- **Spec Kit bug triage** (`BUG-TRIAGE.md`): offer it for a bug, when "Bug triage" there allows
+  it. Check the slug, then run `/speckit-bug-assess "<symptom>" slug=<slug>` in the main checkout. Write
   a Constitution Check at the end of `assessment.md`. The approved plan is `assessment.md` with that
   check.
   The notes stay untracked; `workflow-branch` moves them into the worktree.
 
-Run the Codex and Copilot loop on the approved plan (REFERENCE.md). Before each round, read
+Run the Codex and Copilot loop on the approved plan (`REVIEW-LOOP.md`). Before each round, read
 REFERENCE.md "Checking review findings". A bug triage plan goes in a
 prompt file, as a plan-mode plan does. Apply confirmed findings to the plan. Correct Spec Kit files
 by hand.
@@ -146,8 +147,8 @@ Read the root `CLAUDE.md` in the worktree and the docs it links to. Read
   no branch), and add the comparison to the issue (REFERENCE.md "Blind plan").
 - Before you write code, say in a few lines which files you will change and why.
 - With Spec Kit feature planning, work through `tasks.md` and tick each task when it is done.
-- With bug triage, run `/speckit-bug-fix slug=NNN-<slug>`, then handle its result (REFERENCE.md "Bug
-  triage"). For an upstream port with verdict `invalid`, skip fix and test, and update the
+- With bug triage, read `BUG-TRIAGE.md` before this step. Run `/speckit-bug-fix slug=NNN-<slug>`,
+  then handle its result ("Bug triage" there). For an upstream port with verdict `invalid`, skip fix and test, and update the
   `UPSTREAM.md` row instead.
 - When a decision, a count, the scope, the approach or the shape of a test departs from the spec, do the sweep in
   the repo's `docs/development.md` ("Keeping the spec current") before you commit. Spec files that
@@ -159,15 +160,15 @@ Read the root `CLAUDE.md` in the worktree and the docs it links to. Read
 - When behaviour changes, update the docs in the same change.
 - Decide whether the ticket is a release ("Is this ticket a release?" in REFERENCE.md). Say in one
   line which it is, and for a release the level and why. A release ticket bumps the version and
-  adds its `CHANGELOG.md` entry in this PR.
+  adds its `CHANGELOG.md` entry in this PR; read `RELEASE.md` ("Publishing") before that entry.
 
 ## Step 5. Test
 
 Run the commands from "Commands" in REFERENCE.md. If none are set, say "No build, format or test
 commands are configured" and go on.
 
-With bug triage, then run `/speckit-bug-test slug=NNN-<slug>` and handle its result (REFERENCE.md "Bug
-triage").
+With bug triage, read `BUG-TRIAGE.md` before this step. Then run `/speckit-bug-test slug=NNN-<slug>`
+and handle its result ("Bug triage" there).
 
 If something fails, decide which kind of failure it is **before you touch a test**:
 
@@ -180,7 +181,8 @@ Never hide a timing problem with a sleep or a retry in a test.
 ## Step 6. Commit
 
 Invoke `workflow-commit` with a one-line description of the diff and the list of files this
-ticket changed. With bug triage, the list includes the Markdown files of `.specify/bugs/NNN-<slug>/`,
+ticket changed. With bug triage, read `BUG-TRIAGE.md` before this step (its "Input" rule checks the
+folder before each commit). The list includes the Markdown files of `.specify/bugs/NNN-<slug>/`,
 the path in the issue's `Bug notes:` line. List a planning folder's files by name, not the folder,
 so a `review.html` or a leftover build file is not swept in; the page gets its own commit.
 
@@ -189,8 +191,9 @@ spec review page as "Spec review page" in REFERENCE.md ("Checking review finding
 
 ## Step 7. Review round
 
-Run the code review round (REFERENCE.md) with the plan in the focus text. Before each round, read
-REFERENCE.md "Checking review findings" and "Code review round". A resume at this step
+Read `REVIEW-LOOP.md` before this step. Run the code review round ("Code review round" there) with
+the plan in the focus text. Before each round, read REFERENCE.md "Checking review findings" and
+`REVIEW-LOOP.md` "Code review round". With bug triage, also read `BUG-TRIAGE.md` before this step. A resume at this step
 starts a new round on the current head.
 
 1. The docs check: check the diff against `CLAUDE.md` and the docs it links to. With Spec
@@ -201,9 +204,9 @@ starts a new round on the current head.
    deviations found".
 3. Check the findings of all three together (REFERENCE.md). Fix the confirmed ones by the rules of
    Step 4, and run Step 5 again. With bug triage, a round that changed the fix also updates
-   `fix.md` (REFERENCE.md "Bug triage", Edits). Commit with `workflow-commit`, the description
+   `fix.md` (`BUG-TRIAGE.md`, Edits). Commit with `workflow-commit`, the description
    `Address review round <k>` and a body that gives the outcome of each finding, with the record
-   that REFERENCE.md "Code review round" describes. A round that fixes nothing commits as that
+   that `REVIEW-LOOP.md` "Code review round" describes. A round that fixes nothing commits as that
    section says. After the round commit, build, refresh or remove the spec review page where it applies
    (REFERENCE.md "Checking review findings"). Then run the next round, until the loop ends by its
    rules.
@@ -229,8 +232,9 @@ draft. Read `isDraft` with `gh pr view <n> --json isDraft`, and the comments fro
 
 ## Step 8b. PR review loop
 
-Run the PR review loop (REFERENCE.md) until it ends. Before each round, read REFERENCE.md "Checking
-review findings" and "PR review loop".
+Read `PR-REVIEW-LOOP.md` before this step. Run the PR review loop (there) until it ends. Before each
+round, read REFERENCE.md "Checking review findings" and `PR-REVIEW-LOOP.md` "PR review loop". With
+bug triage, also read `BUG-TRIAGE.md` (a later fix updates `fix.md` and runs the test again).
 
 ## Step 9. Merge (always ask, unless `workflow-auto` answers)
 
@@ -288,14 +292,16 @@ To merge:
 5. Run the "Cleanup" commands in `workflow-branch`. `git branch -D` is safe only after the check
    in point 3. A squash merge makes the branch look unmerged to `git branch -d`.
 6. Run `git -C "$MAIN" pull --ff-only origin main`.
-7. If the PR raised the plugin version, it is a release (see "Release" in REFERENCE.md). Do the
-   release run ("Release run" in REFERENCE.md) on the merge commit, without asking. Only when its
+7. If the PR raised the plugin version, it is a release (see "Is this ticket a release?" in
+   REFERENCE.md). For a release, read `RELEASE.md` before this step. Do the release run ("Release
+   run" there) on the merge commit, without asking. Only when its
    result allows publishing, show the `CHANGELOG.md` summary and the generated notes preview, and
    ask: **Publish (Recommended)** / **Not now**. On **Publish**, run the publish command from
-   REFERENCE.md. Otherwise follow "Result" in "Release run".
+   "Publishing" in `RELEASE.md`. Otherwise follow "Result" in "Release run".
 8. Report the PR URL, the merge commit on `main`, the release URL if there is one, and the fix
-   ticket for a failed release. Report each release run record that is not finished ("Record" in
-   REFERENCE.md), with what it asks of the owner. Report the rounds
+   ticket for a failed release. When a `release-run-*.md` record exists in `$WT_ROOT`, read
+   `RELEASE.md`, and report each release run record that is not finished ("Record" there), with
+   what it asks of the owner. Report the rounds
    of each loop, any rejected findings, and the issue that `Closes #<n>` closed. If the defect also
    exists in codex-plugin-cc and upstream has not fixed it ("Tickets", Upstream), say so. The owner
    reports it upstream, or finds the upstream issue that already reports it. Give the owner the

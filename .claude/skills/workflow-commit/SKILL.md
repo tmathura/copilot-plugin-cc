@@ -6,7 +6,7 @@ argument-hint: "[imperative description] [-- commit body]"
 
 # workflow: commit
 
-First read the repo's `.claude/skills/workflow-common/REFERENCE.md`. Read it again after each summary of the conversation. Follow its "Commit and push rules".
+First read the repo's `.claude/skills/workflow-common/REFERENCE.md`, as its "Reading these files" says: once, and again after each summary of the conversation or change of checkout. Follow its "Commit and push rules".
 
 ## Input
 
@@ -14,31 +14,36 @@ First read the repo's `.claude/skills/workflow-common/REFERENCE.md`. Read it aga
 round, for example, passes its findings and their outcomes as the body.
 
 `--allow-empty` as the first word, before the description, marks a review round commit with no
-change (REFERENCE.md "Code review round"). Then `git status --porcelain` must print nothing: if
-any file is staged, changed or new, stop and report it. Skip step 3, and commit with
-`--allow-empty` in step 6.
+change (`REVIEW-LOOP.md` "Code review round"). Then `git status --porcelain` must print nothing: if
+any file is staged, changed or new, stop and report it. Skip steps 3 and 4, and commit with
+`--allow-empty` in step 7.
 
 ## Steps
 
 1. **Check the branch.** If `git branch --show-current` is `main` or empty, stop. Take `<n>` from the
    branch name `<type>/<n>-<slug>`. If the name does not match, stop and report.
 2. **Look at the changes** with `git status` and `git diff --staged`.
-3. **If nothing is staged:**
+3. **Check bug notes.** When a file under `.specify/bugs/` is staged, read
+   `.claude/skills/workflow-common/BUG-TRIAGE.md` and check the bug folder as its "Input" rule
+   says for a commit of the bug folder.
+4. **If nothing is staged:**
+   - Before you stage a file under `.specify/bugs/` in this step (also a new file), read
+     `BUG-TRIAGE.md` and check the bug folder in the same way as step 3.
    - When `workflow-manual` passed a file list, stage those files by name
      (`git add -- <files>`). Leave any other changed or untracked files alone, and ask whether they
      belong to this ticket.
    - Otherwise ask: **Stage tracked changes with `git add -u` (Recommended)** / **Pick files** /
      **Stop**.
    - If there is nothing to commit at all, say so and stop.
-4. **Write the message.**
+5. **Write the message.**
    - Subject: `[#<n>] <Imperative description>` (see "Naming" in REFERENCE.md). If no description was
      passed, write one from the staged diff.
    - Body: the text after `--`, wrapped at 72 characters. It is optional.
    - Trailer: from "Naming" in REFERENCE.md.
-5. **Ask only if you wrote the description yourself.** Show the message and ask: **Commit
+6. **Ask only if you wrote the description yourself.** Show the message and ask: **Commit
    (Recommended)** / **Edit the subject** / **Stop**. A description that was passed in needs no
    question.
-6. **Commit.** Write the message to `<scratchpad>/commit-msg.txt` with the file tool, not with a
+7. **Commit.** Write the message to `<scratchpad>/commit-msg.txt` with the file tool, not with a
    shell heredoc (a body line that is exactly the heredoc's end word would cut the message):
 
    ```text
@@ -52,6 +57,6 @@ any file is staged, changed or new, stop and report it. Skip step 3, and commit 
    Then run `git commit -F "<scratchpad>/commit-msg.txt"`, or with `--allow-empty`, run
    `git commit --allow-empty -F "<scratchpad>/commit-msg.txt"`.
 
-7. **Check** with `git status` and `git log -1 --oneline`. Report the hash and the subject.
+8. **Check** with `git status` and `git log -1 --oneline`. Report the hash and the subject.
 
 Do not push. `workflow-pr` pushes.

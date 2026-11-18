@@ -71,7 +71,8 @@ How work moves from an idea to `main`. The rules behind these steps are in the
 The `workflow-*` Claude Code skills in `.claude/skills/` run these steps. Start with
 `/workflow-manual`. `/workflow-auto` runs the open tickets, or one, from plan to merge without asking,
 and reports what is not done; which tickets it takes and its options are in its skill. The skills'
-shared rules are in `.claude/skills/workflow-common/REFERENCE.md`.
+shared rules are in `.claude/skills/workflow-common/REFERENCE.md` and the files that its index
+names. Each of those files is read at the step that needs it.
 The skills load only when this repo is open as the project in Claude Code. You can also follow the
 steps by hand.
 
@@ -347,7 +348,7 @@ In the PR that raises the version:
 After the merge, do the release run that the constitution asks for (Principle VI): on the owner's
 system, on a detached checkout of the merge commit, with `claude --plugin-dir` in a throwaway git
 repo. The owner or Claude does it. The steps are in "Release run" in
-`.claude/skills/workflow-common/REFERENCE.md`. Its table (each step, pass, fail or unsure, and a
+`.claude/skills/workflow-common/RELEASE.md`. Its table (each step, pass, fail or unsure, and a
 note) is a comment on the merged PR.
 
 The CI run on the merge commit on `main` must pass too. It is the last step of the release run, so
