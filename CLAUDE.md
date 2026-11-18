@@ -27,6 +27,7 @@ docs/                             architecture, configuration, operations, conve
 .specify/                         Spec Kit: constitution, templates, scripts, the bug extension, bug notes
 .specify/specs/                   the spec folders; 005-copilot-plugin-port is the port spec:
                                   transport decision, call-site map, plan, tasks
+.claude/settings.json             shared Claude Code settings (see "Shared settings")
 .claude/skills/speckit-*          Spec Kit skills (managed, do not edit)
 .claude/skills/workflow-*         the ticket workflow skills (written for this repo, edit as normal)
 .claude/skills/spec-review-page   builds review.html, a one-page reading aid, in a spec or bug folder
@@ -40,3 +41,16 @@ docs/                             architecture, configuration, operations, conve
 | Type check | `npm run build` |
 | Check versions | `npm run check-version` |
 | Validate plugin | `claude plugin validate .` |
+
+## Shared settings
+
+`.claude/settings.json` is tracked, so every clone gets it. It holds two settings:
+
+- `CLAUDE_CODE_AUTO_COMPACT_WINDOW` is `400000`. Claude Code then summarizes the conversation at
+  about 400k tokens. Claude Code caps the value at the model's own context window.
+- A `SessionStart` hook with the matcher `compact` runs after each summary. It prints the rules
+  that tell a workflow session which files to read again, and when a check counts as run.
+
+The hook text is inline in the settings file. Do not move it to a script. A hook runs in the
+session's current folder, so after `EnterWorktree` a relative path can run a PR worktree's copy
+of the script.

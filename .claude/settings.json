@@ -1,0 +1,19 @@
+{
+  "env": {
+    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "400000"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cat <<'EOF'\nAfter-compaction rules of the copilot-plugin-cc ticket workflow.\n\nIf this session does not run workflow-auto, workflow-manual or a step skill that one of them calls, do nothing.\n\nIf it does, the summary can have dropped rules. Do this before you go on with the current step or do anything else in the workflow:\n\n1. Read again .claude/skills/workflow-common/REFERENCE.md and the SKILL.md of the skill whose step you are on (.claude/skills/<skill>/SKILL.md). Under workflow-auto, also read again .claude/skills/workflow-auto/SKILL.md and .claude/skills/workflow-manual/SKILL.md.\n2. Read again the scratchpad files that the current step names. Under workflow-auto, that always includes <scratchpad>/workflow-auto-report.md.\n3. Record a check as run only when you ran it after this compaction, or when the summary quotes its output. A check is one of the commands in REFERENCE.md \"Commands\", a reviewer, a Spec Kit check or a release run step. A result that the summary only restates, such as \"clean\" or \"no findings\", is not its output: run the check again.\nEOF",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
