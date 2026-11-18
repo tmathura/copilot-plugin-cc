@@ -238,10 +238,20 @@ and a new page's snapshot is that commit, not `-wip`), do one of these:
 - **Any other folder:** if it has no `review.html`, build its first page; otherwise refresh the
   page, so that its "What moved" section shows what that round changed. Do steps 1 and 2 below.
 
-1. Run `spec-review-page` on the folder (pass it). The build must print `missing anchors: 0`. A
-   build that fails is a step skill that fails ("Questions to the user"), but ask only **Retry
-   (Recommended)** / **Abort**: a skipped refresh would push a stale page, and the constitution
-   asks for the page to be rebuilt in the same change.
+1. Run `spec-review-page` on the folder in a subagent: an Agent call with `model: sonnet`. A
+   subagent started without `model` runs on the main session's model, and a skill's own `model:`
+   line does not apply inside a subagent, so the Agent call names the model. The prompt gives the
+   folder path and says: build the page with the `spec-review-page` skill
+   (`.claude/skills/spec-review-page/SKILL.md`), do not commit, and report the build's exit code
+   and its line `missing anchors: <n>`; where the skill says to ask, stop and report why. Note
+   `git rev-parse HEAD` before the call. The report must give exit code 0 and
+   `missing anchors: 0` (the build prints the count before it writes the page), and HEAD must not
+   have moved. A build that fails (also a report without these) is a step skill that fails
+   ("Questions to the user"), but ask only **Retry (Recommended)** / **Abort**: a skipped refresh
+   would push a stale page, and the constitution asks for the page to be rebuilt in the same
+   change. Before a retry, put the page back as the noted HEAD has it
+   (`git restore --source=<HEAD> -- <folder>/review.html`, or delete it when that commit has
+   none), so the new build diffs from the same previous page.
 2. Commit the page on its own: `workflow-commit` with the description `Refresh the spec review page`
    and the file list `<folder>/review.html`. This rule is the request to commit that
    `spec-review-page` Step 5 waits for.
