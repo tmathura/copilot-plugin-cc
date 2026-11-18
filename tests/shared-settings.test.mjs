@@ -37,9 +37,9 @@ test("the after-compaction hook names the files to read again and the rule for c
     ".claude/skills/workflow-manual/SKILL.md",
     "<scratchpad>/workflow-auto-report.md",
     "do nothing",
-    "otherwise ask the user",
+    "a ticket that is under neither Done nor Not done. Otherwise do nothing.",
     "only when you ran it after this compaction, or when the summary quotes its output",
-    "Do not run a release run step again"
+    "the release run record decides, not the summary"
   ]) {
     assert.ok(text.includes(part), `missing: ${part}`);
   }
