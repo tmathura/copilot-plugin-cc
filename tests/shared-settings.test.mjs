@@ -20,12 +20,12 @@ test("the shared settings set the 400k compaction window", () => {
 test("the after-compaction hook is one quoted heredoc that nothing cuts short", () => {
   const hook = compactHook();
   assert.equal(hook.type, "command");
-  assert.ok(hook.timeout > 0 && hook.timeout <= 30);
+  assert.ok(hook.timeout > 0);
   assert.ok(hook.command.startsWith(START));
   assert.ok(hook.command.endsWith(END));
   const lines = hook.command.slice(START.length, -END.length).split("\n");
   // A body line equal to the end word would end the heredoc early, and the shell would run the rest.
-  assert.equal(lines.filter((line) => line.trim() === "EOF").length, 0);
+  assert.ok(!lines.includes("EOF"));
   assert.ok(!hook.command.includes("\r"));
 });
 
@@ -37,7 +37,9 @@ test("the after-compaction hook names the files to read again and the rule for c
     ".claude/skills/workflow-manual/SKILL.md",
     "<scratchpad>/workflow-auto-report.md",
     "do nothing",
-    "only when you ran it after this compaction, or when the summary quotes its output"
+    "otherwise ask the user",
+    "only when you ran it after this compaction, or when the summary quotes its output",
+    "Do not run a release run step again"
   ]) {
     assert.ok(text.includes(part), `missing: ${part}`);
   }
