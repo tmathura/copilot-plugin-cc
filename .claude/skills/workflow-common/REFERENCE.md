@@ -244,7 +244,8 @@ and a new page's snapshot is that commit, not `-wip`), do one of these:
    - Before the call, note `git rev-parse HEAD` and `git branch --show-current`. Below, "status"
      is `git status --porcelain --untracked-files=all`. It must print nothing now: the page step
      runs after the last commit, and step 2's `workflow-commit` would commit a staged file or ask
-     about other changed ones. If it prints anything, stop and report it.
+     about other changed ones. If it prints anything, stop and report it. Delete
+     `<scratchpad>/content.html` if it exists, so the build cannot use an earlier fragment.
    - The prompt gives the checkout's absolute path, the folder's path relative to it, and the
      session's scratchpad for the skill's `content.html`. It says to run every command from the
      checkout, and: build the page with the `spec-review-page` skill
@@ -259,7 +260,8 @@ and a new page's snapshot is that commit, not `-wip`), do one of these:
        An answer that stops the build makes it a failed build.
      - Otherwise the build passed only when the report gives exit code 0 and
        `missing anchors: 0` (the build prints the count before it writes the page), and
-       status lists `<folder>/review.html` and no other file, and that file exists.
+       status lists `<folder>/review.html` and no other file, that file exists, and
+       `git diff --cached --quiet` succeeds (nothing is staged).
    - Any other result is a failed build. A failed build is a step skill that fails ("Questions to
      the user"), but ask only **Retry (Recommended)** / **Abort**. A skipped refresh would push a
      stale page, and the constitution asks for the page to be rebuilt in the same change.
