@@ -39,7 +39,9 @@ test("the after-compaction hook names the files to read again and the rule for c
     "If this session does not run workflow-auto, workflow-manual or a step skill that one of them calls, do nothing.",
     "only when you ran it after this compaction, or when the summary quotes its output",
     "Do this before you go on with the current step",
-    "1. Read again .claude/skills/workflow-common/REFERENCE.md",
+    "1. Read again .claude/skills/workflow-common/REFERENCE.md, the SKILL.md of the skill whose step you are on,",
+    "the SKILL.md of each workflow skill that called it",
+    "For a step skill that workflow-manual called, that includes .claude/skills/workflow-manual/SKILL.md.",
     "2. Read again the scratchpad files",
     "is not its output: run the check again.",
     "For a release run step, the proof is its result in the release run record, not the summary"
