@@ -16,7 +16,7 @@ in `.claude/skills/workflow-common/`:
 | `REVIEW-LOOP.md` | "Codex and Copilot review loop", "Background calls", "Code review round" | The start of `workflow-auto` (it finds the reviewers and runs `setup --json`); the blind plan; the plan review; `workflow-manual` Step 7; the PR review loop (the CodeRabbit wait, steps 4 and 5, the end rule); a release run ("Background calls") |
 | `PR-REVIEW-LOOP.md` | "PR review loop", "Bot reviewers" | `workflow-manual` Step 8b |
 | `RELEASE.md` | "Release run", "Publishing" | `workflow-manual` Step 4 of a release ticket (the `CHANGELOG.md` entry), Step 9 point 7 of a release, and Step 9 point 8 when a release run record exists; `workflow-auto` wherever it handles the release run records (its start, before each ticket, after each release run, after a summary, before the stop) and after each merge (step 9, the CI run) |
-| `BUG-TRIAGE.md` | "Bug triage" | Before bug triage is offered or used: `workflow-manual` Step 1, the planning mode question for a bug issue that exists, and Steps 4, 5, 6, 7 and 8b of a bug triage ticket; `workflow-commit` when bug notes are committed; a bug check that the after-compaction hook runs again |
+| `BUG-TRIAGE.md` | "Bug triage" | Before bug triage is offered or used: the planning mode question of a ticket that touches the plugin (`workflow-manual` Step 1, or the start of Step 4 for an issue that exists), and Steps 4, 5, 6, 7 and 8b of a bug triage ticket; `workflow-commit` when bug notes are committed; a bug check that the after-compaction hook runs again |
 
 1. **Read once.** Read this file and each file in the table only if this session has not read it
    since the last of these events: the session start; a summary of the conversation; a pull; a
@@ -34,9 +34,8 @@ in `.claude/skills/workflow-common/`:
    a step of a loop, is followed each time, also when rule 1 would skip the file.
 4. **Fresh readers.** A reviewer prompt or a spawned session reads the files it needs fresh.
 5. **A checkout from before the split.** A worktree whose branch was made before this file was
-   split has no `RELEASE.md` next to its REFERENCE.md. Its REFERENCE.md then holds every section.
-   Where a step names one of the files in the table, read that section in the worktree's
-   REFERENCE.md. A merge of `origin/main` brings in the files (rule 1 then applies).
+   split has no `RELEASE.md` next to its REFERENCE.md. `workflow-manual` Resume, step 4, brings
+   such a worktree up to date before any other step (rule 1 then applies).
 
 ## Repo
 

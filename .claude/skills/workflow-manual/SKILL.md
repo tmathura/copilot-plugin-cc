@@ -59,8 +59,8 @@ Step 9's readiness checks and `--match-head-commit` still apply.
   (`slug=NNN-<slug>` or `SPECIFY_FEATURE_DIRECTORY=.specify/specs/NNN-<name>`), and you add its `Bug notes:` or
   `Spec:` line to the issue (REFERENCE.md "Planning mode"). Run the blind plan, write the
   Constitution Check, and run the Codex and Copilot loop on the merged plan, as in Step 1, before the
-  code. Read `REVIEW-LOOP.md` before the blind plan. For an issue that touches the plugin and fixes
-  a defect, read `BUG-TRIAGE.md` before the planning mode question.
+  code. Read `REVIEW-LOOP.md` before the blind plan. For an issue that touches the plugin, read
+  `BUG-TRIAGE.md` before the planning mode question: it says when bug triage may be offered.
 - **Empty or `new`:** start at Step 1. If no task was described, ask: **Describe and plan
   (Recommended)** / **Give an issue number** / **Abort**.
 
@@ -77,17 +77,14 @@ planning folder.
    `workflow-branch` to add one.
 3. Find where the run stopped from `git status`, `git log origin/main..HEAD` and
    `gh pr view --json number,state,url,reviewDecision,isDraft`. Having no PR is fine.
-4. If the worktree has no `.claude/skills/workflow-common/REFERENCE.md` (its branch was made
-   before the workflow skills were in the repo under these names), bring them in before anything
-   else:
+4. If the worktree has no `.claude/skills/workflow-common/REFERENCE.md` or no
+   `.claude/skills/workflow-common/RELEASE.md` (its branch was made before the workflow skills
+   were in the repo under these names, or before REFERENCE.md was split), bring them in before
+   anything else, and before you read a workflow file there:
    - `git status --porcelain` must be empty. If not, stop and ask.
    - Run `git fetch origin`, then `git merge origin/main`. If the merge stops on a conflict, run
      `git merge --abort`, then stop and report.
-   - Check that the file now exists. If not, stop and report.
-
-   A worktree that has REFERENCE.md but no `RELEASE.md` next to it was made before REFERENCE.md
-   was split. It needs no merge here: REFERENCE.md "Reading these files", rule 5, says where its
-   sections are.
+   - Check that both files now exist. If not, stop and report.
 5. Say in one line where you resume, for example "Resuming #12 at Step 7: 2 commits, no PR yet."
    Then go on from that step. If the work touches the plugin and has no planning notes, stop and ask
    (REFERENCE.md "Planning mode").
@@ -100,7 +97,7 @@ Track the steps of this run with the session's todo tool, or print a checklist i
 
 Ask which planning mode to use. Mark the mode that REFERENCE.md "Planning mode" picks as
 (Recommended), and give the reason in one line. For a change that touches the plugin, offer only the
-two Spec Kit modes.
+two Spec Kit modes, and read `BUG-TRIAGE.md` before you ask: it says when bug triage may be offered.
 
 Pull `main` in the main checkout (`git -C "$MAIN" pull --ff-only origin main`; if it fails, stop
 and report). Read `REVIEW-LOOP.md` before the blind plan. Then start the blind plan (REFERENCE.md)
@@ -113,8 +110,7 @@ by hand). Show the comparison with the plan for approval.
 - **Spec Kit spec flow**: offer it only when REFERENCE.md "Spec Kit" allows it. Run the skills in
   the main checkout, as REFERENCE.md "Planning mode" says. The spec files stay untracked;
   `workflow-branch` moves them into the worktree.
-- **Spec Kit bug triage**: read `BUG-TRIAGE.md` before this step. Offer it for a bug, when "Bug
-  triage" there allows it. Check the
+- **Spec Kit bug triage**: offer it for a bug, when `BUG-TRIAGE.md` "Bug triage" allows it. Check the
   slug, then run `/speckit-bug-assess "<symptom>" slug=<slug>` in the main checkout. Write
   a Constitution Check at the end of `assessment.md`. The approved plan is `assessment.md` with that
   check.
@@ -198,7 +194,7 @@ spec review page as "Spec review page" in REFERENCE.md ("Checking review finding
 
 Read `REVIEW-LOOP.md` before this step. Run the code review round ("Code review round" there) with
 the plan in the focus text. Before each round, read REFERENCE.md "Checking review findings" and
-`REVIEW-LOOP.md` "Code review round". A resume at this step
+`REVIEW-LOOP.md` "Code review round". With bug triage, also read `BUG-TRIAGE.md` before this step. A resume at this step
 starts a new round on the current head.
 
 1. The docs check: check the diff against `CLAUDE.md` and the docs it links to. With Spec
