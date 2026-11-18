@@ -238,10 +238,44 @@ and a new page's snapshot is that commit, not `-wip`), do one of these:
 - **Any other folder:** if it has no `review.html`, build its first page; otherwise refresh the
   page, so that its "What moved" section shows what that round changed. Do steps 1 and 2 below.
 
-1. Run `spec-review-page` on the folder (pass it). The build must print `missing anchors: 0`. A
-   build that fails is a step skill that fails ("Questions to the user"), but ask only **Retry
-   (Recommended)** / **Abort**: a skipped refresh would push a stale page, and the constitution
-   asks for the page to be rebuilt in the same change.
+1. Run `spec-review-page` on the folder in a subagent: an Agent call with `model: sonnet`. A
+   subagent started without `model` runs on the main session's model, and a skill's own `model:`
+   line does not apply inside a subagent, so the Agent call names the model.
+   - Before the call, note `git rev-parse HEAD` and `git branch --show-current`. Below, "status"
+     is `git status --porcelain --untracked-files=all`, and `<folder>` is the folder's path
+     without the `/` at its end. Status must print nothing now: the page step runs after the last
+     commit, and step 2's `workflow-commit` would commit a staged file or ask about other changed
+     ones. If it prints anything, stop and report it. Also stop and report it when
+     `git check-ignore -q -- <folder>/review.html` exits with anything but 1 (1: not ignored). Exit
+     0 means git ignores the page: status would not show it, a retry would delete it, and step 2
+     could not stage it.
+     Delete `<scratchpad>/content.html` if it exists, so the build cannot use an earlier fragment.
+   - The prompt gives the checkout's absolute path, the folder's path relative to it, and the
+     session's scratchpad for the skill's `content.html`. It says to run every command from the
+     checkout, and: build the page with the `spec-review-page` skill
+     (`.claude/skills/spec-review-page/SKILL.md`). Do not stage or commit. Report the build's
+     exit code and its line `missing anchors: <n>`. Where the skill says to ask, stop and report
+     the question.
+   - Wait for the report. Check each report in this order:
+     - If HEAD or the branch changed, or status lists any file but `<folder>/review.html`, do not
+       retry. Stop and report what changed, so that the owner decides what happens to it.
+     - If the report holds a question from the skill, ask the owner that question, as the skill
+       would. Send the answer to the subagent with `SendMessage`, and wait for its next report.
+       An answer that stops the build makes it a failed build.
+     - Otherwise the build passed only when the report gives exit code 0 and
+       `missing anchors: 0` (the build prints the count before it writes the page), and
+       status lists `<folder>/review.html`, that file exists, and `git diff --cached --quiet`
+       succeeds (nothing is staged).
+   - Any other result is a failed build. A failed build is a step skill that fails ("Questions to
+     the user"), but ask only **Retry (Recommended)** / **Abort**. A skipped refresh would push a
+     stale page, and the constitution asks for the page to be rebuilt in the same change.
+   - Before a retry, run the first check of the report again. Then put the page back as the noted
+     HEAD has it, and touch no other file. Run
+     `git ls-tree --name-only <HEAD> -- <folder>/review.html`. If it prints the path, run
+     `git restore --source=<HEAD> --staged --worktree -- <folder>/review.html`. If it prints
+     nothing, run `git rm --cached -f --ignore-unmatch -q -- <folder>/review.html` and delete the
+     file if it exists. If any of these commands fails, stop and report it. The new build then
+     diffs from the same previous page. Then start again at "Before the call".
 2. Commit the page on its own: `workflow-commit` with the description `Refresh the spec review page`
    and the file list `<folder>/review.html`. This rule is the request to commit that
    `spec-review-page` Step 5 waits for.
