@@ -40,7 +40,7 @@ test("the after-compaction hook names the files to read again and the rule for c
     "only when you ran it after this compaction, or when the summary quotes its output",
     "Do this before you go on with the current step",
     "First, if .claude/skills/workflow-common/RELEASE.md does not exist in the current checkout, the checkout is from before the workflow reference was split.",
-    "Before you read anything by rule 1: git status --porcelain must print nothing, git fetch origin must work, and git merge origin/main must end without a conflict (on a conflict, run git merge --abort). If one of these fails, or the file is still missing, stop and report.",
+    "Its REFERENCE.md then holds every section: where a rule below names REVIEW-LOOP.md, PR-REVIEW-LOOP.md, RELEASE.md or BUG-TRIAGE.md, read that section in REFERENCE.md.",
     "1. Read again .claude/skills/workflow-common/REFERENCE.md, the files next to it that the step you are on names (REVIEW-LOOP.md, PR-REVIEW-LOOP.md, RELEASE.md, BUG-TRIAGE.md), the SKILL.md of the skill whose step you are on,",
     "Under workflow-auto, it always includes .claude/skills/workflow-auto/SKILL.md, .claude/skills/workflow-manual/SKILL.md and .claude/skills/workflow-common/RELEASE.md.",
     "Before you run a check again, read the file that holds its rules: BUG-TRIAGE.md for a Spec Kit bug check, REVIEW-LOOP.md or PR-REVIEW-LOOP.md for a reviewer.",

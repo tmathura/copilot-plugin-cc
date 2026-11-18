@@ -1,9 +1,7 @@
 # workflow: bug triage
 
-Moved out of the "Spec Kit" section of `REFERENCE.md`; its "Reading these files" says when to read
-this file. Read at: a bug triage ticket, in `workflow-manual` Step 1, the planning at the start of
-Step 4, and Steps 4, 5, 6, 7 and 8b; `workflow-commit` when bug notes are committed; a bug check
-that the after-compaction hook runs again.
+Moved out of the "Spec Kit" section of `REFERENCE.md`. Its "Reading these files" section says when
+to read this file.
 
 ### Bug triage
 

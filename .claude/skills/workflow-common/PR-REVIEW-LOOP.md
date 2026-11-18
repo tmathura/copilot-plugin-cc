@@ -1,7 +1,6 @@
 # workflow: PR review loop
 
-Moved out of `REFERENCE.md`; its "Reading these files" says when to read this file. Read at:
-`workflow-manual` Step 8b.
+Moved out of `REFERENCE.md`. Its "Reading these files" section says when to read this file.
 
 ## PR review loop
 

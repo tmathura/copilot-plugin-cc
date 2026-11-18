@@ -1,10 +1,7 @@
 # workflow: release run and publishing
 
-Moved out of the "Release" section of `REFERENCE.md`; its "Reading these files" says when to read
-this file. "Is this ticket a release?" stays there. Read at: `workflow-manual` Step 4 of a release
-ticket (the `CHANGELOG.md` entry), Step 9 point 7 of a release, and Step 9 point 8 when a release
-run record exists; `workflow-auto` wherever it handles the release run records, and after each
-merge (step 9, the CI run).
+Moved out of the "Release" section of `REFERENCE.md`. Its "Reading these files" section says when
+to read this file. "Is this ticket a release?" stays there.
 
 ### Release run
 

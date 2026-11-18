@@ -59,8 +59,8 @@ Step 9's readiness checks and `--match-head-commit` still apply.
   (`slug=NNN-<slug>` or `SPECIFY_FEATURE_DIRECTORY=.specify/specs/NNN-<name>`), and you add its `Bug notes:` or
   `Spec:` line to the issue (REFERENCE.md "Planning mode"). Run the blind plan, write the
   Constitution Check, and run the Codex and Copilot loop on the merged plan, as in Step 1, before the
-  code. Read `REVIEW-LOOP.md` before the blind plan and, when bug triage is chosen, `BUG-TRIAGE.md`
-  before `/speckit-bug-assess`.
+  code. Read `REVIEW-LOOP.md` before the blind plan. For an issue that touches the plugin and fixes
+  a defect, read `BUG-TRIAGE.md` before the planning mode question.
 - **Empty or `new`:** start at Step 1. If no task was described, ask: **Describe and plan
   (Recommended)** / **Give an issue number** / **Abort**.
 
@@ -74,17 +74,20 @@ planning folder.
 1. Find the branch: `git -C "$MAIN" branch --list "feature/<n>-*" "bugfix/<n>-*"` and
    `git -C "$MAIN" worktree list --porcelain`.
 2. Enter its worktree (see "Worktrees" in REFERENCE.md). If it has no worktree, invoke
-   `workflow-branch` to add one. Do step 4 before you read a workflow file there.
+   `workflow-branch` to add one.
 3. Find where the run stopped from `git status`, `git log origin/main..HEAD` and
    `gh pr view --json number,state,url,reviewDecision,isDraft`. Having no PR is fine.
-4. If the worktree has no `.claude/skills/workflow-common/REFERENCE.md` or no
-   `.claude/skills/workflow-common/RELEASE.md` (its branch was made before the workflow skills
-   were in the repo under these names, or before REFERENCE.md was split), bring them in before
-   anything else:
+4. If the worktree has no `.claude/skills/workflow-common/REFERENCE.md` (its branch was made
+   before the workflow skills were in the repo under these names), bring them in before anything
+   else:
    - `git status --porcelain` must be empty. If not, stop and ask.
-   - Run `git fetch origin`; if it fails, stop and report. Then `git merge origin/main`. If the
-     merge stops on a conflict, run `git merge --abort`, then stop and report.
-   - Check that both files now exist. If not, stop and report.
+   - Run `git fetch origin`, then `git merge origin/main`. If the merge stops on a conflict, run
+     `git merge --abort`, then stop and report.
+   - Check that the file now exists. If not, stop and report.
+
+   A worktree that has REFERENCE.md but no `RELEASE.md` next to it was made before REFERENCE.md
+   was split. It needs no merge here: REFERENCE.md "Reading these files", rule 5, says where its
+   sections are.
 5. Say in one line where you resume, for example "Resuming #12 at Step 7: 2 commits, no PR yet."
    Then go on from that step. If the work touches the plugin and has no planning notes, stop and ask
    (REFERENCE.md "Planning mode").

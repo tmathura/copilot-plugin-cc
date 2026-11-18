@@ -16,14 +16,15 @@ in `.claude/skills/workflow-common/`:
 | `REVIEW-LOOP.md` | "Codex and Copilot review loop", "Background calls", "Code review round" | The start of `workflow-auto` (it finds the reviewers and runs `setup --json`); the blind plan; the plan review; `workflow-manual` Step 7; the PR review loop (the CodeRabbit wait, steps 4 and 5, the end rule); a release run ("Background calls") |
 | `PR-REVIEW-LOOP.md` | "PR review loop", "Bot reviewers" | `workflow-manual` Step 8b |
 | `RELEASE.md` | "Release run", "Publishing" | `workflow-manual` Step 4 of a release ticket (the `CHANGELOG.md` entry), Step 9 point 7 of a release, and Step 9 point 8 when a release run record exists; `workflow-auto` wherever it handles the release run records (its start, before each ticket, after each release run, after a summary, before the stop) and after each merge (step 9, the CI run) |
-| `BUG-TRIAGE.md` | "Bug triage" | A bug triage ticket: `workflow-manual` Step 1, the planning at the start of Step 4, and Steps 4, 5, 6, 7 and 8b; `workflow-commit` when bug notes are committed; a bug check that the after-compaction hook runs again |
+| `BUG-TRIAGE.md` | "Bug triage" | Before bug triage is offered or used: `workflow-manual` Step 1, the planning mode question for a bug issue that exists, and Steps 4, 5, 6, 7 and 8b of a bug triage ticket; `workflow-commit` when bug notes are committed; a bug check that the after-compaction hook runs again |
 
 1. **Read once.** Read this file and each file in the table only if this session has not read it
    since the last of these events: the session start; a summary of the conversation; a pull; a
    merge of `origin/main` (also while it is still staged); entering or leaving a worktree or
    another checkout; and, for one file, an edit of that file. After such an event the files count
    as not read. Read each one again, from the checkout you now work in, when the next step needs
-   it. Nothing is read at the moment of the event.
+   it. After a summary, the after-compaction hook (`.claude/settings.json`) says which files to
+   read again at once; after the other events, nothing is read at the moment of the event.
 2. **Pointers.** When the instruction you are carrying out points to a section in another of
    these files, read that file first, by rule 1. A pointer inside a case (a PR review loop round,
    a bug triage ticket, a release, an `--allow-empty` round commit) is followed only when that
@@ -32,9 +33,10 @@ in `.claude/skills/workflow-common/`:
 3. **Per-round reads.** A sentence that says to read a named section before each round, or before
    a step of a loop, is followed each time, also when rule 1 would skip the file.
 4. **Fresh readers.** A reviewer prompt or a spawned session reads the files it needs fresh.
-5. **A checkout from before the split.** If `.claude/skills/workflow-common/RELEASE.md` does not
-   exist in the checkout you work in, its branch was made before this file was split. Do
-   `workflow-manual` Resume, step 4, before you read anything there.
+5. **A checkout from before the split.** A worktree whose branch was made before this file was
+   split has no `RELEASE.md` next to its REFERENCE.md. Its REFERENCE.md then holds every section.
+   Where a step names one of the files in the table, read that section in the worktree's
+   REFERENCE.md. A merge of `origin/main` brings in the files (rule 1 then applies).
 
 ## Repo
 
@@ -158,7 +160,8 @@ the file test in "Is this ticket a release?" below.
 | Does not touch the plugin (docs outside it, tests only, tooling, CI, Spec Kit, the workflow) | Claude plan mode |
 
 - Decide from the issue text and the files the plan will change. If unclear, ask.
-- The rules of bug triage are in `BUG-TRIAGE.md`.
+- Before you offer or use bug triage, read `BUG-TRIAGE.md`. It also says when bug triage may be
+  used.
 - A plugin change never uses plan mode. For it, the planning-mode question chooses only between
   bug triage and the spec flow.
 - Give the issue its type label ("Tickets" in the repo's `docs/development.md`) before the branch is made.

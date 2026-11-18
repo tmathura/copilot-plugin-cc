@@ -1,8 +1,6 @@
 # workflow: Codex and Copilot review loop
 
-Moved out of `REFERENCE.md`; its "Reading these files" says when to read this file. Read at: the
-start of `workflow-auto`; the blind plan; the plan review; `workflow-manual` Step 7; the PR review
-loop (the CodeRabbit wait, steps 4 and 5, the end rule); a release run ("Background calls").
+Moved out of `REFERENCE.md`. Its "Reading these files" section says when to read this file.
 
 ## Codex and Copilot review loop
 
