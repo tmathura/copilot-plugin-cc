@@ -6,7 +6,7 @@ argument-hint: "[draft]"
 
 # workflow: pr
 
-First read the repo's `.claude/skills/workflow-common/REFERENCE.md`. Read it again after each summary of the conversation. Follow its "Commit and push rules".
+First read the repo's `.claude/skills/workflow-common/REFERENCE.md`, as its "Reading these files" says: once, and again after each summary of the conversation or change of checkout. Follow its "Commit and push rules".
 
 ## Checks
 

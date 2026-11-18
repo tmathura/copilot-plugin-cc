@@ -4,7 +4,7 @@
 // (nothing when there are none). Exit 1: an entry in another form (prints the commit and the line).
 // Exit 2: bad arguments (prints the usage line) or git failed (prints "git failed").
 //
-// Reads the same commits as REFERENCE.md "Code review round": the first-parent commits in
+// Reads the same commits as REVIEW-LOOP.md "Code review round": the first-parent commits in
 // origin/main..HEAD whose message matches `^\[#<n>\] Address review round [0-9]`.
 import { execFileSync } from "node:child_process";
 

@@ -6,7 +6,7 @@ argument-hint: "[imperative description] [-- commit body]"
 
 # workflow: commit
 
-First read the repo's `.claude/skills/workflow-common/REFERENCE.md`. Read it again after each summary of the conversation. Follow its "Commit and push rules".
+First read the repo's `.claude/skills/workflow-common/REFERENCE.md`, as its "Reading these files" says: once, and again after each summary of the conversation or change of checkout. Follow its "Commit and push rules".
 
 ## Input
 
@@ -14,9 +14,9 @@ First read the repo's `.claude/skills/workflow-common/REFERENCE.md`. Read it aga
 round, for example, passes its findings and their outcomes as the body.
 
 `--allow-empty` as the first word, before the description, marks a review round commit with no
-change (REFERENCE.md "Code review round"). Then `git status --porcelain` must print nothing: if
-any file is staged, changed or new, stop and report it. Skip step 3, and commit with
-`--allow-empty` in step 6.
+change (`REVIEW-LOOP.md` "Code review round"). Then `git status --porcelain` must print nothing: if
+any file is staged, changed or new, stop and report it. Skip steps 3 and 4, and commit with
+`--allow-empty` in step 7.
 
 ## Steps
 
@@ -30,15 +30,23 @@ any file is staged, changed or new, stop and report it. Skip step 3, and commit 
    - Otherwise ask: **Stage tracked changes with `git add -u` (Recommended)** / **Pick files** /
      **Stop**.
    - If there is nothing to commit at all, say so and stop.
-4. **Write the message.**
+4. **Check staged bug notes.** When `git diff --staged --name-only` lists a file under
+   `.specify/bugs/`, read `.claude/skills/workflow-common/BUG-TRIAGE.md`, and do the credential
+   check of its "Input" rule on the staged text, `git diff --staged -- .specify/bugs/` (the lines
+   that the commit would add). Stage nothing again unless the check finds a credential. If it
+   finds one in a file that also has changes that are not staged (`git diff --name-only -- <file>`
+   prints it), stop and report: staging the file again would add those changes to the commit.
+   Otherwise remove the credential from the file, stage that one file again
+   (`git add -- <file>`), and run this check once more.
+5. **Write the message.**
    - Subject: `[#<n>] <Imperative description>` (see "Naming" in REFERENCE.md). If no description was
      passed, write one from the staged diff.
    - Body: the text after `--`, wrapped at 72 characters. It is optional.
    - Trailer: from "Naming" in REFERENCE.md.
-5. **Ask only if you wrote the description yourself.** Show the message and ask: **Commit
+6. **Ask only if you wrote the description yourself.** Show the message and ask: **Commit
    (Recommended)** / **Edit the subject** / **Stop**. A description that was passed in needs no
    question.
-6. **Commit.** Write the message to `<scratchpad>/commit-msg.txt` with the file tool, not with a
+7. **Commit.** Write the message to `<scratchpad>/commit-msg.txt` with the file tool, not with a
    shell heredoc (a body line that is exactly the heredoc's end word would cut the message):
 
    ```text
@@ -52,6 +60,6 @@ any file is staged, changed or new, stop and report it. Skip step 3, and commit 
    Then run `git commit -F "<scratchpad>/commit-msg.txt"`, or with `--allow-empty`, run
    `git commit --allow-empty -F "<scratchpad>/commit-msg.txt"`.
 
-7. **Check** with `git status` and `git log -1 --oneline`. Report the hash and the subject.
+8. **Check** with `git status` and `git log -1 --oneline`. Report the hash and the subject.
 
 Do not push. `workflow-pr` pushes.
