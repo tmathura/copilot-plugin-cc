@@ -41,8 +41,8 @@ test("the after-compaction hook names the files to read again and the rule for c
     "Do this before you go on with the current step",
     "1. Read again .claude/skills/workflow-common/REFERENCE.md",
     "2. Read again the scratchpad files",
-    "the release run record ($WT_ROOT/release-run-X.Y.Z.md)",
-    "Run the check again only when no saved result exists."
+    "is not its output: run the check again.",
+    "For a release run step, the proof is its result in the release run record, not the summary"
   ]) {
     assert.ok(text.includes(part), `missing: ${part}`);
   }
