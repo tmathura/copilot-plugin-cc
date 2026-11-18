@@ -241,25 +241,24 @@ and a new page's snapshot is that commit, not `-wip`), do one of these:
 1. Run `spec-review-page` on the folder in a subagent: an Agent call with `model: sonnet`. A
    subagent started without `model` runs on the main session's model, and a skill's own `model:`
    line does not apply inside a subagent, so the Agent call names the model.
-   - Before the call, note `git rev-parse HEAD` and `git branch --show-current`.
-     `git status --porcelain` must print nothing: the page step runs after the last commit, and
-     step 2's `workflow-commit` would ask about any other changed file. If it prints anything,
-     stop and report it.
+   - Before the call, note `git rev-parse HEAD` and `git branch --show-current`. Below, "status"
+     is `git status --porcelain --untracked-files=all`. It must print nothing now: the page step
+     runs after the last commit, and step 2's `workflow-commit` would commit a staged file or ask
+     about other changed ones. If it prints anything, stop and report it.
    - The prompt gives the checkout's absolute path and the folder's path relative to it, and says
      to run every command from the checkout. It says: build the page with the `spec-review-page`
      skill (`.claude/skills/spec-review-page/SKILL.md`). Do not stage or commit. Report the
      build's exit code and its line `missing anchors: <n>`. Where the skill says to ask, stop and
      report the question.
    - Wait for the report. Check each report in this order:
-     - If HEAD or the branch changed, or `git status --porcelain` shows a file outside the
-       folder, do not retry. Stop and report what changed, so that the owner decides what happens
-       to it.
+     - If HEAD or the branch changed, or status shows a file outside the folder, do not retry.
+       Stop and report what changed, so that the owner decides what happens to it.
      - If the report holds a question from the skill, ask the owner that question, as the skill
        would. Send the answer to the subagent with `SendMessage`, and wait for its next report.
        An answer that stops the build makes it a failed build.
      - Otherwise the build passed only when the report gives exit code 0 and
        `missing anchors: 0` (the build prints the count before it writes the page), and
-       `git status --porcelain` shows `<folder>/review.html` changed or new, and no other file.
+       status shows `<folder>/review.html` as changed (` M`) or new (`??`), and no other file.
    - Any other result is a failed build. A failed build is a step skill that fails ("Questions to
      the user"), but ask only **Retry (Recommended)** / **Abort**. A skipped refresh would push a
      stale page, and the constitution asks for the page to be rebuilt in the same change.
