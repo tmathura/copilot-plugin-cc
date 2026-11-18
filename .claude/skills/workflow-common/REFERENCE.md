@@ -242,9 +242,10 @@ and a new page's snapshot is that commit, not `-wip`), do one of these:
    subagent started without `model` runs on the main session's model, and a skill's own `model:`
    line does not apply inside a subagent, so the Agent call names the model.
    - Before the call, note `git rev-parse HEAD` and `git branch --show-current`. Below, "status"
-     is `git status --porcelain --untracked-files=all`. It must print nothing now: the page step
-     runs after the last commit, and step 2's `workflow-commit` would commit a staged file or ask
-     about other changed ones. If it prints anything, stop and report it. Delete
+     is `git status --porcelain --untracked-files=all`, and `<folder>` is the folder's path
+     without the `/` at its end. Status must print nothing now: the page step runs after the last
+     commit, and step 2's `workflow-commit` would commit a staged file or ask about other changed
+     ones. If it prints anything, stop and report it. Delete
      `<scratchpad>/content.html` if it exists, so the build cannot use an earlier fragment.
    - The prompt gives the checkout's absolute path, the folder's path relative to it, and the
      session's scratchpad for the skill's `content.html`. It says to run every command from the
@@ -253,23 +254,25 @@ and a new page's snapshot is that commit, not `-wip`), do one of these:
      exit code and its line `missing anchors: <n>`. Where the skill says to ask, stop and report
      the question.
    - Wait for the report. Check each report in this order:
-     - If HEAD or the branch changed, or status shows a file outside the folder, do not retry.
-       Stop and report what changed, so that the owner decides what happens to it.
+     - If HEAD or the branch changed, or status lists any file but `<folder>/review.html`, do not
+       retry. Stop and report what changed, so that the owner decides what happens to it.
      - If the report holds a question from the skill, ask the owner that question, as the skill
        would. Send the answer to the subagent with `SendMessage`, and wait for its next report.
        An answer that stops the build makes it a failed build.
      - Otherwise the build passed only when the report gives exit code 0 and
        `missing anchors: 0` (the build prints the count before it writes the page), and
-       status lists `<folder>/review.html` and no other file, that file exists, and
-       `git diff --cached --quiet` succeeds (nothing is staged).
+       status lists `<folder>/review.html`, that file exists, and `git diff --cached --quiet`
+       succeeds (nothing is staged).
    - Any other result is a failed build. A failed build is a step skill that fails ("Questions to
      the user"), but ask only **Retry (Recommended)** / **Abort**. A skipped refresh would push a
      stale page, and the constitution asks for the page to be rebuilt in the same change.
-   - Before a retry, put the folder back as the noted HEAD has it:
-     `git restore --source=<HEAD> --staged --worktree -- <folder>`, then
-     `git clean -fd -- <folder>`. The new build then diffs from the same previous page. The
-     checkout was clean before the call, so this removes only what the subagent wrote. Then
-     start again at "Before the call".
+   - Before a retry, run the first check of the report again. Then put the page back as the noted
+     HEAD has it, and touch no other file. Run
+     `git ls-tree --name-only <HEAD> -- <folder>/review.html`. If it prints the path, run
+     `git restore --source=<HEAD> --staged --worktree -- <folder>/review.html`. If it prints
+     nothing, run `git rm --cached -f --ignore-unmatch -q -- <folder>/review.html` and delete the
+     file if it exists. If any of these commands fails, stop and report it. The new build then
+     diffs from the same previous page. Then start again at "Before the call".
 2. Commit the page on its own: `workflow-commit` with the description `Refresh the spec review page`
    and the file list `<folder>/review.html`. This rule is the request to commit that
    `spec-review-page` Step 5 waits for.
