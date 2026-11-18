@@ -241,26 +241,28 @@ and a new page's snapshot is that commit, not `-wip`), do one of these:
 1. Run `spec-review-page` on the folder in a subagent: an Agent call with `model: sonnet`. A
    subagent started without `model` runs on the main session's model, and a skill's own `model:`
    line does not apply inside a subagent, so the Agent call names the model.
-   - Before the call, note `git rev-parse HEAD`.
-   - The prompt gives the folder's absolute path in the current checkout. It says: build the page
-     with the `spec-review-page` skill (`.claude/skills/spec-review-page/SKILL.md`). Do not
-     commit. Report the build's exit code and its line `missing anchors: <n>`. Where the skill
-     says to ask, stop and report the question.
+   - Before the call, note `git rev-parse HEAD`. `git status --porcelain` must print nothing,
+     because the page step runs after the last commit. If it prints anything, stop and report it.
+   - The prompt gives the checkout's absolute path and the folder's path relative to it, and says
+     to run every command from the checkout. It says: build the page with the `spec-review-page`
+     skill (`.claude/skills/spec-review-page/SKILL.md`). Do not stage or commit. Report the
+     build's exit code and its line `missing anchors: <n>`. Where the skill says to ask, stop and
+     report the question.
    - Wait for the report. If it holds a question from the skill, ask the owner that question, as
-     the skill would.
+     the skill would. Send the answer to the subagent with `SendMessage`, and wait for its next
+     report. If the answer stops the build, skip step 2.
+   - If HEAD moved, do not retry. Stop and name the new commits, so that the owner decides what
+     happens to them.
    - Otherwise the build passed only when all of these are true: the report gives exit code 0 and
-     `missing anchors: 0` (the build prints the count before it writes the page); HEAD has not
-     moved; and `git status --porcelain -- <folder>` shows `review.html` changed or new, and no
-     other file.
+     `missing anchors: 0` (the build prints the count before it writes the page), and
+     `git status --porcelain` shows `<folder>/review.html` changed or new, and no other file.
    - Any other result is a failed build. A failed build is a step skill that fails ("Questions to
      the user"), but ask only **Retry (Recommended)** / **Abort**. A skipped refresh would push a
      stale page, and the constitution asks for the page to be rebuilt in the same change.
    - Before a retry, put the folder back as the noted HEAD has it:
-     `git restore --source=<HEAD> -- <folder>`, then `git clean -f -- <folder>`. The new build
-     then diffs from the same previous page. The folder was clean before the call, so this
-     removes only what the subagent wrote.
-   - If HEAD moved, do not retry. Stop and name the new commits, so that the owner decides what
-     happens to them.
+     `git restore --source=<HEAD> --staged --worktree -- <folder>`, then
+     `git clean -fd -- <folder>`. The new build then diffs from the same previous page. The
+     checkout was clean before the call, so this removes only what the subagent wrote.
 2. Commit the page on its own: `workflow-commit` with the description `Refresh the spec review page`
    and the file list `<folder>/review.html`. This rule is the request to commit that
    `spec-review-page` Step 5 waits for.
