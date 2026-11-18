@@ -245,8 +245,11 @@ and a new page's snapshot is that commit, not `-wip`), do one of these:
      is `git status --porcelain --untracked-files=all`, and `<folder>` is the folder's path
      without the `/` at its end. Status must print nothing now: the page step runs after the last
      commit, and step 2's `workflow-commit` would commit a staged file or ask about other changed
-     ones. If it prints anything, stop and report it. Delete
-     `<scratchpad>/content.html` if it exists, so the build cannot use an earlier fragment.
+     ones. If it prints anything, stop and report it. Also stop and report it when
+     `git check-ignore -q -- <folder>/review.html` exits with anything but 1 (1: not ignored). Exit
+     0 means git ignores the page: status would not show it, a retry would delete it, and step 2
+     could not stage it.
+     Delete `<scratchpad>/content.html` if it exists, so the build cannot use an earlier fragment.
    - The prompt gives the checkout's absolute path, the folder's path relative to it, and the
      session's scratchpad for the skill's `content.html`. It says to run every command from the
      checkout, and: build the page with the `spec-review-page` skill
