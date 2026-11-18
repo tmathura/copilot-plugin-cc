@@ -38,7 +38,11 @@ test("the after-compaction hook names the files to read again and the rule for c
     "<scratchpad>/workflow-auto-report.md",
     "If this session does not run workflow-auto, workflow-manual or a step skill that one of them calls, do nothing.",
     "only when you ran it after this compaction, or when the summary quotes its output",
-    "the release run record decides, not the summary"
+    "Do this before you go on with the current step",
+    "1. Read again .claude/skills/workflow-common/REFERENCE.md",
+    "2. Read again the scratchpad files",
+    "the release run record ($WT_ROOT/release-run-X.Y.Z.md)",
+    "Run the check again only when no saved result exists."
   ]) {
     assert.ok(text.includes(part), `missing: ${part}`);
   }
