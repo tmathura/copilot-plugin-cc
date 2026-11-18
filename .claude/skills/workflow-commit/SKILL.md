@@ -23,9 +23,9 @@ any file is staged, changed or new, stop and report it. Skip steps 3 and 4, and 
 1. **Check the branch.** If `git branch --show-current` is `main` or empty, stop. Take `<n>` from the
    branch name `<type>/<n>-<slug>`. If the name does not match, stop and report.
 2. **Look at the changes** with `git status` and `git diff --staged`.
-3. **Check bug notes.** When a file under `.specify/bugs/` is staged, changed or in the file list
-   that `workflow-manual` passed, read `.claude/skills/workflow-common/BUG-TRIAGE.md`. Then, before
-   you stage a file, check the bug folder as its "Input" rule says for a commit of the bug folder.
+3. **Check bug notes.** When a file under `.specify/bugs/` is staged, and before step 4 stages
+   one (also a new file), read `.claude/skills/workflow-common/BUG-TRIAGE.md` and check the bug
+   folder as its "Input" rule says for a commit of the bug folder.
 4. **If nothing is staged:**
    - When `workflow-manual` passed a file list, stage those files by name
      (`git add -- <files>`). Leave any other changed or untracked files alone, and ask whether they
