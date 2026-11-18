@@ -36,8 +36,7 @@ test("the after-compaction hook names the files to read again and the rule for c
     ".claude/skills/workflow-auto/SKILL.md",
     ".claude/skills/workflow-manual/SKILL.md",
     "<scratchpad>/workflow-auto-report.md",
-    "do nothing",
-    "a ticket that is under neither Done nor Not done. Otherwise do nothing.",
+    "If this session does not run workflow-auto, workflow-manual or a step skill that one of them calls, do nothing.",
     "only when you ran it after this compaction, or when the summary quotes its output",
     "the release run record decides, not the summary"
   ]) {
