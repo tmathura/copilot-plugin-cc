@@ -268,7 +268,8 @@ and a new page's snapshot is that commit, not `-wip`), do one of these:
    - Before a retry, put the folder back as the noted HEAD has it:
      `git restore --source=<HEAD> --staged --worktree -- <folder>`, then
      `git clean -fd -- <folder>`. The new build then diffs from the same previous page. The
-     checkout was clean before the call, so this removes only what the subagent wrote.
+     checkout was clean before the call, so this removes only what the subagent wrote. Then
+     start again at "Before the call".
 2. Commit the page on its own: `workflow-commit` with the description `Refresh the spec review page`
    and the file list `<folder>/review.html`. This rule is the request to commit that
    `spec-review-page` Step 5 waits for.
