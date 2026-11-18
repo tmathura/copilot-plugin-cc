@@ -51,6 +51,6 @@ docs/                             architecture, configuration, operations, conve
 - A `SessionStart` hook with the matcher `compact` runs after each summary. It prints the rules
   that tell a workflow session which files to read again, and when a check counts as run.
 
-The hook text is inline in the settings file. Do not move it to a script. A hook runs in the
-session's current folder, so after `EnterWorktree` a relative path can run a PR worktree's copy
-of the script.
+The hook text is inline in the settings file, not in a script. A hook runs in the session's
+current folder, so after `EnterWorktree` a relative path can run a PR worktree's copy of a
+script. `tests/shared-settings.test.mjs` checks the file.
