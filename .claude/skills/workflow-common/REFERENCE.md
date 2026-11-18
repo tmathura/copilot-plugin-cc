@@ -245,11 +245,12 @@ and a new page's snapshot is that commit, not `-wip`), do one of these:
      is `git status --porcelain --untracked-files=all`. It must print nothing now: the page step
      runs after the last commit, and step 2's `workflow-commit` would commit a staged file or ask
      about other changed ones. If it prints anything, stop and report it.
-   - The prompt gives the checkout's absolute path and the folder's path relative to it, and says
-     to run every command from the checkout. It says: build the page with the `spec-review-page`
-     skill (`.claude/skills/spec-review-page/SKILL.md`). Do not stage or commit. Report the
-     build's exit code and its line `missing anchors: <n>`. Where the skill says to ask, stop and
-     report the question.
+   - The prompt gives the checkout's absolute path, the folder's path relative to it, and the
+     session's scratchpad for the skill's `content.html`. It says to run every command from the
+     checkout, and: build the page with the `spec-review-page` skill
+     (`.claude/skills/spec-review-page/SKILL.md`). Do not stage or commit. Report the build's
+     exit code and its line `missing anchors: <n>`. Where the skill says to ask, stop and report
+     the question.
    - Wait for the report. Check each report in this order:
      - If HEAD or the branch changed, or status shows a file outside the folder, do not retry.
        Stop and report what changed, so that the owner decides what happens to it.
@@ -258,7 +259,7 @@ and a new page's snapshot is that commit, not `-wip`), do one of these:
        An answer that stops the build makes it a failed build.
      - Otherwise the build passed only when the report gives exit code 0 and
        `missing anchors: 0` (the build prints the count before it writes the page), and
-       status shows `<folder>/review.html` as changed (` M`) or new (`??`), and no other file.
+       status lists `<folder>/review.html` and no other file, and that file exists.
    - Any other result is a failed build. A failed build is a step skill that fails ("Questions to
      the user"), but ask only **Retry (Recommended)** / **Abort**. A skipped refresh would push a
      stale page, and the constitution asks for the page to be rebuilt in the same change.
