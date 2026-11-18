@@ -109,9 +109,8 @@ by hand). Show the comparison with the plan for approval.
 - **Spec Kit spec flow**: offer it only when REFERENCE.md "Spec Kit" allows it. Run the skills in
   the main checkout, as REFERENCE.md "Planning mode" says. The spec files stay untracked;
   `workflow-branch` moves them into the worktree.
-- **Spec Kit bug triage**: read `BUG-TRIAGE.md` before this step. Offer it for a bug, when "Bug
-  triage" there allows it. Check the
-  slug, then run `/speckit-bug-assess "<symptom>" slug=<slug>` in the main checkout. Write
+- **Spec Kit bug triage** (`BUG-TRIAGE.md`): offer it for a bug, when "Bug triage" there allows
+  it. Check the slug, then run `/speckit-bug-assess "<symptom>" slug=<slug>` in the main checkout. Write
   a Constitution Check at the end of `assessment.md`. The approved plan is `assessment.md` with that
   check.
   The notes stay untracked; `workflow-branch` moves them into the worktree.
