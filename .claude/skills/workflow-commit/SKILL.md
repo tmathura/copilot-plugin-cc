@@ -32,13 +32,13 @@ any file is staged, changed or new, stop and report it. Skip steps 3 and 4, and 
    - If there is nothing to commit at all, say so and stop.
 4. **Check staged bug notes.** When `git diff --staged --name-only` lists a file under
    `.specify/bugs/`, read `.claude/skills/workflow-common/BUG-TRIAGE.md` and do the check that its
-   "Input" rule asks for before each commit of the bug folder. In this step, check only the staged
-   files of the folder, and look at their staged text (`git diff --staged -- .specify/bugs/`),
-   because that is what the commit holds. When the check finds something in a file, first run
-   `git diff --name-only -- <file>`, before you edit the file. If it prints the file, the file has
-   changes that are not staged: stop and report, because staging it again would add those changes
-   to the commit. Otherwise remove what the check found, stage that one file again
-   (`git add -- <file>`), and check once more.
+   "Input" rule asks for before each commit of the bug folder. Check the folder as that rule
+   says, and also the staged text (`git diff --staged -- .specify/bugs/`), because that is what
+   the commit holds. When the check finds something in a file, change nothing yet. Stop and
+   report if the file is not staged, or if `git diff --name-only -- <file>` prints it (it has
+   changes that are not staged): staging it would add text to the commit that was left out.
+   Otherwise remove what the check found, stage that one file again (`git add -- <file>`), and
+   check once more.
 5. **Write the message.**
    - Subject: `[#<n>] <Imperative description>` (see "Naming" in REFERENCE.md). If no description was
      passed, write one from the staged diff.

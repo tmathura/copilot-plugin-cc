@@ -77,14 +77,13 @@ planning folder.
    `workflow-branch` to add one.
 3. Find where the run stopped from `git status`, `git log origin/main..HEAD` and
    `gh pr view --json number,state,url,reviewDecision,isDraft`. Having no PR is fine.
-4. If the worktree has no `.claude/skills/workflow-common/REFERENCE.md` or no
-   `.claude/skills/workflow-common/RELEASE.md` (its branch was made before the workflow skills
-   were in the repo under these names, or before REFERENCE.md was split), bring them in before
-   anything else, and before you read a workflow file there:
+4. If the worktree has no `.claude/skills/workflow-common/REFERENCE.md` (its branch was made
+   before the workflow skills were in the repo under these names), bring them in before anything
+   else:
    - `git status --porcelain` must be empty. If not, stop and ask.
    - Run `git fetch origin`, then `git merge origin/main`. If the merge stops on a conflict, run
      `git merge --abort`, then stop and report.
-   - Check that both files now exist. If not, stop and report.
+   - Check that the file now exists. If not, stop and report.
 5. Say in one line where you resume, for example "Resuming #12 at Step 7: 2 commits, no PR yet."
    Then go on from that step. If the work touches the plugin and has no planning notes, stop and ask
    (REFERENCE.md "Planning mode").
@@ -110,7 +109,8 @@ by hand). Show the comparison with the plan for approval.
 - **Spec Kit spec flow**: offer it only when REFERENCE.md "Spec Kit" allows it. Run the skills in
   the main checkout, as REFERENCE.md "Planning mode" says. The spec files stay untracked;
   `workflow-branch` moves them into the worktree.
-- **Spec Kit bug triage**: offer it for a bug, when `BUG-TRIAGE.md` "Bug triage" allows it. Check the
+- **Spec Kit bug triage**: read `BUG-TRIAGE.md` before this step. Offer it for a bug, when "Bug
+  triage" there allows it. Check the
   slug, then run `/speckit-bug-assess "<symptom>" slug=<slug>` in the main checkout. Write
   a Constitution Check at the end of `assessment.md`. The approved plan is `assessment.md` with that
   check.

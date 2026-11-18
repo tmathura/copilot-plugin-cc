@@ -33,9 +33,6 @@ in `.claude/skills/workflow-common/`:
 3. **Per-round reads.** A sentence that says to read a named section before each round, or before
    a step of a loop, is followed each time, also when rule 1 would skip the file.
 4. **Fresh readers.** A reviewer prompt or a spawned session reads the files it needs fresh.
-5. **A checkout from before the split.** A worktree whose branch was made before this file was
-   split has no `RELEASE.md` next to its REFERENCE.md. `workflow-manual` Resume, step 4, brings
-   such a worktree up to date before any other step (rule 1 then applies).
 
 ## Repo
 
