@@ -44,7 +44,10 @@ test("the after-compaction hook names the files to read again and the rule for c
     "For a step skill that workflow-manual called, that includes .claude/skills/workflow-manual/SKILL.md.",
     "2. Read again the scratchpad files",
     "is not its output: run the check again.",
-    "For a release run step, the proof is its result in the release run record, not the summary"
+    "For two steps, a report file is the proof, not the summary: read it again.",
+    "For /speckit-bug-test it is test.md in the folder that the \"Bug notes:\" line of the issue names: its result counts, and the test does not run again only because the summary restates the result.",
+    "The workflow rules still say when that test must run again after a code change: Step 5 of workflow-manual, and \"Bug triage\" in REFERENCE.md after a later fix.",
+    "For a release run step it is the release run record: do not run a step again because of the summary, and go on from the record as \"Record\" under \"Release run\" in REFERENCE.md says."
   ]) {
     assert.ok(text.includes(part), `missing: ${part}`);
   }
